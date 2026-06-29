@@ -1,7 +1,7 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T07:59:30Z",
+    "last_updated_at_utc":  "2026-06-29T08:15:18Z",
     "current_stage":  "6.2",
     "current_substep":  "final-delivery-complete",
     "completed_stages":  [
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "complete",
-                        "description":  "下载版 PPTX 已改为 PowerPoint 原生可编辑版本：文字、卡片、流程块和表格均可编辑，不再使用整页截图。"
+                        "description":  "下载版 PPTX 已修复中文乱码：由 UTF-8 HTML 源文件重新生成 PowerPoint 原生可编辑文本、形状和表格，并显式设置中文字体。"
                     },
     "open_questions":  [
                            {
@@ -305,6 +305,11 @@
                                 "stage":  "6.2",
                                 "timestamp":  "2026-06-29T07:59:30Z",
                                 "summary":  "用户反馈 PPT 不能编辑；已覆盖生成可编辑 PPTX，使用 PowerPoint 原生文本框、形状和表格，不再使用整页图片。"
+                            },
+                            {
+                                "stage":  "6.2",
+                                "timestamp":  "2026-06-29T08:15:18Z",
+                                "summary":  "用户反馈可编辑 PPTX 中文显示为问号；已新增 UTF-8 HTML 到 OpenXML 的生成脚本，重新覆盖下载版 PPTX，并验证中文文本正常、无整页图片。"
                             }
                         ]
 }

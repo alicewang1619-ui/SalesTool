@@ -372,3 +372,10 @@ V1 收敛：第一版不是做完整客户增长中台，而是做询盘闭环 M
 - 用户反馈：当前输出的 PPT 不能编辑。
 - 执行结果：覆盖生成 output/ppt/ultrasound-sales-agent-report.pptx，内部改为 PowerPoint 原生文本框、卡片、表格和流程块。
 - 验证结果：PPTX 包结构正常，11 页 slide，ppt/media/ 为空，每页都有可编辑文本节点，HTTP 下载返回 200。
+
+## 06-29-2026 16:15 可编辑 PPTX 中文乱码修复
+
+- 用户反馈：下载版 PPTX 打开后中文显示为问号，页面没有正常内容。
+- 根因修复：新增 output/ppt/generate_editable_pptx.py，生成脚本不再通过 PowerShell 管道写入中文常量，而是从 UTF-8 HTML 源文件读取中文后写入 OpenXML。
+- 执行结果：重新覆盖 output/ppt/ultrasound-sales-agent-report.pptx，仍保持 PowerPoint 原生文本框、表格和形状可编辑，并显式设置 Microsoft YaHei 中文字体。
+- 验证结果：PPTX 包结构正常，11 页 slide，ppt/media/ 为空；XML 文本包含“智能销售接待”，不包含连续问号串；HTTP 下载返回 200。

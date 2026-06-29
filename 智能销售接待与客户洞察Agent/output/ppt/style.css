@@ -158,6 +158,14 @@ p { font-size: 25px; line-height: 1.42; color: var(--muted); }
   font-size: 18px;
 }
 .nav a { color: var(--accent-2); text-decoration: none; }
+.nav .download {
+  color: var(--panel);
+  background: var(--accent-2);
+  border: 1px solid var(--accent-2);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-weight: 700;
+}
 
 .bars { display: grid; gap: 14px; margin-top: 20px; }
 .bar { background: #e7edf4; border-radius: 999px; overflow: hidden; height: 30px; }

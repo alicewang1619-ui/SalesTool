@@ -346,3 +346,9 @@ V1 收敛：第一版不是做完整客户增长中台，而是做询盘闭环 M
 - 用户指令：继续。
 - 执行结果：延续已确认的原 V1 范围，第一版不接 Facebook/LinkedIn；完成 PRD 详细版、老板版、开发版、PPT 大纲与 10 页 HTML 幻灯片交付。
 - 状态同步：state.json 更新为 6.2 final-delivery-complete，下一步建议进入 design master。
+
+## 06-29-2026 15:13 可下载 PPTX
+
+- 用户指令：变成可以下载的PPT。
+- 执行结果：生成 output/ppt/ultrasound-sales-agent-report.pptx，并在 p01.html 到 p10.html 的导航中加入“下载 PPT”入口。
+- 实现方式：逐页截图 HTML 汇报页，打包为 16:9 PowerPoint 文件，尽量保持浏览器版视觉一致。

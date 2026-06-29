@@ -41,3 +41,9 @@
 ## p10 本次训练营要做的阶段
 
 本次落地做阶段一 MVP：官网聊天/官网后台/邮箱/展会名片进入统一线索池，AI 接待引导，画像评分，国家分发，销售轻反馈，基础报表。
+
+## 下载版 PPT
+
+- PowerPoint 文件：`output/ppt/ultrasound-sales-agent-report.pptx`
+- HTML 汇报页：`output/ppt/p01.html` 到 `output/ppt/p10.html` 均已加入“下载 PPT”入口。
+- 生成方式：以 HTML 汇报页为视觉母版，逐页渲染为图片后打包为 16:9 PPTX，确保下载版与浏览器版视觉一致。

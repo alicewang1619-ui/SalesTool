@@ -1,7 +1,7 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T06:58:56Z",
+    "last_updated_at_utc":  "2026-06-29T07:14:32Z",
     "current_stage":  "6.2",
     "current_substep":  "final-delivery-complete",
     "completed_stages":  [
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "complete",
-                        "description":  "PRD、老板版、开发版与方案 PPT HTML 已交付完成。下一步可进入 design master，把 PRD 落成页面、设计系统和技术方案。"
+                        "description":  "可下载 PPTX 已生成，HTML 汇报页已加入“下载 PPT”入口。下一步可进入 design master，或继续优化 PPT 内容/视觉。"
                     },
     "open_questions":  [
                            {
@@ -116,7 +116,8 @@
                                           "output/ppt/p08.html",
                                           "output/ppt/p09.html",
                                           "output/ppt/p10.html"
-                                      ]
+                                      ],
+                         "pptx":  "output/ppt/ultrasound-sales-agent-report.pptx"
                      },
     "user_inputs_log":  [
                             {
@@ -283,6 +284,11 @@
                                 "stage":  "6.2",
                                 "timestamp":  "2026-06-29T06:58:56Z",
                                 "summary":  "PRD master 终交付完成：生成 PRD详细版、PRD-summary、PRD-dev、ppt.md 与 10 页 HTML 方案 PPT。"
+                            },
+                            {
+                                "stage":  "6.2",
+                                "timestamp":  "2026-06-29T07:14:32Z",
+                                "summary":  "用户要求把 HTML 汇报 PPT 变成可下载 PPT；已生成 output/ppt/ultrasound-sales-agent-report.pptx，并在 10 页 HTML 中加入下载入口。"
                             }
                         ]
 }

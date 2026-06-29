@@ -1,9 +1,9 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T09:25:39Z",
+    "last_updated_at_utc":  "2026-06-29T10:05:15Z",
     "current_stage":  "design-I",
-    "current_substep":  "socratic-round-3-role-permission",
+    "current_substep":  "socratic-round-4-feature-page-split",
     "completed_stages":  [
                              "0",
                              "1.1",
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "user_decision",
-                        "description":  "等待用户确认 design master 第三轮：角色权限与账号体系是否按管理员、营销/运营、销售三层推进。"
+                        "description":  "等待用户确认 design master 第四轮：核心功能页面拆解是否按线索闭环优先的页面组推进。"
                     },
     "open_questions":  [
                            {
@@ -48,7 +48,7 @@
                            },
                            {
                                "id":  "OQ-4",
-                               "title":  "销售反馈的最终交互方式尚未确认：微信/邮件通知、反馈卡片、邮件回复解析或企业微信集成",
+                               "title":  "销售反馈通知入口尚未确认：通过微信或邮件发送手机反馈卡片链接，以及链接有效期细节",
                                "category":  "operations",
                                "priority":  "P0"
                            },
@@ -65,9 +65,9 @@
                                "priority":  "P1"
                            },
                            {
-                               "id":  "OQ-9",
-                               "title":  "设计阶段角色权限待确认：管理员、营销/运营、销售三类角色的能力边界与账号体系",
-                               "category":  "permissions",
+                               "id":  "OQ-10",
+                               "title":  "设计阶段核心功能页面拆解待确认：线索池、AI 接待、客户画像、分发、反馈、报表、客户池、再营销和系统配置如何落页",
+                               "category":  "design",
                                "priority":  "P0"
                            }
                        ],
@@ -101,6 +101,12 @@
                                    "decision":  "PC 后台信息架构确认为左侧导航 + 首页工作台 + 6 个主分区。",
                                    "stage":  "design-I",
                                    "rationale":  "PRD 的 MVP 闭环包含线索池、轻量销售反馈、报表、客户池、再营销与配置项；用户在推荐后回复“继续”。"
+                               },
+                               {
+                                   "id":  "D-6",
+                                   "decision":  "角色权限确认为管理员、营销/运营、销售三层；销售只使用手机反馈卡片。",
+                                   "stage":  "design-I",
+                                   "rationale":  "PRD 明确营销负责人看全局、管理员维护规则、销售反馈卡片必须手机可用；用户强调销售不能被复杂反馈拖累，并在推荐后回复“继续”。"
                                }
                            ],
     "category":  "saas",
@@ -363,6 +369,11 @@
                                 "stage":  "design-I",
                                 "timestamp":  "2026-06-29T09:25:39Z",
                                 "summary":  "用户回复“继续”，确认 PC 后台采用左侧导航、首页工作台和 6 个主分区：工作台、线索池、客户池、报表中心、再营销待办、系统配置。"
+                            },
+                            {
+                                "stage":  "design-I",
+                                "timestamp":  "2026-06-29T10:05:15Z",
+                                "summary":  "用户回复“继续”，确认角色按管理员、营销/运营、销售三层设计；销售只通过手机反馈卡片处理分配给自己的线索。"
                             }
                         ]
 }

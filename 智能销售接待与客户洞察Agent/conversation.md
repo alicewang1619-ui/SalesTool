@@ -352,3 +352,10 @@ V1 收敛：第一版不是做完整客户增长中台，而是做询盘闭环 M
 - 用户指令：变成可以下载的PPT。
 - 执行结果：生成 output/ppt/ultrasound-sales-agent-report.pptx，并在 p01.html 到 p10.html 的导航中加入“下载 PPT”入口。
 - 实现方式：逐页截图 HTML 汇报页，打包为 16:9 PowerPoint 文件，尽量保持浏览器版视觉一致。
+
+## 06-29-2026 15:23 高清 PPTX 修复
+
+- 用户反馈：PPT 中图片不清晰，且变形。
+- 根因修复：旧版截图实际为 JPEG 内容但按 PNG 类型写入 PPTX 包，且未强制固定高清 16:9 渲染尺寸。
+- 执行结果：用 1920x1080 固定视口重新渲染 10 张高清 JPEG，按 image/jpeg 正确写入 output/ppt/ultrasound-sales-agent-report.pptx。
+- 验证结果：PPTX 包结构正常，10 个 slide、10 张 jpg、0 张 png，HTTP 下载返回 200。

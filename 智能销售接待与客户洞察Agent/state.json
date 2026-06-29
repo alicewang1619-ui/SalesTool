@@ -1,7 +1,7 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T07:14:32Z",
+    "last_updated_at_utc":  "2026-06-29T07:24:22Z",
     "current_stage":  "6.2",
     "current_substep":  "final-delivery-complete",
     "completed_stages":  [
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "complete",
-                        "description":  "可下载 PPTX 已生成，HTML 汇报页已加入“下载 PPT”入口。下一步可进入 design master，或继续优化 PPT 内容/视觉。"
+                        "description":  "可下载 PPTX 已重新生成为 1920x1080 高清 JPEG 版，已修正图片类型与 16:9 比例。"
                     },
     "open_questions":  [
                            {
@@ -289,6 +289,11 @@
                                 "stage":  "6.2",
                                 "timestamp":  "2026-06-29T07:14:32Z",
                                 "summary":  "用户要求把 HTML 汇报 PPT 变成可下载 PPT；已生成 output/ppt/ultrasound-sales-agent-report.pptx，并在 10 页 HTML 中加入下载入口。"
+                            },
+                            {
+                                "stage":  "6.2",
+                                "timestamp":  "2026-06-29T07:24:22Z",
+                                "summary":  "用户反馈 PPT 图片不清晰且变形；已用固定 1920x1080 视口重新渲染 10 张高清 JPEG，并重新打包 output/ppt/ultrasound-sales-agent-report.pptx。"
                             }
                         ]
 }

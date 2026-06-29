@@ -46,4 +46,4 @@
 
 - PowerPoint 文件：`output/ppt/ultrasound-sales-agent-report.pptx`
 - HTML 汇报页：`output/ppt/p01.html` 到 `output/ppt/p10.html` 均已加入“下载 PPT”入口。
-- 生成方式：以 HTML 汇报页为视觉母版，逐页渲染为图片后打包为 16:9 PPTX，确保下载版与浏览器版视觉一致。
+- 生成方式：以 HTML 汇报页为视觉母版，在固定 1920×1080 画布逐页渲染为高清 JPEG 后打包为 16:9 PPTX，确保下载版与浏览器版比例一致、不拉伸。

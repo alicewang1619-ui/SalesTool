@@ -379,3 +379,10 @@ V1 收敛：第一版不是做完整客户增长中台，而是做询盘闭环 M
 - 根因修复：新增 output/ppt/generate_editable_pptx.py，生成脚本不再通过 PowerShell 管道写入中文常量，而是从 UTF-8 HTML 源文件读取中文后写入 OpenXML。
 - 执行结果：重新覆盖 output/ppt/ultrasound-sales-agent-report.pptx，仍保持 PowerPoint 原生文本框、表格和形状可编辑，并显式设置 Microsoft YaHei 中文字体。
 - 验证结果：PPTX 包结构正常，11 页 slide，ppt/media/ 为空；XML 文本包含“智能销售接待”，不包含连续问号串；HTTP 下载返回 200。
+
+## 06-29-2026 16:48 PPT 视觉美化
+
+- 用户需求：PPT 可以美化，加入合适图片和背景。
+- 执行结果：生成并接入 3 张 16:9 视觉资产，分别用于首页医疗超声增长、询盘汇聚痛点、AI 架构/路由技术场景；HTML 预览页通过 `data-visual` 和统一 CSS 背景层加载图片。
+- 下载版：更新 output/ppt/generate_editable_pptx.py，让 PPTX 同步嵌入图片背景到 `ppt/media/`，正文仍是 PowerPoint 原生可编辑文本、表格和形状。
+- 验证结果：PPTX 包结构正常，11 页 slide，3 张媒体图片，11 页均有图片背景和可编辑文本；中文标题正常，无连续问号串；HTTP 下载返回 200；已用 Chrome 截图检查 p01、p03、p09 预览无遮挡。

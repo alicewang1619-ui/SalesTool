@@ -9,6 +9,7 @@ from xml.sax.saxutils import escape as xml_escape
 
 PPT_DIR = Path(__file__).resolve().parent
 PPTX_PATH = PPT_DIR / "ultrasound-sales-agent-report.pptx"
+ASSET_DIR = PPT_DIR / "assets"
 EMU_PER_INCH = 914400
 SLIDE_W = int(13.333333 * EMU_PER_INCH)
 SLIDE_H = int(7.5 * EMU_PER_INCH)
@@ -23,6 +24,11 @@ ACCENT_2 = "224E7A"
 WARN = "B45F2A"
 GOOD = "2F7D5B"
 FONT = "Microsoft YaHei"
+VISUAL_FILES = {
+    "hero": "hero-ultrasound-growth.png",
+    "inquiry": "inquiry-funnel.png",
+    "architecture": "agent-architecture.png",
+}
 
 
 def emu(value: float) -> int:
@@ -103,14 +109,16 @@ def parse_slide(path: Path) -> dict:
         "paragraphs": all_clean(r"<p[^>]*>(.*?)</p>", source_no_nav),
         "bars_note": first(r'<div class="bars">.*?<p class="small">(.*?)</p>.*?</div>', source_no_nav),
         "has_split": 'class="split"' in source_no_nav,
+        "visual": first(r'<main class="stage" data-visual="([^"]+)"', source),
         "page": int(re.search(r"p(\d+)\.html$", path.name).group(1)),
     }
 
 
 class SlideBuilder:
-    def __init__(self) -> None:
+    def __init__(self, image_rel: str | None = None) -> None:
         self.next_id = 2
         self.parts: list[str] = []
+        self.image_rel = image_rel
 
     def ident(self) -> int:
         value = self.next_id
@@ -127,9 +135,14 @@ class SlideBuilder:
         fill: str = PANEL,
         line: str | None = LINE,
         rounded: bool = False,
+        alpha: int | None = None,
     ) -> None:
         shape_id = self.ident()
-        fill_xml = f'<a:solidFill><a:srgbClr val="{fill}"/></a:solidFill>' if fill else "<a:noFill/>"
+        if fill:
+            alpha_xml = f'<a:alpha val="{alpha}"/>' if alpha is not None else ""
+            fill_xml = f'<a:solidFill><a:srgbClr val="{fill}">{alpha_xml}</a:srgbClr></a:solidFill>'
+        else:
+            fill_xml = "<a:noFill/>"
         line_xml = (
             f'<a:ln w="9525"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln>'
             if line
@@ -142,6 +155,18 @@ class SlideBuilder:
             f'<a:xfrm><a:off x="{emu(x)}" y="{emu(y)}"/><a:ext cx="{emu(w)}" cy="{emu(h)}"/></a:xfrm>'
             f'<a:prstGeom prst="{geom}"><a:avLst/></a:prstGeom>{fill_xml}{line_xml}'
             f"</p:spPr></p:sp>"
+        )
+
+    def picture(self, name: str, rel_id: str, x: float, y: float, w: float, h: float) -> None:
+        shape_id = self.ident()
+        self.parts.append(
+            f'<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/>'
+            f"<p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill>"
+            f'<a:blip r:embed="{rel_id}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'
+            f"<p:spPr>"
+            f'<a:xfrm><a:off x="{emu(x)}" y="{emu(y)}"/><a:ext cx="{emu(w)}" cy="{emu(h)}"/></a:xfrm>'
+            f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+            f"</p:spPr></p:pic>"
         )
 
     def text(
@@ -205,7 +230,12 @@ class SlideBuilder:
 
 
 def header(slide: SlideBuilder, data: dict, hero: bool = False) -> None:
-    slide.rect("Background", 0, 0, 13.333333, 7.5, BG, None)
+    if slide.image_rel:
+        slide.picture("Visual Background", slide.image_rel, 0, 0, 13.333333, 7.5)
+        slide.rect("Photo Wash", 0, 0, 13.333333, 7.5, BG, None, alpha=68000)
+        slide.rect("Content Wash", 0, 0, 7.65 if hero else 13.333333, 7.5, BG, None, alpha=88000 if hero else 76000)
+    else:
+        slide.rect("Background", 0, 0, 13.333333, 7.5, BG, None)
     slide.rect("Top Accent", 0, 0, 13.333333, 0.08, ACCENT, None)
     slide.text("Slide Number", data["slide_no"], 11.5, 0.22, 1.0, 0.3, 11, MUTED, align="r")
     slide.text("Eyebrow", data["eyebrow"], 0.72, 0.40, 5.4, 0.35, 13, ACCENT, bold=True)
@@ -339,7 +369,8 @@ def add_phases(slide: SlideBuilder, data: dict) -> None:
 
 
 def render_slide(data: dict) -> str:
-    slide = SlideBuilder()
+    image_rel = "rId2" if data.get("visual") in VISUAL_FILES else None
+    slide = SlideBuilder(image_rel=image_rel)
     is_hero = data["page"] == 1
     header(slide, data, hero=is_hero)
     if is_hero:
@@ -366,23 +397,64 @@ def slide_key(path: Path) -> int:
     return int(re.search(r"p(\d+)\.html$", path.name).group(1))
 
 
+def slide_rels(visual: str) -> bytes:
+    image_rel = ""
+    if visual in VISUAL_FILES:
+        image_rel = (
+            f'<Relationship Id="rId2" '
+            f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
+            f'Target="../media/{VISUAL_FILES[visual]}"/>'
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" '
+        'Target="../slideLayouts/slideLayout1.xml"/>'
+        f"{image_rel}</Relationships>"
+    )
+    return xml.encode("utf-8")
+
+
+def content_types_xml(existing: bytes) -> bytes:
+    text = existing.decode("utf-8")
+    if 'Extension="png"' not in text:
+        text = text.replace(
+            '<Default Extension="xml" ContentType="application/xml"/>',
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Default Extension="png" ContentType="image/png"/>',
+        )
+    return text.encode("utf-8")
+
+
 def regenerate() -> None:
     html_files = sorted(PPT_DIR.glob("p*.html"), key=slide_key)
     if not html_files:
         raise SystemExit("No html slides found.")
     if not PPTX_PATH.exists():
         raise SystemExit("PPTX template is missing.")
-    slide_xml = [render_slide(parse_slide(path)).encode("utf-8") for path in html_files]
+    slides = [parse_slide(path) for path in html_files]
+    slide_xml = [render_slide(data).encode("utf-8") for data in slides]
     tmp_path = PPTX_PATH.with_suffix(".tmp.pptx")
     slide_pattern = re.compile(r"ppt/slides/slide\d+\.xml$")
+    slide_rel_pattern = re.compile(r"ppt/slides/_rels/slide\d+\.xml\.rels$")
     media_pattern = re.compile(r"ppt/media/")
     with zipfile.ZipFile(PPTX_PATH, "r") as src, zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as dst:
         for item in src.infolist():
-            if slide_pattern.fullmatch(item.filename) or media_pattern.match(item.filename):
+            if item.filename == "[Content_Types].xml":
+                dst.writestr(item, content_types_xml(src.read(item.filename)))
+                continue
+            if slide_pattern.fullmatch(item.filename) or slide_rel_pattern.fullmatch(item.filename) or media_pattern.match(item.filename):
                 continue
             dst.writestr(item, src.read(item.filename))
         for idx, xml in enumerate(slide_xml, start=1):
             dst.writestr(f"ppt/slides/slide{idx}.xml", xml)
+            dst.writestr(f"ppt/slides/_rels/slide{idx}.xml.rels", slide_rels(slides[idx - 1].get("visual", "")))
+        for file_name in sorted({VISUAL_FILES[data["visual"]] for data in slides if data.get("visual") in VISUAL_FILES}):
+            asset_path = ASSET_DIR / file_name
+            if not asset_path.exists():
+                raise SystemExit(f"Missing visual asset: {asset_path}")
+            dst.writestr(f"ppt/media/{file_name}", asset_path.read_bytes())
     tmp_path.replace(PPTX_PATH)
 
 

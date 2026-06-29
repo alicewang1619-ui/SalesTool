@@ -52,3 +52,4 @@
 - HTML 汇报页：`output/ppt/p01.html` 到 `output/ppt/p11.html` 均已加入“下载 PPT”入口。
 - 生成方式：可下载 PPTX 使用 PowerPoint 原生文本框、表格和形状生成；文字、卡片、流程块、表格均可在 PowerPoint 中直接编辑，不再使用整页截图作为主体。
 - 编码保障：可编辑 PPTX 由 `output/ppt/generate_editable_pptx.py` 从 UTF-8 HTML 源文件读取中文内容后写入 OpenXML，并显式设置中文字体，避免 PowerShell 管道编码把中文替换为问号。
+- 视觉增强：HTML 汇报页和下载版 PPTX 已加入 3 张 AI 生成的 16:9 视觉资产，分别对应医疗超声增长场景、询盘汇聚场景和 AI 架构路由场景；资产位于 `output/ppt/assets/`，图片无文字、无 Logo、无水印。

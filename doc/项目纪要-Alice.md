@@ -4,7 +4,7 @@
 - 约束：第一版按用户确认的原 V1 执行，暂不接 Facebook / LinkedIn 官方 API 或个人后台，不做未授权抓取；再营销内容由 AI 起草、人工确认后发送；指标不统计成交金额和报价金额。
 
 ## 当前状态
-- ✅ 已完成：已安装全局提示词、PRD master、design master；已完成 PRD 深挖、价值论证、竞品调研、V1 方案、MVP 边界确认；已生成并交付 PRD 详细版、老板版、开发版、PPT 大纲、11 页 HTML 方案 PPT 和可下载 PPTX；已修复可编辑 PPTX 中文乱码；`state.json` 已更新到 6.2 交付完成。
+- ✅ 已完成：已安装全局提示词、PRD master、design master；已完成 PRD 深挖、价值论证、竞品调研、V1 方案、MVP 边界确认；已生成并交付 PRD 详细版、老板版、开发版、PPT 大纲、11 页 HTML 方案 PPT 和可下载 PPTX；已修复可编辑 PPTX 中文乱码；已完成 PPT 图片背景美化；`state.json` 已更新到 6.2 交付完成。
 - ▶️ 进行中：等待用户确认是否进入设计阶段。
 - ⏸️ 待办：可进入 design master，把 PRD 落成页面、设计系统和技术方案。
 - ❓ 待确认：是否在 PRD 完成后立即进入设计阶段。
@@ -27,6 +27,9 @@
 - [06-29-2026 16:03:36] 修复可编辑 PPTX 中文乱码｜背景：用户截图反馈当前可编辑 PPTX 中中文全部显示为问号，没有正常内容。｜结论：重新生成可编辑 PPTX，生成脚本不得把中文直接写在 PowerShell 管道中，而应从 UTF-8 的 HTML/PPT 源文件读取中文内容后写入 PPTX，避免编码被替换为 `?`。｜来源：用户
 - [06-29-2026 16:15:18] 可编辑 PPTX 编码修复验证｜背景：修复乱码后需要确认下载版 PPTX 不再出现问号且仍然可编辑。｜结论：新增 `output/ppt/generate_editable_pptx.py`，从 UTF-8 HTML 源读取中文并写入 OpenXML；重新生成 PPTX 后验证 11 页均有文本节点、`ppt/media/` 为空、包含“智能销售接待”、不包含连续问号串，下载地址返回 200。｜来源：AI
 - [06-29-2026 16:16:48] Python 缓存处理｜背景：运行 PPTX 生成脚本的编译校验后出现 `__pycache__/` 缓存目录。｜结论：不删除工作区文件，新增 `.gitignore` 忽略 Python 缓存目录，保持 Git 状态干净。｜来源：AI
+- [06-29-2026 16:22:13] PPT 视觉美化｜背景：用户希望当前方案 PPT 更好看，不只是可编辑文字版。｜结论：对 HTML 汇报页和下载版 PPTX 做视觉美化，加入合适的图片和背景，同时保留 PPT 可编辑文字、中文正常和下载能力。｜来源：用户
+- [06-29-2026 16:36:39] PPT 视觉资产策略｜背景：PPT 需要加入合适图片和背景，但仍要适合 ultrasound 海外销售增长方案汇报。｜结论：使用 AI 生成的 3 张无文字、无 Logo、16:9 宽幅视觉资产，分别承载首页医疗超声增长、询盘汇聚痛点、技术路由架构三类场景；所有正文仍保留为可编辑 PowerPoint 文本。｜来源：AI
+- [06-29-2026 16:48:04] PPT 视觉美化验证｜背景：图片背景已接入 HTML 和 PPTX，需要确认没有遮挡正文且下载版仍可编辑。｜结论：HTML 预览页已通过 Chrome 截图检查 p01、p03、p09；PPTX 包内包含 11 页 slide、3 张媒体图片、每页 1 张背景图、文本节点正常、包含“智能销售接待”、不含连续问号串，下载地址返回 200。｜来源：AI
 
 ## 待解决问题
 
@@ -43,6 +46,10 @@
 - `智能销售接待与客户洞察Agent/output/PRD-dev.md`
 - `智能销售接待与客户洞察Agent/output/ppt.md`
 - `智能销售接待与客户洞察Agent/output/ppt/p01.html`
+- `智能销售接待与客户洞察Agent/output/ppt/style.css`
+- `智能销售接待与客户洞察Agent/output/ppt/assets/hero-ultrasound-growth.png`
+- `智能销售接待与客户洞察Agent/output/ppt/assets/inquiry-funnel.png`
+- `智能销售接待与客户洞察Agent/output/ppt/assets/agent-architecture.png`
 - `智能销售接待与客户洞察Agent/output/ppt/p09.html`
 - `智能销售接待与客户洞察Agent/output/ppt/p11.html`
 - `智能销售接待与客户洞察Agent/output/ppt/generate_editable_pptx.py`

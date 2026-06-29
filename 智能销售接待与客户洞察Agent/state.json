@@ -1,7 +1,7 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T08:15:18Z",
+    "last_updated_at_utc":  "2026-06-29T08:48:04Z",
     "current_stage":  "6.2",
     "current_substep":  "final-delivery-complete",
     "completed_stages":  [
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "complete",
-                        "description":  "下载版 PPTX 已修复中文乱码：由 UTF-8 HTML 源文件重新生成 PowerPoint 原生可编辑文本、形状和表格，并显式设置中文字体。"
+                        "description":  "方案 PPT 已完成视觉美化：HTML 预览页和可下载 PPTX 均加入医疗超声、询盘汇聚、AI 架构三类图片背景，且 PPTX 仍保留可编辑文字、表格和形状。"
                     },
     "open_questions":  [
                            {
@@ -118,6 +118,11 @@
                                           "output/ppt/p10.html",
                                           "output/ppt/p11.html"
                                       ],
+                         "ppt_assets":  [
+                                            "output/ppt/assets/hero-ultrasound-growth.png",
+                                            "output/ppt/assets/inquiry-funnel.png",
+                                            "output/ppt/assets/agent-architecture.png"
+                                        ],
                          "pptx":  "output/ppt/ultrasound-sales-agent-report.pptx"
                      },
     "user_inputs_log":  [
@@ -310,6 +315,11 @@
                                 "stage":  "6.2",
                                 "timestamp":  "2026-06-29T08:15:18Z",
                                 "summary":  "用户反馈可编辑 PPTX 中文显示为问号；已新增 UTF-8 HTML 到 OpenXML 的生成脚本，重新覆盖下载版 PPTX，并验证中文文本正常、无整页图片。"
+                            },
+                            {
+                                "stage":  "6.2",
+                                "timestamp":  "2026-06-29T08:48:04Z",
+                                "summary":  "用户要求 PPT 美化并加入合适图片和背景；已生成 3 张无文字、无 Logo 的 16:9 视觉资产，接入 HTML 预览页和可下载 PPTX，并验证图片背景、中文文本和可编辑结构正常。"
                             }
                         ]
 }

@@ -1,9 +1,9 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T10:05:15Z",
+    "last_updated_at_utc":  "2026-06-29T10:24:12Z",
     "current_stage":  "design-I",
-    "current_substep":  "socratic-round-4-feature-page-split",
+    "current_substep":  "socratic-round-5-common-interaction",
     "completed_stages":  [
                              "0",
                              "1.1",
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "user_decision",
-                        "description":  "等待用户确认 design master 第四轮：核心功能页面拆解是否按线索闭环优先的页面组推进。"
+                        "description":  "等待用户确认 design master 第五轮：通用交互范式是否按表格分页、右侧抽屉、自动草稿、Toast/弹窗确认推进。"
                     },
     "open_questions":  [
                            {
@@ -65,9 +65,9 @@
                                "priority":  "P1"
                            },
                            {
-                               "id":  "OQ-10",
-                               "title":  "设计阶段核心功能页面拆解待确认：线索池、AI 接待、客户画像、分发、反馈、报表、客户池、再营销和系统配置如何落页",
-                               "category":  "design",
+                               "id":  "OQ-11",
+                               "title":  "设计阶段通用交互范式待确认：列表、表单、反馈、批量操作、导出和移动端反馈卡片如何统一",
+                               "category":  "interaction",
                                "priority":  "P0"
                            }
                        ],
@@ -107,6 +107,12 @@
                                    "decision":  "角色权限确认为管理员、营销/运营、销售三层；销售只使用手机反馈卡片。",
                                    "stage":  "design-I",
                                    "rationale":  "PRD 明确营销负责人看全局、管理员维护规则、销售反馈卡片必须手机可用；用户强调销售不能被复杂反馈拖累，并在推荐后回复“继续”。"
+                               },
+                               {
+                                   "id":  "D-7",
+                                   "decision":  "核心功能页面拆解确认为线索闭环优先的页面组。",
+                                   "stage":  "design-I",
+                                   "rationale":  "PRD 的 MVP 完成定义是跑通询盘进入、AI 问清、销售收到、销售反馈、管理者看报表；用户在推荐后回复“继续”。"
                                }
                            ],
     "category":  "saas",
@@ -374,6 +380,11 @@
                                 "stage":  "design-I",
                                 "timestamp":  "2026-06-29T10:05:15Z",
                                 "summary":  "用户回复“继续”，确认角色按管理员、营销/运营、销售三层设计；销售只通过手机反馈卡片处理分配给自己的线索。"
+                            },
+                            {
+                                "stage":  "design-I",
+                                "timestamp":  "2026-06-29T10:24:12Z",
+                                "summary":  "用户回复“继续”，确认第一版按线索闭环优先拆页面，覆盖工作台、线索池、线索详情、渠道导入、手机销售反馈卡片、客户池、报表中心、再营销待办和系统配置。"
                             }
                         ]
 }

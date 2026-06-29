@@ -1,9 +1,9 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T09:01:02Z",
+    "last_updated_at_utc":  "2026-06-29T09:15:19Z",
     "current_stage":  "design-I",
-    "current_substep":  "socratic-round-1-device-scope",
+    "current_substep":  "socratic-round-2-information-architecture",
     "completed_stages":  [
                              "0",
                              "1.1",
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "user_decision",
-                        "description":  "等待用户确认 design master 第一轮关键骨架：第一版是否按 PC 管理后台 + 手机销售反馈卡片继续。"
+                        "description":  "等待用户确认 design master 第二轮：PC 后台导航与首页工作台是否按侧边栏 + 工作台首页 + 6 个主分区推进。"
                     },
     "open_questions":  [
                            {
@@ -65,8 +65,8 @@
                                "priority":  "P1"
                            },
                            {
-                               "id":  "OQ-7",
-                               "title":  "设计阶段第一版端形态待确认：PC 管理后台 + 手机销售反馈卡片，或改为全响应式后台/仅 PC",
+                               "id":  "OQ-8",
+                               "title":  "设计阶段信息架构待确认：PC 后台导航和首页工作台如何组织",
                                "category":  "design",
                                "priority":  "P0"
                            }
@@ -89,6 +89,12 @@
                                    "decision":  "PRD/方案确认后进入 design master 设计阶段。",
                                    "stage":  "design-I",
                                    "rationale":  "用户在方案 PPT 美化后表示“方案可以，继续做吧”。"
+                               },
+                               {
+                                   "id":  "D-4",
+                                   "decision":  "第一版端形态确认为 PC 管理后台 + 手机销售反馈卡片。",
+                                   "stage":  "design-I",
+                                   "rationale":  "PRD 明确 MVP 以 Web 后台为主，销售反馈卡片必须适配手机浏览器；用户在推荐后回复“继续”。"
                                }
                            ],
     "category":  "saas",
@@ -341,6 +347,11 @@
                                 "stage":  "design-I",
                                 "timestamp":  "2026-06-29T09:01:02Z",
                                 "summary":  "用户确认方案可以并要求继续；已进入 design master 阶段 I，第一轮需确认端形态和工作台骨架。"
+                            },
+                            {
+                                "stage":  "design-I",
+                                "timestamp":  "2026-06-29T09:15:19Z",
+                                "summary":  "用户回复“继续”，确认第一版按 PC 管理后台 + 手机销售反馈卡片推进。"
                             }
                         ]
 }

@@ -1,0 +1,288 @@
+{
+    "project_name":  "智能销售接待与客户洞察Agent",
+    "project_started_at_utc":  "2026-06-29T04:06:53Z",
+    "last_updated_at_utc":  "2026-06-29T06:58:56Z",
+    "current_stage":  "6.2",
+    "current_substep":  "final-delivery-complete",
+    "completed_stages":  [
+                             "0",
+                             "1.1",
+                             "1.2",
+                             "1.3",
+                             "1.4",
+                             "1.5",
+                             "1.6",
+                             "2",
+                             "3",
+                             "4.1",
+                             "4.2",
+                             "4.3",
+                             "4.4",
+                             "4.5",
+                             "4.6",
+                             "5.0",
+                             "5.1",
+                             "5.2",
+                             "5.3",
+                             "5.4",
+                             "5.4.5",
+                             "5.5",
+                             "5.6",
+                             "5.7",
+                             "6.1",
+                             "6.2"
+                         ],
+    "skipped_stages":  [
+
+                       ],
+    "next_action":  {
+                        "type":  "complete",
+                        "description":  "PRD、老板版、开发版与方案 PPT HTML 已交付完成。下一步可进入 design master，把 PRD 落成页面、设计系统和技术方案。"
+                    },
+    "open_questions":  [
+                           {
+                               "id":  "OQ-3",
+                               "title":  "客户调研数据源和合规边界尚未确认",
+                               "category":  "data",
+                               "priority":  "P0"
+                           },
+                           {
+                               "id":  "OQ-4",
+                               "title":  "销售反馈的最终交互方式尚未确认：微信/邮件通知、反馈卡片、邮件回复解析或企业微信集成",
+                               "category":  "operations",
+                               "priority":  "P0"
+                           },
+                           {
+                               "id":  "OQ-5",
+                               "title":  "再营销的退订/合规边界尚未确认；发送原则已确认：AI 生成内容，人工确认后发送",
+                               "category":  "marketing",
+                               "priority":  "P1"
+                           },
+                           {
+                               "id":  "OQ-6",
+                               "title":  "客户态势监督与商机发现的数据源、授权方式、机会信号和触发规则尚未确认",
+                               "category":  "monitoring",
+                               "priority":  "P1"
+                           }
+                       ],
+    "key_decisions_made":  [
+                               {
+                                   "id":  "D-1",
+                                   "decision":  "产品不是单纯询盘管理，而是智能销售接待与客户洞察 Agent。",
+                                   "stage":  "0",
+                                   "rationale":  "用户明确要求在线沟通、产品讲解、引导式提问、客户背景调研、线索分发、销售反馈追踪和每日询盘报告。"
+                               },
+                               {
+                                   "id":  "D-2",
+                                   "decision":  "产品总模式确认为九个模块：统一收口、在线接待、引导提问、客户背调、客户态势监督、线索评分、销售分发、反馈追踪与客户分析报表、客户分层再营销。",
+                                   "stage":  "1.0",
+                                   "rationale":  "用户确认“对的，就是这些事情”。"
+                               }
+                           ],
+    "category":  "saas",
+    "prd_type":  "new_product",
+    "agents_used":  {
+                        "lead_pm_calls":  0,
+                        "reviewer_calls":  0,
+                        "author_calls":  0,
+                        "total_tokens_estimated":  0
+                    },
+    "deliverables":  {
+                         "scene_anchor":  "scene-anchor.md",
+                         "proposal_v0":  "proposal-v0.md",
+                         "proposal_v1":  "proposal-v1.md",
+                         "debate_log":  "debate-log.md",
+                         "assumptions":  "assumptions.md",
+                         "conversation":  "conversation.md",
+                         "evidence":  [
+                                          "evidence/competitors.md",
+                                          "evidence/benchmark.md"
+                                      ],
+                         "drafts":  [
+
+                                    ],
+                         "final_prd":  "output/PRD详细版.md",
+                         "prd_summary":  "output/PRD-summary.md",
+                         "prd_dev":  "output/PRD-dev.md",
+                         "ppt_outline":  "output/ppt.md",
+                         "ppt_html":  [
+                                          "output/ppt/p01.html",
+                                          "output/ppt/p02.html",
+                                          "output/ppt/p03.html",
+                                          "output/ppt/p04.html",
+                                          "output/ppt/p05.html",
+                                          "output/ppt/p06.html",
+                                          "output/ppt/p07.html",
+                                          "output/ppt/p08.html",
+                                          "output/ppt/p09.html",
+                                          "output/ppt/p10.html"
+                                      ]
+                     },
+    "user_inputs_log":  [
+                            {
+                                "stage":  "0",
+                                "timestamp":  "2026-06-29T04:06:53Z",
+                                "summary":  "用户做数字化营销，询盘来源分散，线上沟通人工效率低，询盘整理、分发和反馈收集靠人工。希望有 Agent 处理这些工作。"
+                            },
+                            {
+                                "stage":  "0",
+                                "timestamp":  "2026-06-29T04:06:53Z",
+                                "summary":  "用户补充：不仅是询盘，还要做客户调研、分析、背景查询。"
+                            },
+                            {
+                                "stage":  "0",
+                                "timestamp":  "2026-06-29T04:06:53Z",
+                                "summary":  "用户补充：在线时 Agent 要像初级销售或售前一样沟通、讲产品并引导提问，例如客户询问 ultrasound 时继续追问应用场景。"
+                            },
+                            {
+                                "stage":  "0",
+                                "timestamp":  "2026-06-29T04:06:53Z",
+                                "summary":  "用户补充：销售线索分发给销售后，要追踪销售反馈，并每天形成询盘报告发给用户。"
+                            },
+                            {
+                                "stage":  "1.0",
+                                "timestamp":  "2026-06-29T04:09:45Z",
+                                "summary":  "用户询问当前需求是否完整，以及竞品或相关产品通常怎么做。"
+                            },
+                            {
+                                "stage":  "1.0",
+                                "timestamp":  "2026-06-29T04:16:20Z",
+                                "summary":  "用户补充：客户信息收集后，应按不同进度和客户类别进行再次营销沟通，例如邮件群发。"
+                            },
+                            {
+                                "stage":  "1.0",
+                                "timestamp":  "2026-06-29T04:17:42Z",
+                                "summary":  "用户补充：后续可以对客户网站、LinkedIn、Facebook 等平台进行动态监测，并在出现机会信号时给客户发信息。"
+                            },
+                            {
+                                "stage":  "1.0",
+                                "timestamp":  "2026-06-29T04:18:52Z",
+                                "summary":  "用户澄清：该能力严格来说应是客户情况监督，用于发现商机以及进行客户背景调查，而不是单纯平台动态监测。"
+                            },
+                            {
+                                "stage":  "1.0",
+                                "timestamp":  "2026-06-29T04:20:09Z",
+                                "summary":  "用户要求整理当前总模式需要做几件事情。当前收敛为九个模块：统一收口、在线接待、引导提问、客户背调、客户态势监督、线索评分、销售分发、反馈追踪与日报、客户分层再营销。"
+                            },
+                            {
+                                "stage":  "1.0",
+                                "timestamp":  "2026-06-29T04:21:18Z",
+                                "summary":  "用户补充：除每天日报外，背后还需要一整套客户分析和报表系统，可生成月报、季报、年报。"
+                            },
+                            {
+                                "stage":  "1.0",
+                                "timestamp":  "2026-06-29T04:23:25Z",
+                                "summary":  "用户确认九个模块就是当前总模式，可以继续沟通细节。"
+                            },
+                            {
+                                "stage":  "1.1",
+                                "timestamp":  "2026-06-29T04:24:55Z",
+                                "summary":  "用户确认产品为 Ultrasound，产品线包括 Trolley Ultrasound、Portable Ultrasound、Handheld Ultrasound。询盘渠道包括官网在线聊天、WhatsApp、邮箱、Facebook、LinkedIn、Google 询盘、官网后台、展会名片、Facebook Message 聊天记录以及 LinkedIn 收件箱。"
+                            },
+                            {
+                                "stage":  "1.1",
+                                "timestamp":  "2026-06-29T04:26:08Z",
+                                "summary":  "用户澄清：虽然系统是 B2B 销售增长系统，但主要客户不仅是 B2B 企业，也包括代理商和较多终端用户，尤其是医生类型。"
+                            },
+                            {
+                                "stage":  "1.1",
+                                "timestamp":  "2026-06-29T04:29:46Z",
+                                "summary":  "用户定义高质量线索标准：客户必须能明确说出身份信息，包括所在机构类型（Company、Hospital、Doctor 等）和具体应用领域（Radiology、Cardiology 等）；还必须给出具体业务需求，不能只是泛泛咨询或询价。"
+                            },
+                            {
+                                "stage":  "1.2",
+                                "timestamp":  "2026-06-29T04:34:45Z",
+                                "summary":  "用户补充两类客户画像字段。代理商需关注重点国家、历史合作业务/代理品牌、是否做过超声及涉及品牌、年业务规模。医生需关注所属科室和临床应用、之前使用过的机器、预算、想购买的产品和应用场景。"
+                            },
+                            {
+                                "stage":  "1.2",
+                                "timestamp":  "2026-06-29T04:36:25Z",
+                                "summary":  "用户确认销售分发原则：按国家区域划分，先确认所属区域（如拉美、北美、中东），再确认具体国家，根据国家分配给对应销售人员。"
+                            },
+                            {
+                                "stage":  "1.3",
+                                "timestamp":  "2026-06-29T04:39:24Z",
+                                "summary":  "用户确认销售反馈状态包括已联系、已报价、无效、需跟进、已成交。销售还需做简单客户分析：有效客户继续跟进、放入资料库后续再跟进、确认真实需求、已转给代理商跟进。当前主要用微信和邮件沟通，没有 CRM，担心让销售填表会太麻烦。"
+                            },
+                            {
+                                "stage":  "1.3",
+                                "timestamp":  "2026-06-29T04:40:44Z",
+                                "summary":  "用户确认不希望做复杂 CRM，销售反馈必须最简单方便；销售工作繁忙，无法花太长时间写反馈，并且销售的一线判断比系统更懂实际客户。"
+                            },
+                            {
+                                "stage":  "1.3",
+                                "timestamp":  "2026-06-29T04:42:17Z",
+                                "summary":  "用户确认报表指标：每天看总询盘数、有效询盘数、不同国家区域询盘分量；分析每个销售反馈、不同渠道线索质量（如 Facebook vs 官网有效客户数量）、不同区域销售反馈差异；分析跟进后转化，包括区域销售转化和来源渠道转化率；分析产品询盘分布和产品转化率，例如 Sonos Max、Sonos I。"
+                            },
+                            {
+                                "stage":  "1.4",
+                                "timestamp":  "2026-06-29T04:44:49Z",
+                                "summary":  "用户收敛报表指标：关注询盘总量、有效数量、国家分布、渠道质量、代理商/医生占比、产品分类、销售反馈、未及时反馈、撤单、再营销数据、客户池变化；不需要成交金额、报价等金额类指标。"
+                            },
+                            {
+                                "stage":  "1.4",
+                                "timestamp":  "2026-06-29T04:45:30Z",
+                                "summary":  "用户说继续，默认接受客户池第一版分层：高意向客户、有效客户持续跟进、已报价未回复、暂无明确需求放入资料库、已转代理商跟进、无效客户、撤单/流失客户、已成交客户。"
+                            },
+                            {
+                                "stage":  "1.5",
+                                "timestamp":  "2026-06-29T06:05:07Z",
+                                "summary":  "用户确认再营销发送原则：人工确认后发送。AI 可生成内容和建议，但不能未经确认自动发送。"
+                            },
+                            {
+                                "stage":  "1.6",
+                                "timestamp":  "2026-06-29T06:09:05Z",
+                                "summary":  "用户说继续，默认接受客户态势监督信号第一版轻量覆盖官网、社媒公开动态、邮件行为和销售反馈；已生成 scene-anchor.md 与 assumptions.md。"
+                            },
+                            {
+                                "stage":  "2.0",
+                                "timestamp":  "2026-06-29T06:10:38Z",
+                                "summary":  "用户确认场景锚点准确，进入价值论证阶段。"
+                            },
+                            {
+                                "stage":  "2.0",
+                                "timestamp":  "2026-06-29T06:14:02Z",
+                                "summary":  "用户确认每月约 300 多条询盘，人工处理单个客户平均约 10 分钟；沟通、查背景、分发给销售通常约 5-10 分钟。"
+                            },
+                            {
+                                "stage":  "2.1",
+                                "timestamp":  "2026-06-29T06:17:17Z",
+                                "summary":  "用户确认由于速度、效率和反馈环节断裂，损失 20%-30% 客户；销售无反馈比例占 50% 以上。价值论证已写入 scene-anchor.md。"
+                            },
+                            {
+                                "stage":  "3.0",
+                                "timestamp":  "2026-06-29T06:24:03Z",
+                                "summary":  "完成标准档竞品与行业 benchmark 调研，生成 evidence/competitors.md 和 evidence/benchmark.md。"
+                            },
+                            {
+                                "stage":  "4.1",
+                                "timestamp":  "2026-06-29T06:27:12Z",
+                                "summary":  "基于场景锚点、价值论证和竞品调研，生成方案 V0。"
+                            },
+                            {
+                                "stage":  "4.5",
+                                "timestamp":  "2026-06-29T06:30:36Z",
+                                "summary":  "完成工程、设计、商业、战略四方评审，收敛生成方案 V1。"
+                            },
+                            {
+                                "stage":  "4.6",
+                                "timestamp":  "2026-06-29T06:33:31Z",
+                                "summary":  "用户接受方案 V1，进入 MVP 边界确认。"
+                            },
+                            {
+                                "stage":  "4.6",
+                                "timestamp":  "2026-06-29T06:39:01Z",
+                                "summary":  "用户要求 Facebook/LinkedIn 也放进第一版必须做。已更新 proposal-v1.md：Facebook 线索/Message、LinkedIn 线索/收件箱进入第一版统一线索池，但第一版只承诺合规线索接入/导入和会话归档，深度态势监测与未授权抓取后置。"
+                            },
+                            {
+                                "stage":  "4.6",
+                                "timestamp":  "2026-06-29T06:45:00Z",
+                                "summary":  "用户在了解 Facebook/LinkedIn 官方授权/API 限制后，决定先不接 Facebook 和 LinkedIn，按原来的 V1 做。已回退 proposal-v1.md：第一版 P0 渠道为官网聊天、官网后台、邮箱、展会名片导入；Facebook/LinkedIn 后置。"
+                            },
+                            {
+                                "stage":  "6.2",
+                                "timestamp":  "2026-06-29T06:58:56Z",
+                                "summary":  "PRD master 终交付完成：生成 PRD详细版、PRD-summary、PRD-dev、ppt.md 与 10 页 HTML 方案 PPT。"
+                            }
+                        ]
+}

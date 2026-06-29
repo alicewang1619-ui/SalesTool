@@ -1,7 +1,7 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T07:35:19Z",
+    "last_updated_at_utc":  "2026-06-29T07:59:30Z",
     "current_stage":  "6.2",
     "current_substep":  "final-delivery-complete",
     "completed_stages":  [
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "complete",
-                        "description":  "PPT 已新增“每一步用什么技术实现”页，放在技术方案之后、阶段路线图之前；下载版 PPTX 已更新为 11 页高清版。"
+                        "description":  "下载版 PPTX 已改为 PowerPoint 原生可编辑版本：文字、卡片、流程块和表格均可编辑，不再使用整页截图。"
                     },
     "open_questions":  [
                            {
@@ -300,6 +300,11 @@
                                 "stage":  "6.2",
                                 "timestamp":  "2026-06-29T07:35:19Z",
                                 "summary":  "用户要求补充每一步用什么技术实现以及技术内容放在哪里；已更新 PRD详细版、PRD-dev、ppt.md、HTML PPT，并重新生成 11 页高清 PPTX。"
+                            },
+                            {
+                                "stage":  "6.2",
+                                "timestamp":  "2026-06-29T07:59:30Z",
+                                "summary":  "用户反馈 PPT 不能编辑；已覆盖生成可编辑 PPTX，使用 PowerPoint 原生文本框、形状和表格，不再使用整页图片。"
                             }
                         ]
 }

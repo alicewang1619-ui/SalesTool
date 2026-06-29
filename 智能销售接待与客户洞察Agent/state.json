@@ -1,7 +1,7 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T07:24:22Z",
+    "last_updated_at_utc":  "2026-06-29T07:35:19Z",
     "current_stage":  "6.2",
     "current_substep":  "final-delivery-complete",
     "completed_stages":  [
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "complete",
-                        "description":  "可下载 PPTX 已重新生成为 1920x1080 高清 JPEG 版，已修正图片类型与 16:9 比例。"
+                        "description":  "PPT 已新增“每一步用什么技术实现”页，放在技术方案之后、阶段路线图之前；下载版 PPTX 已更新为 11 页高清版。"
                     },
     "open_questions":  [
                            {
@@ -115,7 +115,8 @@
                                           "output/ppt/p07.html",
                                           "output/ppt/p08.html",
                                           "output/ppt/p09.html",
-                                          "output/ppt/p10.html"
+                                          "output/ppt/p10.html",
+                                          "output/ppt/p11.html"
                                       ],
                          "pptx":  "output/ppt/ultrasound-sales-agent-report.pptx"
                      },
@@ -294,6 +295,11 @@
                                 "stage":  "6.2",
                                 "timestamp":  "2026-06-29T07:24:22Z",
                                 "summary":  "用户反馈 PPT 图片不清晰且变形；已用固定 1920x1080 视口重新渲染 10 张高清 JPEG，并重新打包 output/ppt/ultrasound-sales-agent-report.pptx。"
+                            },
+                            {
+                                "stage":  "6.2",
+                                "timestamp":  "2026-06-29T07:35:19Z",
+                                "summary":  "用户要求补充每一步用什么技术实现以及技术内容放在哪里；已更新 PRD详细版、PRD-dev、ppt.md、HTML PPT，并重新生成 11 页高清 PPTX。"
                             }
                         ]
 }

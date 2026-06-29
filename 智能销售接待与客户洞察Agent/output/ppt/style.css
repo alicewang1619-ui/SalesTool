@@ -123,6 +123,19 @@ p { font-size: 25px; line-height: 1.42; color: var(--muted); }
 }
 .table th { color: var(--accent-2); background: #eaf2f7; }
 .table tr:last-child td { border-bottom: none; }
+.tech-table th, .tech-table td {
+  padding: 12px 14px;
+  font-size: 16px;
+  line-height: 1.28;
+}
+.tech-table th:nth-child(1),
+.tech-table td:nth-child(1) {
+  width: 20%;
+}
+.tech-table th:nth-child(2),
+.tech-table td:nth-child(2) {
+  width: 42%;
+}
 
 .split {
   display: grid;
@@ -181,7 +194,7 @@ p { font-size: 25px; line-height: 1.42; color: var(--muted); }
   font-size: 18px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .stage { padding: 36px 28px 54px; min-height: 100vh; aspect-ratio: auto; }
   h1 { font-size: 42px; }
   h2 { font-size: 32px; }

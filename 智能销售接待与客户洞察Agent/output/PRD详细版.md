@@ -763,3 +763,15 @@ sequenceDiagram
 | 报表模块 | 聚合非金额指标 | 输出 ReportMetric |
 | 客户池模块 | 管理客户状态 | 输出 CustomerPoolRecord |
 | 再营销模块 | 生成草稿和待办 | 输出 NurtureTask |
+
+### 12.5 每步技术实现落点
+
+| 业务步骤 | 推荐技术 | 技术放置位置 | 输出对象 |
+|---|---|---|---|
+| 线索进入统一线索池 | 官网聊天 Webhook/API、邮箱 IMAP 或 Microsoft Graph/Gmail API、官网后台 CSV/Excel 导入、展会名片 OCR/表格导入 | 渠道接入适配层，统一写入后端标准化服务 | Inquiry |
+| AI 接待和引导提问 | LLM 对话编排、规则引擎、产品知识库检索、结构化字段抽取 | AI 接待服务和产品知识库，不放在前端页面里硬编码 | Conversation、关键字段 |
+| 客户画像和背景补全 | LLM 结构化抽取、规则评分、公开/授权数据源查询、人工修正记录 | 画像评分服务，结果和来源写入数据库 | CustomerProfile、LeadScore |
+| 国家/区域分发 | Postgres 国家/区域/销售映射表、确定性路由规则、异常待分配队列 | 路由模块和管理员配置后台 | SalesAssignment |
+| 销售轻反馈 | 移动端 H5 反馈卡片、带过期时间的安全链接、邮件/微信消息中的反馈入口 | 反馈服务和权限校验层，销售只看到最小反馈页 | SalesFeedback |
+| 未反馈提醒和日报 | 定时任务、消息/邮件通知、报表聚合 SQL、缓存表或报表快照 | 后台任务服务和报表模块 | ReportMetric、Reminder |
+| 客户池和再营销草稿 | 客户状态机、任务队列、邮件模板、人工审批流、退订/合规标记 | 客户池模块和再营销待办模块，发送前必须人工确认 | CustomerPoolRecord、NurtureTask |

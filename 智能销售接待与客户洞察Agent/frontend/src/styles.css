@@ -388,12 +388,27 @@ body {
   gap: 18px;
 }
 
+.product-knowledge-page {
+  display: grid;
+  gap: 18px;
+}
+
 .mapping-form-card {
   position: sticky;
   top: 104px;
 }
 
+.knowledge-form-card {
+  position: sticky;
+  top: 104px;
+}
+
 .mapping-filter-bar {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.knowledge-filter-bar {
   width: 100%;
   margin-bottom: 16px;
 }
@@ -452,6 +467,10 @@ body {
   }
 
   .mapping-form-card {
+    position: static;
+  }
+
+  .knowledge-form-card {
     position: static;
   }
 }

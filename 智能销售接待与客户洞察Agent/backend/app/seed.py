@@ -2,7 +2,7 @@ import json
 
 from sqlalchemy.orm import Session
 
-from .models import Banner, CountrySalesMapping, Customer, CustomerBackground, Lead, SourceDictionary, User
+from .models import Banner, CountrySalesMapping, Customer, CustomerBackground, Lead, ProductKnowledge, SourceDictionary, User
 from .security import hash_password
 
 
@@ -28,6 +28,38 @@ def seed_data(db: Session) -> None:
     db.flush()
 
     db.add(CountrySalesMapping(country="Peru", region="Latam", sales_user_id=sales.id, active=True))
+
+    db.add_all(
+        [
+            ProductKnowledge(
+                product_type="Portable",
+                model_name="SonoBook P3",
+                application_scenario="Regional clinic, distributor demo, and outpatient screening",
+                ai_guidance="Ask about clinic volume, battery use, probe mix, and distributor training needs.",
+                version="v1",
+                status="active",
+                updated_by=admin.id,
+            ),
+            ProductKnowledge(
+                product_type="Handheld",
+                model_name="SonoEye H1",
+                application_scenario="Mobile clinic, emergency triage, and bedside quick scan",
+                ai_guidance="Ask about portability, phone/tablet workflow, target department, and probe requirements.",
+                version="v1",
+                status="active",
+                updated_by=admin.id,
+            ),
+            ProductKnowledge(
+                product_type="Trolley",
+                model_name="SonoMax T8",
+                application_scenario="Radiology, emergency department, and hospital room-based ultrasound",
+                ai_guidance="Ask about room setup, departments, image quality expectations, and after-sales service needs.",
+                version="v1",
+                status="active",
+                updated_by=admin.id,
+            ),
+        ]
+    )
 
     db.add(
         Banner(

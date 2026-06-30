@@ -574,6 +574,57 @@ class CountrySalesMappingUpdateRequest(BaseModel):
     active: bool = True
 
 
+class ProductKnowledgeOut(BaseModel):
+    id: int
+    product_type: str
+    model_name: str
+    application_scenario: str
+    ai_guidance: str
+    version: str
+    status: str
+    updated_by: int | None
+    updated_at: datetime
+
+
+class ProductKnowledgePage(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    summary: dict[str, int]
+    active_version: str
+    items: list[ProductKnowledgeOut]
+    empty_state: EmptyStateOut | None = None
+    recent_changes: list[dict[str, object]] = Field(default_factory=list)
+
+
+class ProductKnowledgeUpdateRequest(BaseModel):
+    product_type: str = Field(min_length=2, max_length=80)
+    model_name: str = Field(min_length=2, max_length=120)
+    application_scenario: str = Field(min_length=2, max_length=500)
+    ai_guidance: str = Field(min_length=2, max_length=4000)
+    status: str = Field(pattern="^(active|draft|disabled)$")
+
+
+class ProductKnowledgeStatusRequest(BaseModel):
+    status: str = Field(pattern="^(active|draft|disabled)$")
+
+
+class ProductKnowledgeBlockOut(BaseModel):
+    id: int
+    product_type: str
+    model_name: str
+    application_scenario: str
+    ai_guidance: str
+    version: str
+
+
+class ProductKnowledgeContextOut(BaseModel):
+    active_version: str
+    safety_boundary: str
+    knowledge_blocks: list[ProductKnowledgeBlockOut]
+    rendered_prompt: str
+
+
 class AuditLogOut(BaseModel):
     id: int
     action: str

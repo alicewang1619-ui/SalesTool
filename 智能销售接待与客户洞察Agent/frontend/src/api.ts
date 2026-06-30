@@ -514,6 +514,55 @@ export type CountrySalesMappingPageResult = {
   } | null;
 };
 
+export type ProductKnowledge = {
+  id: number;
+  product_type: string;
+  model_name: string;
+  application_scenario: string;
+  ai_guidance: string;
+  version: string;
+  status: "active" | "draft" | "disabled";
+  updated_by: number | null;
+  updated_at: string;
+};
+
+export type ProductKnowledgePageResult = {
+  page: number;
+  page_size: number;
+  total: number;
+  summary: Record<string, number>;
+  active_version: string;
+  items: ProductKnowledge[];
+  empty_state: {
+    title: string;
+    action_label: string;
+    action_path: string;
+  } | null;
+  recent_changes: Array<{
+    id: number;
+    action: string;
+    target_type: string;
+    target_id: number | null;
+    trace_id: string;
+    detail: string;
+    created_at: string;
+  }>;
+};
+
+export type ProductKnowledgeContext = {
+  active_version: string;
+  safety_boundary: string;
+  knowledge_blocks: Array<{
+    id: number;
+    product_type: string;
+    model_name: string;
+    application_scenario: string;
+    ai_guidance: string;
+    version: string;
+  }>;
+  rendered_prompt: string;
+};
+
 const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET ?? "").trim();
 const API_BASE = import.meta.env.DEV && DEV_PROXY_TARGET ? "" : (import.meta.env.VITE_API_BASE ?? "").trim();
 
@@ -873,6 +922,53 @@ export function saveCountrySalesMapping(payload: {
       active: payload.active
     })
   });
+}
+
+export function fetchProductKnowledge(filters: {
+  query?: string;
+  productType?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<ProductKnowledgePageResult> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20)
+  });
+  if (filters.query) params.set("query", filters.query);
+  if (filters.productType) params.set("product_type", filters.productType);
+  if (filters.status) params.set("status", filters.status);
+  return request<ProductKnowledgePageResult>(`/api/settings/product-knowledge?${params.toString()}`);
+}
+
+export function saveProductKnowledge(payload: {
+  productType: string;
+  modelName: string;
+  applicationScenario: string;
+  aiGuidance: string;
+  status: string;
+}): Promise<ProductKnowledge> {
+  return request<ProductKnowledge>("/api/settings/product-knowledge", {
+    method: "PUT",
+    body: JSON.stringify({
+      product_type: payload.productType,
+      model_name: payload.modelName,
+      application_scenario: payload.applicationScenario,
+      ai_guidance: payload.aiGuidance,
+      status: payload.status
+    })
+  });
+}
+
+export function updateProductKnowledgeStatus(id: number, status: string): Promise<ProductKnowledge> {
+  return request<ProductKnowledge>(`/api/settings/product-knowledge/${id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status })
+  });
+}
+
+export function fetchProductKnowledgeContext(): Promise<ProductKnowledgeContext> {
+  return request<ProductKnowledgeContext>("/api/ai/product-knowledge/context");
 }
 
 export function fetchSalesUsers(): Promise<SalesUser[]> {

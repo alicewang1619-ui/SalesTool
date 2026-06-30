@@ -78,6 +78,21 @@ class CountrySalesMapping(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ProductKnowledge(Base):
+    __tablename__ = "product_knowledge"
+    __table_args__ = (UniqueConstraint("product_type", "model_name", name="uq_product_type_model"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    application_scenario: Mapped[str] = mapped_column(String(500), nullable=False)
+    ai_guidance: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[str] = mapped_column(String(40), nullable=False, default="v1")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class SalesFeedbackLink(Base):
     __tablename__ = "sales_feedback_links"
 

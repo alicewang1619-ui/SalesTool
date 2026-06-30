@@ -19,6 +19,7 @@ import { ReportsExportPage } from "./pages/ReportsExportPage";
 import { ReportsMetricsPage } from "./pages/ReportsMetricsPage";
 import { ReportsPeriodPage } from "./pages/ReportsPeriodPage";
 import { CountrySalesMappingPage } from "./pages/CountrySalesMappingPage";
+import { ProductKnowledgePage } from "./pages/ProductKnowledgePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./styles.css";
 
@@ -41,7 +42,8 @@ const router = createBrowserRouter([
       { path: "reports/metrics", element: <ReportsMetricsPage /> },
       { path: "reports/export", element: <ReportsExportPage /> },
       { path: "settings", element: <SettingsPage /> },
-      { path: "settings/country-sales", element: <CountrySalesMappingPage /> }
+      { path: "settings/country-sales", element: <CountrySalesMappingPage /> },
+      { path: "settings/product-knowledge", element: <ProductKnowledgePage /> }
     ]
   }
 ]);

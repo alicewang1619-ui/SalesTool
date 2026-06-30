@@ -182,14 +182,35 @@ def list_leads(
 
 @app.get("/api/dashboard", response_model=DashboardOut)
 def dashboard(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=50),
+    source_category: str | None = None,
+    country: str | None = None,
+    customer_type: str | None = None,
+    product: str | None = None,
+    owner_id: int | None = None,
+    cycle: str | None = Query(None, pattern="^(today|all)?$"),
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ) -> DashboardOut:
     base_conditions = []
     if user.role == "sales":
         base_conditions.append(Lead.owner_id == user.id)
+    elif owner_id is not None:
+        base_conditions.append(Lead.owner_id == owner_id)
+    if source_category:
+        base_conditions.append(Lead.source_category == source_category)
+    if country:
+        base_conditions.append(Lead.country == country)
+    if customer_type:
+        base_conditions.append(Lead.customer_type == customer_type)
+    if product:
+        base_conditions.append(Lead.product == product)
+
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    if cycle == "today":
+        base_conditions.append(Lead.created_at >= today_start)
 
     def scoped_count(*conditions) -> int:
         query = select(func.count()).select_from(Lead)
@@ -201,10 +222,12 @@ def dashboard(
     for condition in base_conditions:
         query = query.where(condition)
 
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     total = scoped_count()
     website_total = scoped_count(Lead.source_category.in_(["网站", "缃戠珯"]))
     rows = db.scalars(query.order_by(Lead.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
+
+    add_audit(db, request.state.trace_id, "dashboard_viewed", "用户查看工作台首页", actor_id=user.id, target_type="dashboard")
+    db.commit()
 
     return DashboardOut(
         page=page,

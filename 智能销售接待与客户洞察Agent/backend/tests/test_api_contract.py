@@ -105,6 +105,35 @@ def test_dashboard_returns_backend_aggregates_and_paginated_todos(client: TestCl
     assert str(body["items"][0]["id"]) in body["items"][0]["detail_path"]
 
 
+def test_dashboard_filters_and_pagination_are_backend_driven(client: TestClient) -> None:
+    headers = auth_headers(client)
+    seed_rows = client.get("/api/leads", params={"page_size": 10}, headers=headers).json()["items"]
+    target = next(item for item in seed_rows if item["customer_name"] == "Al Noor Hospital")
+
+    filtered = client.get(
+        "/api/dashboard",
+        params={
+            "source_category": target["source_category"],
+            "country": target["country"],
+            "customer_type": target["customer_type"],
+            "product": target["product"],
+            "page_size": 10,
+        },
+        headers=headers,
+    )
+    assert filtered.status_code == 200
+    filtered_body = filtered.json()
+    assert filtered_body["total"] == 1
+    assert filtered_body["items"][0]["customer_name"] == "Al Noor Hospital"
+    assert all(item["source_category"] == target["source_category"] for item in filtered_body["items"])
+
+    first_page = client.get("/api/dashboard", params={"page": 1, "page_size": 1}, headers=headers)
+    second_page = client.get("/api/dashboard", params={"page": 2, "page_size": 1}, headers=headers)
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+    assert first_page.json()["items"][0]["id"] != second_page.json()["items"][0]["id"]
+
+
 def test_dashboard_respects_sales_data_scope(client: TestClient) -> None:
     response = client.get(
         "/api/dashboard",
@@ -114,6 +143,17 @@ def test_dashboard_respects_sales_data_scope(client: TestClient) -> None:
     names = [item["customer_name"] for item in response.json()["items"]]
     assert "GlobalMed Peru" in names
     assert "Al Noor Hospital" not in names
+
+
+def test_dashboard_view_is_audited_with_trace_id(client: TestClient) -> None:
+    headers = auth_headers(client)
+    response = client.get("/api/dashboard", headers=headers)
+    assert response.status_code == 200
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert audit.status_code == 200
+    events = audit.json()["items"]
+    assert any(event["action"] == "dashboard_viewed" and event["trace_id"] for event in events)
 
 
 def test_customer_background_can_be_manually_updated_by_admin(client: TestClient) -> None:

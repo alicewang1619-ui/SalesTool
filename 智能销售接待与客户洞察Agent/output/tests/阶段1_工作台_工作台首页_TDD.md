@@ -20,6 +20,12 @@
 - 当前验证结果：后端 `py -m pytest .\tests -q` 为 10 passed；前端 `npm.cmd run build` 通过。
 
 ## 浏览器复核补充（06-30-2026）
+
+### 返修门禁补充（06-30-2026）
+- 新增后端契约用例 `test_dashboard_filters_and_pagination_are_backend_driven`：用真实种子线索字段反查 `GET /api/dashboard`，要求来源、国家、客户类型、产品筛选在后端生效，并验证 `page/page_size` 返回不同页记录。
+- 新增后端契约用例 `test_dashboard_view_is_audited_with_trace_id`：访问工作台后，`GET /api/audit-logs` 必须能看到 `dashboard_viewed`，且带 trace id。
+- 前端验收补充：工作台筛选控件必须包含来源、国家、客户类型、产品、销售、周期；“应用/确认”必须触发真实查询，“导入线索”必须进入 `/admin/leads?intent=import`，“查看详情”必须进入携带真实 `recordId` 的路径。
+- 当前验证结果：`py -m pytest .\tests -q` 为 12 passed；`npm.cmd run build` 通过；浏览器实测登录后工作台无横向溢出，导入入口进入线索池导入意图路径，详情入口进入 `/admin/leads?recordId=2`；标准库 HTTP 验证来源字典“邮箱”筛选返回 1 条 Al Noor Hospital。
 - 真实浏览器发现成功加载数据后仍可能残留旧错误条，已要求工作台页在 `fetchDashboard()` 成功后同步清空错误状态。
 - 响应式复核覆盖 1366px 与 390px：全局 Banner、四个指标卡、待办表格动作可见，页面级 `scrollWidth <= clientWidth`。
 - “查看详情”复核要求点击后 URL 必须携带真实记录 id，例如 `/admin/leads?recordId=2`。

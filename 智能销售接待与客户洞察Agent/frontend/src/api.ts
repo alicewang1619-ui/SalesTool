@@ -53,6 +53,22 @@ export type DashboardResult = {
   items: DashboardTodo[];
 };
 
+export type SourceOption = {
+  category: string;
+  label: string;
+};
+
+export type DashboardFilters = {
+  page?: number;
+  pageSize?: number;
+  sourceCategory?: string;
+  country?: string;
+  customerType?: string;
+  product?: string;
+  ownerId?: number;
+  cycle?: "today" | "all";
+};
+
 export type Customer = {
   id: number;
   name: string;
@@ -140,8 +156,21 @@ export function fetchLeads(sourceCategory?: string): Promise<PageResult<Lead>> {
   return request<PageResult<Lead>>(`/api/leads?${params.toString()}`);
 }
 
-export function fetchDashboard(pageSize = 10): Promise<DashboardResult> {
-  const params = new URLSearchParams({ page: "1", page_size: String(pageSize) });
+export function fetchSourceDictionary(): Promise<SourceOption[]> {
+  return request<SourceOption[]>("/api/source-dictionary");
+}
+
+export function fetchDashboard(filters: DashboardFilters = {}): Promise<DashboardResult> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 10)
+  });
+  if (filters.sourceCategory) params.set("source_category", filters.sourceCategory);
+  if (filters.country) params.set("country", filters.country);
+  if (filters.customerType) params.set("customer_type", filters.customerType);
+  if (filters.product) params.set("product", filters.product);
+  if (filters.ownerId) params.set("owner_id", String(filters.ownerId));
+  if (filters.cycle && filters.cycle !== "all") params.set("cycle", filters.cycle);
   return request<DashboardResult>(`/api/dashboard?${params.toString()}`);
 }
 

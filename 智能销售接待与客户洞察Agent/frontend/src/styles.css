@@ -127,6 +127,13 @@ body {
   width: 180px;
 }
 
+.assignment-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
 .timeline-list {
   display: grid;
   gap: 12px;
@@ -277,6 +284,10 @@ body {
   .dashboard-toolbar .ant-input,
   .dashboard-toolbar .ant-select {
     width: 100%;
+  }
+
+  .assignment-metrics {
+    grid-template-columns: 1fr;
   }
 
   .page-content {

@@ -10,6 +10,7 @@ import { LeadsPage } from "./pages/LeadsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadImportPage } from "./pages/LeadImportPage";
 import { LoginPage } from "./pages/LoginPage";
+import { PendingAssignmentsPage } from "./pages/PendingAssignmentsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./styles.css";
 
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
       { path: "leads", element: <LeadsPage /> },
       { path: "leads/import", element: <LeadImportPage /> },
       { path: "leads/:leadId", element: <LeadDetailPage /> },
+      { path: "assignments/pending", element: <PendingAssignmentsPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
       { path: "settings", element: <SettingsPage /> }
     ]

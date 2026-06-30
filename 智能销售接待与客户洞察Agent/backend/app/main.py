@@ -104,12 +104,12 @@ def ensure_sqlite_compatibility() -> None:
                 ),
                 {
                     "customer_name": "GlobalMed Peru",
-                    "raw_inquiry": "Original inquiry: We distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics.",
+                    "raw_inquiry": "客户原文：We distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics.",
                     "conversation_history": json.dumps(
                         [
-                            "Customer asked about portable ultrasound for regional clinics.",
-                            "AI confirmed Peru distributor context after follow-up.",
-                            "Customer expects product comparison materials within three days.",
+                            "客户询问 portable ultrasound 代理组合与区域诊所应用。",
+                            "AI 追问国家、客户身份和应用场景后确认其为 Peru 代理商。",
+                            "客户表示希望三天内收到产品对比资料。",
                         ],
                         ensure_ascii=False,
                     ),
@@ -126,12 +126,12 @@ def ensure_sqlite_compatibility() -> None:
                 ),
                 {
                     "customer_name": "Al Noor Hospital",
-                    "raw_inquiry": "Original inquiry: Our hospital is reviewing trolley ultrasound systems for emergency and radiology departments.",
+                    "raw_inquiry": "客户原文：Our hospital is reviewing trolley ultrasound systems for emergency and radiology departments.",
                     "conversation_history": json.dumps(
                         [
-                            "Email inquiry says the hospital is reviewing trolley ultrasound.",
-                            "AI identified UAE hospital context from country and signature fields.",
-                            "System marks the lead as needing follow-up and pending sales assignment.",
+                            "邮件询盘说明医院正在评估 trolley ultrasound。",
+                            "AI 从邮箱签名和国家字段识别 UAE Hospital。",
+                            "系统标记为需跟进，等待运营分配销售负责人。",
                         ],
                         ensure_ascii=False,
                     ),
@@ -319,11 +319,11 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     trace_id = request.state.trace_id
     attempt = db.get(LoginAttempt, payload.email)
     if attempt and attempt.locked_until and attempt.locked_until > now:
-        add_audit(db, trace_id, "login_locked", f"{payload.email} 鍦ㄩ攣瀹氭湡鍐呯户缁皾璇曠櫥褰?)
+        add_audit(db, trace_id, "login_locked", f"{payload.email} tried to login while locked")
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=error_detail("LOGIN_LOCKED", "鐧诲綍澶辫触娆℃暟杩囧锛岃绋嶅悗鍐嶈瘯", locked_until=attempt.locked_until.isoformat()),
+            detail=error_detail("LOGIN_LOCKED", "Too many failed login attempts", locked_until=attempt.locked_until.isoformat()),
         )
 
     user = db.scalar(select(User).where(User.email == payload.email))
@@ -334,17 +334,17 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         attempt.failed_count += 1
         if attempt.failed_count >= 5:
             attempt.locked_until = now + timedelta(minutes=15)
-        add_audit(db, trace_id, "login_failed", f"{payload.email} 鐧诲綍澶辫触 {attempt.failed_count} 娆?)
+        add_audit(db, trace_id, "login_failed", f"{payload.email} login failed {attempt.failed_count} times")
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=error_detail("INVALID_CREDENTIALS", "璐﹀彿鎴栧瘑鐮侀敊璇?),
+            detail=error_detail("INVALID_CREDENTIALS", "Invalid email or password"),
         )
 
     if attempt:
         attempt.failed_count = 0
         attempt.locked_until = None
-    add_audit(db, trace_id, "login_succeeded", f"{payload.email} 鐧诲綍鎴愬姛", actor_id=user.id, target_id=user.id)
+    add_audit(db, trace_id, "login_succeeded", f"{payload.email} login succeeded", actor_id=user.id, target_id=user.id)
     db.commit()
     return LoginResponse(
         access_token=create_access_token(user.id, user.role),
@@ -362,7 +362,7 @@ def me(user: User = Depends(current_user)) -> User:
 def active_banner(db: Session = Depends(get_db)) -> Banner:
     banner = db.scalar(select(Banner).where(Banner.active.is_(True)).order_by(Banner.updated_at.desc()))
     if not banner:
-        raise HTTPException(status_code=404, detail="鏈厤缃?Banner")
+        raise HTTPException(status_code=404, detail="Banner not configured")
     return banner
 
 
@@ -383,11 +383,11 @@ async def create_import_job(
     filename = file.filename or ""
     content = await file.read()
     if not filename.lower().endswith((".csv", ".xlsx")) or len(content) > 5 * 1024 * 1024:
-        add_audit(db, request.state.trace_id, "import_rejected", f"瀵煎叆鏂囦欢琚嫆缁濓細{filename}", actor_id=user.id, target_type="import_job")
+        add_audit(db, request.state.trace_id, "import_rejected", f"Import file rejected: {filename}", actor_id=user.id, target_type="import_job")
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail("INVALID_IMPORT_FILE", "浠呮敮鎸?5MB 鍐呯殑 CSV/Excel 瀵煎叆鏂囦欢"),
+            detail=error_detail("INVALID_IMPORT_FILE", "Only CSV/XLSX files up to 5MB are supported"),
         )
 
     text_content = content.decode("latin1") if filename.lower().endswith(".xlsx") else content.decode("utf-8-sig")
@@ -404,7 +404,7 @@ async def create_import_job(
 def get_import_job(task_id: str, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ops)) -> ImportJobOut:
     job = db.scalar(select(ImportJob).where(ImportJob.task_id == task_id))
     if not job:
-        raise HTTPException(status_code=404, detail="瀵煎叆浠诲姟涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="Import job not found")
     return import_job_out(job)
 
 
@@ -412,7 +412,7 @@ def get_import_job(task_id: str, db: Session = Depends(get_db), user: User = Dep
 def download_import_failures(task_id: str, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ops)) -> Response:
     job = db.scalar(select(ImportJob).where(ImportJob.task_id == task_id))
     if not job:
-        raise HTTPException(status_code=404, detail="瀵煎叆浠诲姟涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="Import job not found")
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=["row_number", "customer_name", "reason"])
     writer.writeheader()
@@ -430,10 +430,10 @@ def retry_import_job(
 ) -> ImportJobOut:
     job = db.scalar(select(ImportJob).where(ImportJob.task_id == task_id))
     if not job:
-        raise HTTPException(status_code=404, detail="瀵煎叆浠诲姟涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="Import job not found")
     if job.status != "completed":
         process_import_job(db, job)
-    add_audit(db, request.state.trace_id, "import_job_retried", f"瀵煎叆浠诲姟 {task_id} 宸查噸璇?, actor_id=user.id, target_type="import_job", target_id=job.id)
+    add_audit(db, request.state.trace_id, "import_job_retried", f"Import job {task_id} retried", actor_id=user.id, target_type="import_job", target_id=job.id)
     db.commit()
     db.refresh(job)
     return import_job_out(job)
@@ -450,13 +450,16 @@ def pending_reasons_for_lead(lead: Lead, mapped_countries: set[str]) -> list[str
     return reasons
 
 
-def pending_assignment_out(lead: Lead, reasons: list[str]) -> PendingAssignmentOut:
+def pending_assignment_out(db: Session, lead: Lead, reasons: list[str]) -> PendingAssignmentOut:
     base = LeadOut.model_validate(lead, from_attributes=True).model_dump()
+    owner = db.get(User, lead.owner_id) if lead.owner_id else None
     configure_mapping_path = None
     if "COUNTRY_MAPPING_MISSING" in reasons:
         configure_mapping_path = f"/admin/settings?section=country-sales&pending_country={lead.country}"
     return PendingAssignmentOut(
         **base,
+        owner_id=owner.id if owner else None,
+        owner_name=owner.name if owner else "Unassigned",
         pending_reasons=reasons,
         detail_path=f"/admin/leads/{lead.id}",
         configure_mapping_path=configure_mapping_path,
@@ -478,7 +481,7 @@ def pending_assignments(
     for lead in leads:
         reasons = pending_reasons_for_lead(lead, mapped_countries)
         if reasons:
-            pending_items.append(pending_assignment_out(lead, reasons))
+            pending_items.append(pending_assignment_out(db, lead, reasons))
 
     start = (page - 1) * page_size
     return PendingAssignmentPage(
@@ -574,9 +577,9 @@ def list_leads(
 def get_lead(lead_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Lead:
     lead = db.get(Lead, lead_id)
     if not lead:
-        raise HTTPException(status_code=404, detail="绾跨储涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="Lead not found")
     if user.role == "sales" and lead.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="鏃犳潈鏌ョ湅璇ョ嚎绱?)
+        raise HTTPException(status_code=403, detail="No permission to view this lead")
     return build_lead_detail(db, lead)
 
 
@@ -589,10 +592,10 @@ def build_lead_detail(db: Session, lead: Lead) -> LeadDetailOut:
     background_summary = (
         background.manual_summary or background.auto_summary
         if background
-        else f"{lead.customer_name} 灏氭湭鍏宠仈瀹㈡埛鑳屾櫙璋冩煡锛岄渶杩愯惀琛ュ厖瀹樼綉鎴栭偖绠卞叕寮€淇℃伅銆?
+        else f"{lead.customer_name} has no linked customer background yet; operations should add public website or email evidence."
     )
     feedback_text = (
-        f"{owner.name if owner else '寰呭垎閰?} 褰撳墠鐘舵€佷负 {lead.feedback_status}锛岀嚎绱㈡潵鑷?{source}銆?
+        f"{owner.name if owner else 'Unassigned'} current status is {lead.feedback_status}; lead source is {source}."
     )
     try:
         conversation_history = json.loads(lead.conversation_history or "[]")
@@ -611,24 +614,24 @@ def build_lead_detail(db: Session, lead: Lead) -> LeadDetailOut:
             source=source,
         ),
         score_reasons=[
-            f"璇勫垎鏍囩锛歿lead.score_label}",
-            f"瀹㈡埛韬唤涓?{lead.customer_type}锛屼骇鍝佸叴瓒ｆ槑纭€?,
-            "鍥藉瀛楁瀹屾暣锛屽彲杩涘叆閿€鍞垎鍙戣鍒欍€?,
+            f"Score label: {lead.score_label}",
+            f"Customer type is {lead.customer_type}; product interest is clear.",
+            "Country field is available for sales assignment rules.",
         ],
         background_summary=background_summary,
-        background_confidence=background.confidence if background else "寰呰ˉ鍏?,
+        background_confidence=background.confidence if background else "pending",
         background_updated_at=background.updated_at if background else None,
         customer_id=customer.id if customer else None,
         assignment=LeadAssignmentOut(
             owner_id=owner.id if owner else None,
-            owner_name=owner.name if owner else "寰呭垎閰?,
+            owner_name=owner.name if owner else "Unassigned",
             status=lead.feedback_status,
         ),
         feedback_history=[
             feedback_text,
-            "閿€鍞弽棣堜紭鍏堜簬 AI 璇勫垎锛屼絾 AI 鍒ゆ柇鐞嗙敱浼氫繚鐣欏湪璇︽儏涓€?,
+            "Sales feedback has priority over AI score, while AI reasons remain visible in detail.",
         ],
-        background_task_status="宸插畬鎴? if background else "寰呰ˉ鍏?,
+        background_task_status="completed" if background else "pending",
     )
 
 
@@ -642,11 +645,11 @@ def update_lead_assignment(
 ) -> LeadDetailOut:
     lead = db.get(Lead, lead_id)
     if not lead:
-        raise HTTPException(status_code=404, detail="绾跨储涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="Lead not found")
     if payload.owner_id is not None:
         owner = db.get(User, payload.owner_id)
         if not owner or owner.role != "sales" or not owner.enabled:
-            raise HTTPException(status_code=400, detail="璐熻矗浜哄繀椤绘槸鍚敤鐨勯攢鍞处鍙?)
+            raise HTTPException(status_code=400, detail="Assignee must be an enabled sales user")
         lead.owner_id = owner.id
     else:
         lead.owner_id = None
@@ -708,10 +711,10 @@ def dashboard(
         query = query.where(condition)
 
     total = scoped_count()
-    website_total = scoped_count(Lead.source_category.in_(["缃戠珯", "缂冩垹鐝?]))
+    website_total = scoped_count(Lead.source_category.in_(["网站", "缃戠珯", "website"]))
     rows = db.scalars(query.order_by(Lead.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
 
-    add_audit(db, request.state.trace_id, "dashboard_viewed", "鐢ㄦ埛鏌ョ湅宸ヤ綔鍙伴椤?, actor_id=user.id, target_type="dashboard")
+    add_audit(db, request.state.trace_id, "dashboard_viewed", "Dashboard viewed", actor_id=user.id, target_type="dashboard")
     db.commit()
 
     return DashboardOut(
@@ -720,15 +723,15 @@ def dashboard(
         total=total,
         metrics=DashboardMetrics(
             today_inquiries=scoped_count(Lead.created_at >= today_start),
-            valid_leads=scoped_count(Lead.score_label.in_(["鏈夋晥", "閺堝鏅?])),
-            unfeedback=scoped_count(Lead.feedback_status.in_(["鏈弽棣?, "閺堫亜寮芥＃?"])),
+            valid_leads=scoped_count(Lead.score_label.in_(["有效", "鏈夋晥", "valid"])),
+            unfeedback=scoped_count(Lead.feedback_status.in_(["未反馈", "鏈弽棣?", "unfeedback"])),
             website_kpi=round((website_total / total) * 100) if total else 0,
         ),
-        ai_summary="宸ヤ綔鍙版眹鎬诲綋鍓嶇嚎绱€佸鎴蜂笌鍙嶉鐘舵€侊紝鎵€鏈夋暟瀛楃敱鍚庣鎸夌櫥褰曠敤鎴锋潈闄愯仛鍚堢敓鎴愩€?,
+        ai_summary="Dashboard aggregates current leads, customers, and feedback by login role.",
         assignment_timeline=[
-            DashboardTimelineItem(label="绾跨储杩涘叆", value=f"{total} 鏉″緟澶勭悊璁板綍"),
-            DashboardTimelineItem(label="鏈夋晥鍒ゆ柇", value="浼樺厛澶勭悊鏈夋晥涓庨珮鎰忓悜瀹㈡埛"),
-            DashboardTimelineItem(label="閿€鍞弽棣?, value="鏈弽棣堣褰曢渶瑕佺户缁窡杩?),
+            DashboardTimelineItem(label="Lead intake", value=f"{total} records to review"),
+            DashboardTimelineItem(label="Valid scoring", value="Prioritize valid and high-intent customers"),
+            DashboardTimelineItem(label="Sales feedback", value="Unfeedback records need follow-up"),
         ],
         items=[
             DashboardTodoOut(
@@ -744,9 +747,9 @@ def dashboard(
 def get_customer(customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Customer:
     customer = db.get(Customer, customer_id)
     if not customer:
-        raise HTTPException(status_code=404, detail="瀹㈡埛涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="Customer not found")
     if user.role == "sales" and customer.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="鏃犳潈鏌ョ湅璇ュ鎴?)
+        raise HTTPException(status_code=403, detail="No permission to view this customer")
     return customer
 
 
@@ -759,7 +762,7 @@ def update_customer_background(
 ) -> Customer:
     customer = db.get(Customer, customer_id)
     if not customer or not customer.background:
-        raise HTTPException(status_code=404, detail="瀹㈡埛鑳屾櫙璋冩煡涓嶅瓨鍦?)
+        raise HTTPException(status_code=404, detail="Customer background not found")
     customer.background.manual_summary = payload.manual_summary
     customer.background.updated_by = user.name
     db.add(
@@ -768,7 +771,7 @@ def update_customer_background(
             action="update_customer_background",
             target_type="customer",
             target_id=customer.id,
-            detail="浜哄伐淇敼瀹㈡埛鑳屾櫙璋冩煡",
+            detail="Customer background manually updated",
         )
     )
     db.commit()

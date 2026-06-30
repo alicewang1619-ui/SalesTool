@@ -98,6 +98,23 @@ export type ImportJob = {
   failures: ImportFailure[];
 };
 
+export type PendingAssignment = Lead & {
+  owner_id: number | null;
+  owner_name: string;
+  pending_reasons: string[];
+  detail_path: string;
+  configure_mapping_path?: string | null;
+};
+
+export type AssignmentConfirmResult = {
+  lead_id: number;
+  owner_id: number;
+  owner_name: string;
+  feedback_link_token: string;
+  feedback_link_path: string;
+  expires_at: string;
+};
+
 export type DashboardFilters = {
   page?: number;
   pageSize?: number;
@@ -254,6 +271,24 @@ export function fetchImportJob(taskId: string): Promise<ImportJob> {
 
 export function retryImportJob(taskId: string): Promise<ImportJob> {
   return request<ImportJob>(`/api/import-jobs/${taskId}/retry`, { method: "POST" });
+}
+
+export function fetchPendingAssignments(filters: { page?: number; pageSize?: number } = {}): Promise<PageResult<PendingAssignment>> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20)
+  });
+  return request<PageResult<PendingAssignment>>(`/api/assignments/pending?${params.toString()}`);
+}
+
+export function confirmPendingAssignment(
+  leadId: number,
+  payload: { ownerId: number; expectedOwnerId: number | null }
+): Promise<AssignmentConfirmResult> {
+  return request<AssignmentConfirmResult>(`/api/assignments/${leadId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ owner_id: payload.ownerId, expected_owner_id: payload.expectedOwnerId })
+  });
 }
 
 export async function downloadImportFailures(taskId: string): Promise<string> {

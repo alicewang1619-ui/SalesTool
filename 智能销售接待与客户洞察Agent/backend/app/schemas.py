@@ -74,6 +74,8 @@ class PageResult(BaseModel):
 
 
 class PendingAssignmentOut(LeadOut):
+    owner_id: int | None
+    owner_name: str
     pending_reasons: list[str]
     detail_path: str
     configure_mapping_path: str | None = None

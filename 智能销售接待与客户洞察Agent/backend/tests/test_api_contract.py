@@ -495,6 +495,11 @@ def test_pending_assignments_list_unassigned_and_mapping_failures_with_paginatio
 
 def test_pending_assignment_confirm_writes_owner_feedback_link_and_audit(client: TestClient) -> None:
     headers = auth_headers(client)
+    with SessionLocal() as db:
+        lead = db.query(Lead).filter(Lead.customer_name == "Al Noor Hospital").first()
+        assert lead is not None
+        lead.owner_id = None
+        db.commit()
     target = next(
         item
         for item in client.get("/api/assignments/pending", headers=headers).json()["items"]
@@ -527,6 +532,39 @@ def test_pending_assignment_confirm_writes_owner_feedback_link_and_audit(client:
         and event["trace_id"] == "pending-assignment-test"
         for event in audit.json()["items"]
     )
+
+
+def test_pending_assignment_with_existing_owner_requires_expected_owner(client: TestClient) -> None:
+    headers = auth_headers(client)
+    with SessionLocal() as db:
+        lead = db.query(Lead).filter(Lead.customer_name == "Al Noor Hospital").first()
+        assert lead is not None
+        lead.owner_id = 2
+        db.commit()
+    target = next(
+        item
+        for item in client.get("/api/assignments/pending", headers=headers).json()["items"]
+        if item["customer_name"] == "Al Noor Hospital"
+    )
+    assert target["owner_id"] == 2
+    assert target["owner_name"] == "Maria Chen"
+    assert "COUNTRY_MAPPING_MISSING" in target["pending_reasons"]
+
+    stale = client.post(
+        f"/api/assignments/{target['id']}/assign",
+        json={"owner_id": 2, "expected_owner_id": None},
+        headers=headers,
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "ASSIGNMENT_CONFLICT"
+
+    current = client.post(
+        f"/api/assignments/{target['id']}/assign",
+        json={"owner_id": 2, "expected_owner_id": target["owner_id"]},
+        headers=headers,
+    )
+    assert current.status_code == 200
+    assert current.json()["owner_id"] == 2
 
 
 def test_sales_user_cannot_access_pending_assignments(client: TestClient) -> None:

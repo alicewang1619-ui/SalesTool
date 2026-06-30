@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "@ant-design/v5-patch-for-react-19";
 import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
@@ -14,6 +15,7 @@ import { FeedbackCardPage } from "./pages/FeedbackCardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PendingAssignmentsPage } from "./pages/PendingAssignmentsPage";
 import { ReportsHomePage } from "./pages/ReportsHomePage";
+import { ReportsPeriodPage } from "./pages/ReportsPeriodPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./styles.css";
 
@@ -32,6 +34,7 @@ const router = createBrowserRouter([
       { path: "customers", element: <CustomersPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
       { path: "reports", element: <ReportsHomePage /> },
+      { path: "reports/period", element: <ReportsPeriodPage /> },
       { path: "settings", element: <SettingsPage /> }
     ]
   }

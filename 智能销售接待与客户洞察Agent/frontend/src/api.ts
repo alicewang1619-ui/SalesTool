@@ -123,6 +123,60 @@ export type ReportHomeResult = {
   };
 };
 
+export type ReportBreakdownItem = {
+  label: string;
+  inquiry_count: number;
+  valid_count: number;
+  valid_rate: number;
+};
+
+export type ReportPeriodViewResult = {
+  period: ReportPeriod;
+  query_window: {
+    start_at: string;
+    end_at: string;
+  };
+  filters: {
+    country: string | null;
+    source_category: string | null;
+    product: string | null;
+    feedback_status: string | null;
+  };
+  limits: {
+    page: number;
+    page_size: number;
+  };
+  metrics: {
+    inquiries: number;
+    valid_leads: number;
+    unfeedback: number;
+    website_kpi: number;
+  };
+  breakdowns: {
+    countries: ReportBreakdownItem[];
+    channels: ReportBreakdownItem[];
+    products: ReportBreakdownItem[];
+    feedback_statuses: ReportBreakdownItem[];
+  };
+  items: Array<{
+    id: number;
+    customer_name: string;
+    country: string;
+    source_category: string;
+    product: string;
+    feedback_status: string;
+    score_label: string;
+    owner_id: number | null;
+    detail_path: string;
+  }>;
+  total: number;
+  downstream: {
+    metrics_path: string;
+    export_path: string;
+    export_requires_confirmation: boolean;
+  };
+};
+
 export type SourceOption = {
   category: string;
   label: string;
@@ -331,8 +385,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const rawDetail = detail.detail;
     const message =
       typeof rawDetail === "string" ? rawDetail : typeof rawDetail?.message === "string" ? rawDetail.message : "请求失败";
-    const error = new Error(message);
+    const error = new Error(message) as Error & { traceId?: string };
     error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
+    const traceId = response.headers.get("x-trace-id");
+    if (traceId) {
+      error.traceId = traceId;
+    }
     throw error;
   }
   return response.json() as Promise<T>;
@@ -350,8 +408,12 @@ async function requestForm<T>(path: string, body: FormData): Promise<T> {
     const rawDetail = detail.detail;
     const message =
       typeof rawDetail === "string" ? rawDetail : typeof rawDetail?.message === "string" ? rawDetail.message : "请求失败";
-    const error = new Error(message);
+    const error = new Error(message) as Error & { traceId?: string };
     error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
+    const traceId = response.headers.get("x-trace-id");
+    if (traceId) {
+      error.traceId = traceId;
+    }
     throw error;
   }
   return response.json() as Promise<T>;
@@ -489,6 +551,31 @@ export function fetchReportHome(filters: { period?: ReportPeriod; page?: number;
 
 export function retryReportHome(): Promise<ReportHomeResult["generation"]> {
   return request<ReportHomeResult["generation"]>("/api/reports/home/retry", { method: "POST" });
+}
+
+export function fetchReportPeriod(
+  filters: {
+    period?: ReportPeriod;
+    country?: string;
+    sourceCategory?: string;
+    product?: string;
+    feedbackStatus?: string;
+    page?: number;
+    pageSize?: number;
+    timeoutMs?: number;
+  } = {}
+): Promise<ReportPeriodViewResult> {
+  const params = new URLSearchParams({
+    period: filters.period ?? "day",
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 10)
+  });
+  if (filters.country) params.set("country", filters.country);
+  if (filters.sourceCategory) params.set("source_category", filters.sourceCategory);
+  if (filters.product) params.set("product", filters.product);
+  if (filters.feedbackStatus) params.set("feedback_status", filters.feedbackStatus);
+  if (filters.timeoutMs) params.set("timeout_ms", String(filters.timeoutMs));
+  return request<ReportPeriodViewResult>(`/api/reports/period?${params.toString()}`);
 }
 
 export function fetchCustomer(customerId: string): Promise<Customer> {

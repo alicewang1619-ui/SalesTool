@@ -244,6 +244,64 @@ class ReportRetryOut(BaseModel):
     retry_path: str
 
 
+class ReportPeriodMetricsOut(BaseModel):
+    inquiries: int
+    valid_leads: int
+    unfeedback: int
+    website_kpi: int
+
+
+class ReportPeriodFiltersOut(BaseModel):
+    country: str | None = None
+    source_category: str | None = None
+    product: str | None = None
+    feedback_status: str | None = None
+
+
+class ReportBreakdownItemOut(BaseModel):
+    label: str
+    inquiry_count: int
+    valid_count: int
+    valid_rate: int
+
+
+class ReportPeriodBreakdownsOut(BaseModel):
+    countries: list[ReportBreakdownItemOut]
+    channels: list[ReportBreakdownItemOut]
+    products: list[ReportBreakdownItemOut]
+    feedback_statuses: list[ReportBreakdownItemOut]
+
+
+class ReportPeriodLeadItemOut(BaseModel):
+    id: int
+    customer_name: str
+    country: str
+    source_category: str
+    product: str
+    feedback_status: str
+    score_label: str
+    owner_id: int | None
+    detail_path: str
+
+
+class ReportPeriodDownstreamOut(BaseModel):
+    metrics_path: str
+    export_path: str
+    export_requires_confirmation: bool
+
+
+class ReportPeriodOut(BaseModel):
+    period: str
+    query_window: ReportQueryWindowOut
+    filters: ReportPeriodFiltersOut
+    limits: ReportLimitsOut
+    metrics: ReportPeriodMetricsOut
+    breakdowns: ReportPeriodBreakdownsOut
+    items: list[ReportPeriodLeadItemOut]
+    total: int
+    downstream: ReportPeriodDownstreamOut
+
+
 class CustomerBackgroundSourceOut(BaseModel):
     type: str
     title: str

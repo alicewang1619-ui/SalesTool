@@ -1054,3 +1054,78 @@ def test_sales_user_cannot_access_report_home(client: TestClient) -> None:
 
     assert response.status_code == 403
     assert response.json()["detail"]["code"] == "FORBIDDEN"
+
+
+def test_report_period_aggregates_by_dimensions_and_excludes_money(client: TestClient) -> None:
+    response = client.get("/api/reports/period", params={"period": "year"}, headers=auth_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["period"] == "year"
+    assert_no_money_fields(body)
+    assert body["metrics"]["inquiries"] >= 2
+    assert body["metrics"]["valid_leads"] >= 2
+    assert body["breakdowns"]["countries"][0]["label"]
+    assert body["breakdowns"]["channels"][0]["label"]
+    assert body["breakdowns"]["products"][0]["label"]
+    assert body["breakdowns"]["feedback_statuses"][0]["label"]
+    assert all("inquiry_count" in item and "valid_count" in item for item in body["breakdowns"]["channels"])
+
+
+def test_report_period_filters_change_backend_results_and_cache_context(client: TestClient) -> None:
+    headers = auth_headers(client)
+    all_response = client.get("/api/reports/period", params={"period": "year"}, headers=headers)
+    filtered = client.get(
+        "/api/reports/period",
+        params={"period": "year", "country": "Peru", "source_category": "缃戠珯", "product": "Portable Ultrasound"},
+        headers=headers,
+    )
+
+    assert all_response.status_code == 200
+    assert filtered.status_code == 200
+    all_body = all_response.json()
+    filtered_body = filtered.json()
+    assert filtered_body["filters"]["country"] == "Peru"
+    assert filtered_body["filters"]["source_category"] == "缃戠珯"
+    assert filtered_body["filters"]["product"] == "Portable Ultrasound"
+    assert filtered_body["metrics"]["inquiries"] < all_body["metrics"]["inquiries"]
+    assert all(item["country"] == "Peru" for item in filtered_body["items"])
+    assert all(item["source_category"] == "缃戠珯" for item in filtered_body["items"])
+    assert all(item["product"] == "Portable Ultrasound" for item in filtered_body["items"])
+
+
+def test_report_period_downstream_paths_carry_period_dimension_and_filters(client: TestClient) -> None:
+    response = client.get(
+        "/api/reports/period",
+        params={"period": "month", "country": "Peru", "source_category": "缃戠珯"},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "period=month" in body["downstream"]["metrics_path"]
+    assert "country=Peru" in body["downstream"]["metrics_path"]
+    assert "source_category=" in body["downstream"]["metrics_path"]
+    assert "period=month" in body["downstream"]["export_path"]
+    assert body["downstream"]["export_requires_confirmation"] is True
+
+
+def test_report_period_timeout_returns_traceable_error(client: TestClient) -> None:
+    response = client.get(
+        "/api/reports/period",
+        params={"period": "year", "timeout_ms": 1},
+        headers={**auth_headers(client), "x-trace-id": "report-period-timeout-test"},
+    )
+
+    assert response.status_code == 504
+    assert response.json()["detail"]["code"] == "REPORT_PERIOD_TIMEOUT"
+    assert response.json()["detail"]["trace_id"] == "report-period-timeout-test"
+    assert response.headers["x-trace-id"] == "report-period-timeout-test"
+
+
+def test_sales_user_cannot_access_report_period(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+    response = client.get("/api/reports/period", headers=sales_headers)
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "FORBIDDEN"

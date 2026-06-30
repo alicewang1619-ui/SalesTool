@@ -2,6 +2,7 @@
 import io
 import json
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 from uuid import uuid4
 import zipfile
 import xml.etree.ElementTree as ET
@@ -68,11 +69,18 @@ from .schemas import (
     PageResult,
     ReportChannelQualityItemOut,
     ReportChannelQualityOut,
+    ReportBreakdownItemOut,
     ReportGenerationOut,
     ReportHomeOut,
     ReportLimitsOut,
     ReportMetricCardOut,
+    ReportPeriodBreakdownsOut,
+    ReportPeriodDownstreamOut,
     ReportPeriodEntryOut,
+    ReportPeriodFiltersOut,
+    ReportPeriodLeadItemOut,
+    ReportPeriodMetricsOut,
+    ReportPeriodOut,
     ReportQueryWindowOut,
     ReportRetryOut,
     ReportWebsiteKpiOut,
@@ -1005,6 +1013,154 @@ def retry_report_home(
     )
     db.commit()
     return ReportRetryOut(status="queued", updated_at=generation.updated_at, retry_path=generation.retry_path)
+
+
+def report_period_conditions(
+    start_at: datetime,
+    end_at: datetime,
+    country: str | None,
+    source_category: str | None,
+    product: str | None,
+    feedback_status: str | None,
+) -> list[object]:
+    conditions: list[object] = [Lead.created_at >= start_at, Lead.created_at <= end_at]
+    if country:
+        conditions.append(Lead.country == country)
+    if source_category:
+        conditions.append(Lead.source_category == source_category)
+    if product:
+        conditions.append(Lead.product == product)
+    if feedback_status:
+        conditions.append(Lead.feedback_status == feedback_status)
+    return conditions
+
+
+def report_breakdown(db: Session, conditions: list[object], column: object) -> list[ReportBreakdownItemOut]:
+    valid_case = case((Lead.score_label.in_(VALID_SCORE_LABELS), 1), else_=0)
+    rows = db.execute(
+        select(
+            column,
+            func.count(Lead.id).label("inquiry_count"),
+            func.sum(valid_case).label("valid_count"),
+        )
+        .where(*conditions)
+        .group_by(column)
+        .order_by(func.count(Lead.id).desc(), column)
+        .limit(20)
+    ).all()
+    return [
+        ReportBreakdownItemOut(
+            label=row[0],
+            inquiry_count=row.inquiry_count,
+            valid_count=row.valid_count or 0,
+            valid_rate=pct(row.valid_count or 0, row.inquiry_count),
+        )
+        for row in rows
+    ]
+
+
+def report_downstream_paths(period: str, filters: ReportPeriodFiltersOut) -> ReportPeriodDownstreamOut:
+    params = {"period": period}
+    for key, value in filters.model_dump(exclude_none=True).items():
+        if value:
+            params[key] = value
+    query = urlencode(params)
+    return ReportPeriodDownstreamOut(
+        metrics_path=f"/admin/reports/metrics?{query}",
+        export_path=f"/admin/reports/export?{query}",
+        export_requires_confirmation=True,
+    )
+
+
+@app.get("/api/reports/period", response_model=ReportPeriodOut)
+def report_period(
+    request: Request,
+    period: str = Query("day", pattern="^(day|month|quarter|year)$"),
+    country: str | None = None,
+    source_category: str | None = None,
+    product: str | None = None,
+    feedback_status: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+    timeout_ms: int = Query(3000, ge=1, le=30000),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ReportPeriodOut:
+    if timeout_ms < 5:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail={
+                "code": "REPORT_PERIOD_TIMEOUT",
+                "message": "报表查询超时，请重试",
+                "trace_id": request.state.trace_id,
+            },
+        )
+
+    resolved_period, start_at, end_at = report_period_window(period)
+    filters = ReportPeriodFiltersOut(
+        country=country,
+        source_category=source_category,
+        product=product,
+        feedback_status=feedback_status,
+    )
+    conditions = report_period_conditions(start_at, end_at, country, source_category, product, feedback_status)
+    total = report_count(db, conditions)
+    valid_total = report_count(db, conditions, Lead.score_label.in_(VALID_SCORE_LABELS))
+    unfeedback_total = report_count(db, conditions, Lead.feedback_status.in_(UNFEEDBACK_LABELS))
+    website_total = report_count(db, conditions, Lead.source_category.in_(WEBSITE_SOURCE_LABELS))
+
+    rows = db.execute(
+        select(Lead)
+        .where(*conditions)
+        .order_by(Lead.created_at.desc(), Lead.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).scalars().all()
+
+    add_audit(
+        db,
+        request.state.trace_id,
+        "report_period_viewed",
+        f"Report period viewed: {resolved_period}",
+        actor_id=user.id,
+        target_type="report",
+    )
+    db.commit()
+
+    return ReportPeriodOut(
+        period=resolved_period,
+        query_window=ReportQueryWindowOut(start_at=start_at, end_at=end_at),
+        filters=filters,
+        limits=ReportLimitsOut(page=page, page_size=page_size),
+        metrics=ReportPeriodMetricsOut(
+            inquiries=total,
+            valid_leads=valid_total,
+            unfeedback=unfeedback_total,
+            website_kpi=pct(website_total, total),
+        ),
+        breakdowns=ReportPeriodBreakdownsOut(
+            countries=report_breakdown(db, conditions, Lead.country),
+            channels=report_breakdown(db, conditions, Lead.source_category),
+            products=report_breakdown(db, conditions, Lead.product),
+            feedback_statuses=report_breakdown(db, conditions, Lead.feedback_status),
+        ),
+        items=[
+            ReportPeriodLeadItemOut(
+                id=row.id,
+                customer_name=row.customer_name,
+                country=row.country,
+                source_category=row.source_category,
+                product=row.product,
+                feedback_status=row.feedback_status,
+                score_label=row.score_label,
+                owner_id=row.owner_id,
+                detail_path=f"/admin/leads/{row.id}",
+            )
+            for row in rows
+        ],
+        total=total,
+        downstream=report_downstream_paths(resolved_period, filters),
+    )
 
 
 def customer_conditions(user: User, country: str | None, product: str | None, tier: str | None) -> list[object]:

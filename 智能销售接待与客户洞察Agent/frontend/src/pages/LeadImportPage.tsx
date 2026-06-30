@@ -19,16 +19,21 @@ export function LeadImportPage() {
   const [error, setError] = useState<string | null>(null);
 
   const pollImportJob = async (taskId: string) => {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
       const latest = await fetchImportJob(taskId);
       setJob(latest);
       if (latest.status === "completed") {
         message.success(`导入任务已完成：成功 ${latest.success_rows} 行，失败 ${latest.failed_rows} 行`);
         return;
       }
-      await new Promise((resolve) => window.setTimeout(resolve, 800));
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
     }
   };
+
+  const jobDescription =
+    job?.status === "completed"
+      ? "成功行已持久化到线索池；失败行保留原因，可下载后修正再导入。"
+      : "任务已创建，后台正在处理文件；页面会继续查询最新进度。";
 
   const uploadProps: UploadProps = {
     accept: ".csv,.xlsx",
@@ -144,7 +149,7 @@ export function LeadImportPage() {
               type={job.failed_rows ? "warning" : "success"}
               showIcon
               message={`${job.filename} 已写入后端导入任务 ${job.task_id}`}
-              description="成功行已持久化到线索池；失败行保留原因，可下载后修正再导入。"
+              description={jobDescription}
             />
             <Table<ImportFailure>
               rowKey={(record) => `${record.row_number}-${record.reason}-${record.customer_name}`}

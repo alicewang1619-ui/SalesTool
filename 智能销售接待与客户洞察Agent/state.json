@@ -1,23 +1,24 @@
 ﻿{
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-30T01:53:26Z",
+    "last_updated_at_utc":  "2026-06-30T02:26:14Z",
     "current_stage":  "design-complete",
-    "current_substep":  "tdd-master-installed",
+    "current_substep":  "lead-source-filter-updated",
     "completed_stages":  [
                              "prd-master",
                              "ppt-delivery",
                              "design-I",
                              "design-II",
                              "html-preview-index",
-                             "tdd-master-installed"
+                             "tdd-master-installed",
+                             "lead-source-filter-update"
                          ],
     "skipped_stages":  [
 
                        ],
     "next_action":  {
-                        "type":  "restart_or_new_session_then_start_tdd",
-                        "description":  "TDD master 已安装；重启 Codex 或新会话加载技能后，可进入 TDD master 阶段生成测试用例与验收门禁。"
+                        "type":  "review_updated_html_or_start_tdd",
+                        "description":  "线索池列表已补充来源筛选与来源列；可先查看更新后的 HTML 页面，也可在重启/新会话加载 TDD master 后进入测试用例与验收门禁阶段。"
                     },
     "open_questions":  [
 
@@ -96,6 +97,12 @@
                                    "stage":  "tdd-install",
                                    "decision":  "安装 tdd-master 为 Codex 全局 skill。",
                                    "rationale":  "用户要求阅读远程 tdd.md 并安装 TDD master，当前环境使用 Codex skills 目录。"
+                               },
+                               {
+                                   "id":  "D-13",
+                                   "stage":  "design-iteration",
+                                   "decision":  "线索池列表新增来源筛选和来源列，来源支持官网、社媒、邮箱、线下展会聚合筛选，以及官网聊天、官网后台、Facebook、领英、邮箱、线下展会导入具体标签。",
+                                   "rationale":  "用户在截图中要求红框处从单一官网聊天扩展为多来源，并能按邮箱、社媒、官网筛选对应客户；Facebook/领英仅作为来源标签或授权归档来源，不改变未授权抓取边界。"
                                }
                            ],
     "deliverables":  {
@@ -124,7 +131,8 @@
                        "page_html_count":  25,
                        "html_index_links":  33,
                        "html_index_page_cards":  25,
-                       "last_checked_at_utc":  "2026-06-30T01:47:37Z"
+                       "last_checked_at_utc":  "2026-06-30T02:26:14Z",
+                       "lead_source_filter_html":  "通过：来源列存在；Facebook/领英/邮箱/线下展会导入选项存在；官网/社媒/邮箱过滤结果分别为 3/3/2 条；无 ??? 乱码。"
                    },
     "user_inputs_log":  [
                             {
@@ -136,6 +144,11 @@
                                 "stage":  "tdd-install",
                                 "timestamp":  "2026-06-30T01:53:26Z",
                                 "summary":  "用户要求安装 TDD master；已安装到 Codex 全局 skills 目录。"
+                            },
+                            {
+                                "stage":  "lead-source-filter-update",
+                                "timestamp":  "2026-06-30T02:22:41Z",
+                                "summary":  "用户要求线索池列表增加 Facebook、领英、邮箱、线下展会导入来源选项，表格增加来源列，并支持按邮箱、社媒、官网筛选显示对应客户。"
                             }
                         ]
 }

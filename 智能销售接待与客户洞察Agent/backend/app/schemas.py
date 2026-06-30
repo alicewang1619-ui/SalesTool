@@ -493,6 +493,52 @@ class SalesUserOut(BaseModel):
     enabled: bool
 
 
+class SettingsEntryOut(BaseModel):
+    key: str
+    title: str
+    description: str
+    path: str
+    status: str
+    risk_count: int = 0
+
+
+class SettingsPermissionOut(BaseModel):
+    role: str
+    permissions: list[str]
+
+
+class SettingsOverviewOut(BaseModel):
+    summary: dict[str, int]
+    banner: BannerOut
+    entries: list[SettingsEntryOut]
+    sales_users: list[SalesUserOut]
+    permissions: list[SettingsPermissionOut]
+    risks: list[str]
+    recent_changes: list[dict[str, object]]
+
+
+class SalesUserCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=5, max_length=255)
+    password: str = Field(min_length=8, max_length=120)
+    role: str = Field(pattern="^(sales|ops|admin)$")
+    data_scope: str = Field(default="all", max_length=255)
+    enabled: bool = True
+
+
+class BannerUpdateRequest(BaseModel):
+    title: str = Field(min_length=2, max_length=120)
+    body: str = Field(min_length=2, max_length=500)
+    image_url: str = Field(min_length=1, max_length=200000)
+    link_url: str | None = Field(default=None, max_length=500)
+    active: bool = True
+
+
+class PermissionUpdateRequest(BaseModel):
+    role: str = Field(pattern="^(sales|ops|admin)$")
+    permissions: list[str] = Field(min_length=1)
+
+
 class AuditLogOut(BaseModel):
     id: int
     action: str

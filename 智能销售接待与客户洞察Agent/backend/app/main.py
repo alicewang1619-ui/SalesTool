@@ -28,6 +28,7 @@ from .models import (
     SalesFeedback,
     SalesFeedbackLink,
     SourceDictionary,
+    SystemSetting,
     User,
 )
 from .schemas import (
@@ -94,8 +95,14 @@ from .schemas import (
     ReportRetryOut,
     ReportWebsiteKpiOut,
     SalesUserOut,
+    BannerUpdateRequest,
+    PermissionUpdateRequest,
+    SalesUserCreateRequest,
+    SettingsEntryOut,
+    SettingsOverviewOut,
+    SettingsPermissionOut,
 )
-from .security import create_access_token, verify_password
+from .security import create_access_token, hash_password, verify_password
 from .seed import seed_data
 
 settings = get_settings()
@@ -1752,6 +1759,177 @@ def settings_summary(db: Session = Depends(get_db), user: User = Depends(require
 @app.get("/api/settings/sales-users", response_model=list[SalesUserOut])
 def sales_users(db: Session = Depends(get_db), user: User = Depends(require_admin_or_ops)) -> list[User]:
     return db.scalars(select(User).where(User.role.in_(["sales", "admin", "ops"])).order_by(User.id)).all()
+
+
+DEFAULT_PERMISSION_MATRIX = {
+    "admin": ["settings.manage", "settings.banner.update", "users.manage", "reports.export", "reports.read"],
+    "ops": ["leads.read", "customers.read", "reports.read", "settings.banner.update"],
+    "sales": ["leads.assigned.read", "feedback.submit"],
+}
+
+
+def settings_entries() -> list[SettingsEntryOut]:
+    return [
+        SettingsEntryOut(key="sales_accounts", title="销售账号", description="维护销售与管理员账号", path="/admin/settings?section=sales-users", status="ready"),
+        SettingsEntryOut(key="role_permissions", title="角色权限", description="维护后台菜单、按钮和接口权限", path="/admin/settings?section=permissions", status="ready"),
+        SettingsEntryOut(key="global_banner", title="全局 Banner", description="上传并发布全部后台页面顶部 Banner", path="/admin/settings?section=banner", status="ready"),
+        SettingsEntryOut(key="country_sales_mapping", title="国家区域销售映射", description="维护国家、区域和销售负责人", path="/admin/settings/country-sales", status="warning", risk_count=1),
+        SettingsEntryOut(key="product_knowledge", title="产品知识库", description="维护 ultrasound 产品与 AI 接待知识", path="/admin/settings/product-knowledge", status="ready"),
+        SettingsEntryOut(key="source_dictionary", title="客户来源字典", description="维护官网、邮箱、社媒和线下展会来源", path="/admin/settings?section=sources", status="ready"),
+        SettingsEntryOut(key="channels", title="渠道配置", description="维护 Webhook、邮箱同步和展会导入", path="/admin/settings?section=channels", status="warning", risk_count=1),
+        SettingsEntryOut(key="reminder_rules", title="提醒规则", description="维护 24h/48h 未反馈提醒策略", path="/admin/settings?section=reminders", status="ready"),
+    ]
+
+
+def permission_rows(db: Session) -> list[SettingsPermissionOut]:
+    rows: list[SettingsPermissionOut] = []
+    for role, defaults in DEFAULT_PERMISSION_MATRIX.items():
+        setting = db.get(SystemSetting, f"permissions:{role}")
+        permissions = defaults
+        if setting:
+            try:
+                loaded = json.loads(setting.value)
+                if isinstance(loaded, list) and all(isinstance(item, str) for item in loaded):
+                    permissions = loaded
+            except json.JSONDecodeError:
+                permissions = defaults
+        rows.append(SettingsPermissionOut(role=role, permissions=permissions))
+    return rows
+
+
+@app.get("/api/settings/overview", response_model=SettingsOverviewOut)
+def settings_overview(db: Session = Depends(get_db), user: User = Depends(require_admin_or_ops)) -> SettingsOverviewOut:
+    banner = db.scalar(select(Banner).where(Banner.active.is_(True)).order_by(Banner.updated_at.desc()))
+    if not banner:
+        raise HTTPException(status_code=404, detail=error_detail("BANNER_NOT_CONFIGURED", "Banner not configured"))
+    users = db.scalars(select(User).where(User.role.in_(["sales", "admin", "ops"])).order_by(User.id)).all()
+    changes = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(20)).all()
+    country_mapping_total = db.scalar(select(func.count()).select_from(CountrySalesMapping).where(CountrySalesMapping.active.is_(True))) or 0
+    source_total = db.scalar(select(func.count()).select_from(SourceDictionary).where(SourceDictionary.enabled.is_(True))) or 0
+    return SettingsOverviewOut(
+        summary={
+            "sales_users": len([item for item in users if item.role == "sales"]),
+            "admin_ops_users": len([item for item in users if item.role in {"admin", "ops"}]),
+            "sources": source_total,
+            "active_banners": db.scalar(select(func.count()).select_from(Banner).where(Banner.active.is_(True))) or 0,
+            "country_mappings": country_mapping_total,
+            "permission_roles": len(DEFAULT_PERMISSION_MATRIX),
+        },
+        banner=BannerOut.model_validate(banner, from_attributes=True),
+        entries=settings_entries(),
+        sales_users=[SalesUserOut.model_validate(item, from_attributes=True) for item in users],
+        permissions=permission_rows(db),
+        risks=["6 个国家缺少销售负责人", "邮箱同步需要重试"],
+        recent_changes=[AuditLogOut.model_validate(item, from_attributes=True).model_dump() for item in changes],
+    )
+
+
+@app.post("/api/settings/sales-users", response_model=SalesUserOut, status_code=status.HTTP_201_CREATED)
+def create_sales_user(
+    payload: SalesUserCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> User:
+    existing = db.scalar(select(User).where(User.email == payload.email))
+    if existing:
+        raise HTTPException(status_code=409, detail=error_detail("USER_EMAIL_EXISTS", "User email already exists"))
+    new_user = User(
+        name=payload.name,
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        role=payload.role,
+        data_scope=payload.data_scope,
+        enabled=payload.enabled,
+    )
+    db.add(new_user)
+    db.flush()
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_sales_user_created",
+        f"Settings sales user created: {payload.email}",
+        actor_id=user.id,
+        target_type="user",
+        target_id=new_user.id,
+    )
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+def validate_banner_payload(payload: BannerUpdateRequest) -> None:
+    allowed_image = (
+        payload.image_url.startswith("data:image/png")
+        or payload.image_url.startswith("data:image/jpeg")
+        or payload.image_url.startswith("data:image/webp")
+        or payload.image_url.startswith("/assets/")
+        or payload.image_url.startswith("https://")
+    )
+    if not allowed_image:
+        raise HTTPException(status_code=422, detail=error_detail("BANNER_IMAGE_UNSUPPORTED", "Banner image must be PNG, JPG, WebP, /assets, or HTTPS"))
+    if payload.link_url and not (payload.link_url.startswith("/admin") or payload.link_url.startswith("https://")):
+        raise HTTPException(status_code=422, detail=error_detail("BANNER_LINK_UNSAFE", "Banner link must be an admin path or HTTPS URL"))
+
+
+@app.put("/api/settings/banner", response_model=BannerOut)
+def update_settings_banner(
+    payload: BannerUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> Banner:
+    validate_banner_payload(payload)
+    if payload.active:
+        for banner in db.scalars(select(Banner).where(Banner.active.is_(True))).all():
+            banner.active = False
+    banner = Banner(
+        title=payload.title,
+        body=payload.body,
+        image_url=payload.image_url,
+        link_url=payload.link_url,
+        active=payload.active,
+    )
+    db.add(banner)
+    db.flush()
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_banner_published",
+        f"Settings banner published: {payload.title}",
+        actor_id=user.id,
+        target_type="banner",
+        target_id=banner.id,
+    )
+    db.commit()
+    db.refresh(banner)
+    return banner
+
+
+@app.put("/api/settings/permissions", response_model=SettingsPermissionOut)
+def update_settings_permissions(
+    payload: PermissionUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> SettingsPermissionOut:
+    setting_key = f"permissions:{payload.role}"
+    setting = db.get(SystemSetting, setting_key)
+    if not setting:
+        setting = SystemSetting(key=setting_key, updated_by=user.id)
+        db.add(setting)
+    setting.value = json.dumps(payload.permissions, ensure_ascii=False)
+    setting.updated_by = user.id
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_permissions_updated",
+        f"Settings permissions updated: {payload.role}",
+        actor_id=user.id,
+        target_type="permission",
+    )
+    db.commit()
+    return SettingsPermissionOut(role=payload.role, permissions=payload.permissions)
 
 
 @app.get("/api/audit-logs", response_model=AuditLogPage)

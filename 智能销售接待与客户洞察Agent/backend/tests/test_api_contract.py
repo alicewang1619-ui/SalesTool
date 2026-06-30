@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 import io
 import pytest
 from sqlalchemy import delete
+from uuid import uuid4
 import zipfile
 
 from app.database import Base, SessionLocal, engine
@@ -1329,3 +1330,134 @@ def test_report_export_context_does_not_create_task_until_confirmed(client: Test
         event["action"] == "report_export_created" and event["trace_id"] == "report-export-cancel-test"
         for event in audit.json()["items"]
     )
+
+
+def test_settings_overview_contains_entries_banner_accounts_and_permissions(client: TestClient) -> None:
+    response = client.get("/api/settings/overview", headers=auth_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]["sales_users"] >= 1
+    assert body["banner"]["title"]
+    entry_keys = {entry["key"] for entry in body["entries"]}
+    assert {
+        "sales_accounts",
+        "role_permissions",
+        "global_banner",
+        "country_sales_mapping",
+        "product_knowledge",
+        "source_dictionary",
+        "channels",
+        "reminder_rules",
+    }.issubset(entry_keys)
+    assert any(user["email"] == "maria@ultrasound-growth.local" for user in body["sales_users"])
+    assert any(row["role"] == "sales" for row in body["permissions"])
+
+
+def test_settings_create_sales_user_persists_scope_role_and_audit(client: TestClient) -> None:
+    email = f"lucia-{uuid4().hex[:8]}@ultrasound-growth.local"
+    headers = {**auth_headers(client), "x-trace-id": "settings-create-sales-test"}
+    response = client.post(
+        "/api/settings/sales-users",
+        json={
+            "name": "Lucia Torres",
+            "email": email,
+            "password": "Sales123!",
+            "role": "sales",
+            "data_scope": "Chile",
+            "enabled": True,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["email"] == email
+    assert body["role"] == "sales"
+    assert body["data_scope"] == "Chile"
+    assert body["enabled"] is True
+
+    users = client.get("/api/settings/sales-users", headers=headers).json()
+    assert any(user["email"] == email and user["data_scope"] == "Chile" for user in users)
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "settings_sales_user_created" and event["trace_id"] == "settings-create-sales-test"
+        for event in audit
+    )
+
+
+def test_settings_publish_banner_updates_global_banner_and_audit(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-banner-test"}
+    response = client.put(
+        "/api/settings/banner",
+        json={
+            "title": "Ultrasound Growth Global Notice",
+            "body": "New distributor onboarding policy is available.",
+            "image_url": "data:image/png;base64,iVBORw0KGgo=",
+            "link_url": "/admin/settings",
+            "active": True,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    banner = response.json()
+    assert banner["title"] == "Ultrasound Growth Global Notice"
+    assert banner["image_url"].startswith("data:image/png")
+
+    active = client.get("/api/banner").json()
+    assert active["title"] == "Ultrasound Growth Global Notice"
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "settings_banner_published" and event["trace_id"] == "settings-banner-test"
+        for event in audit
+    )
+
+
+def test_settings_save_permission_matrix_records_audit(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-permission-test"}
+    response = client.put(
+        "/api/settings/permissions",
+        json={"role": "ops", "permissions": ["leads.read", "reports.read", "settings.banner.update"]},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["role"] == "ops"
+    assert "settings.banner.update" in body["permissions"]
+    overview = client.get("/api/settings/overview", headers=headers).json()
+    ops = next(row for row in overview["permissions"] if row["role"] == "ops")
+    assert "settings.banner.update" in ops["permissions"]
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "settings_permissions_updated" and event["trace_id"] == "settings-permission-test"
+        for event in audit
+    )
+
+
+def test_sales_user_cannot_access_settings_management(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+
+    overview = client.get("/api/settings/overview", headers=sales_headers)
+    created = client.post(
+        "/api/settings/sales-users",
+        json={
+            "name": "Blocked Sales",
+            "email": "blocked-sales@ultrasound-growth.local",
+            "password": "Sales123!",
+            "role": "sales",
+            "data_scope": "Peru",
+            "enabled": True,
+        },
+        headers=sales_headers,
+    )
+    banner = client.put(
+        "/api/settings/banner",
+        json={"title": "Blocked", "body": "Blocked", "image_url": "/assets/default-banner.png"},
+        headers=sales_headers,
+    )
+
+    assert overview.status_code == 403
+    assert created.status_code == 403
+    assert banner.status_code == 403

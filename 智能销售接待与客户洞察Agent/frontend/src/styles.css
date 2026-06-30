@@ -340,6 +340,49 @@ body {
   background: #fff;
 }
 
+.settings-section {
+  margin-top: 18px;
+}
+
+.settings-entry-card {
+  min-height: 150px;
+  border: 1px solid #e6eaf3;
+}
+
+.settings-entry-card:hover {
+  border-color: #5b4be8;
+  background: #fbfaff;
+}
+
+.banner-preview {
+  min-height: 210px;
+  padding: 24px;
+  border-radius: 8px;
+  background-color: #4f46e5;
+  background-position: center;
+  background-size: cover;
+  color: #fff;
+}
+
+.banner-preview strong {
+  display: block;
+  max-width: 680px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.banner-preview span {
+  display: block;
+  max-width: 720px;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.permission-checkbox-group {
+  display: grid;
+  gap: 8px;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;

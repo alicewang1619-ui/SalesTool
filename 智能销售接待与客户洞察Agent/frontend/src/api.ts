@@ -450,6 +450,38 @@ export type SalesUser = {
   enabled: boolean;
 };
 
+export type SettingsEntry = {
+  key: string;
+  title: string;
+  description: string;
+  path: string;
+  status: string;
+  risk_count: number;
+};
+
+export type SettingsPermission = {
+  role: string;
+  permissions: string[];
+};
+
+export type SettingsOverview = {
+  summary: Record<string, number>;
+  banner: Banner;
+  entries: SettingsEntry[];
+  sales_users: SalesUser[];
+  permissions: SettingsPermission[];
+  risks: string[];
+  recent_changes: Array<{
+    id: number;
+    action: string;
+    target_type: string;
+    target_id: number | null;
+    trace_id: string;
+    detail: string;
+    created_at: string;
+  }>;
+};
+
 const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET ?? "").trim();
 const API_BASE = import.meta.env.DEV && DEV_PROXY_TARGET ? "" : (import.meta.env.VITE_API_BASE ?? "").trim();
 
@@ -773,6 +805,57 @@ export function fetchSettingsSummary(): Promise<Record<string, number>> {
   return request<Record<string, number>>("/api/settings/summary");
 }
 
+export function fetchSettingsOverview(): Promise<SettingsOverview> {
+  return request<SettingsOverview>("/api/settings/overview");
+}
+
 export function fetchSalesUsers(): Promise<SalesUser[]> {
   return request<SalesUser[]>("/api/settings/sales-users");
+}
+
+export function createSalesUser(payload: {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  dataScope: string;
+  enabled: boolean;
+}): Promise<SalesUser> {
+  return request<SalesUser>("/api/settings/sales-users", {
+    method: "POST",
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      role: payload.role,
+      data_scope: payload.dataScope,
+      enabled: payload.enabled
+    })
+  });
+}
+
+export function updateSettingsBanner(payload: {
+  title: string;
+  body: string;
+  imageUrl: string;
+  linkUrl?: string | null;
+  active: boolean;
+}): Promise<Banner> {
+  return request<Banner>("/api/settings/banner", {
+    method: "PUT",
+    body: JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      image_url: payload.imageUrl,
+      link_url: payload.linkUrl || null,
+      active: payload.active
+    })
+  });
+}
+
+export function updateSettingsPermissions(payload: { role: string; permissions: string[] }): Promise<SettingsPermission> {
+  return request<SettingsPermission>("/api/settings/permissions", {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
 }

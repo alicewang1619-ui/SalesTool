@@ -28,6 +28,15 @@ class SourceDictionary(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Banner(Base):
     __tablename__ = "banners"
 

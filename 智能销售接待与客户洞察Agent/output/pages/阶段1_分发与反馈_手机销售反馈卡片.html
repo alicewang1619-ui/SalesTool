@@ -151,10 +151,18 @@ tr:last-child td { border-bottom: 0; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .card, .topbar, table { animation: rise-in var(--motion-base) var(--ease-standard) both; }
 @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .main { padding: var(--space-4); } .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } .topbar { flex-direction: column; } }
-@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }</style>
+@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }    .global-banner { position: sticky; top: 0; z-index: 20; min-height: 88px; margin: -32px -32px 24px; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.42); background: linear-gradient(105deg, rgba(17,24,39,.76), rgba(91,75,219,.72)), var(--banner-image, url('')); background-size: cover; background-position: center; color: #fff; box-shadow: 0 12px 32px rgba(17,24,39,.12); }
+    .global-banner strong { display: block; font-size: 20px; line-height: 1.2; letter-spacing: 0; }
+    .global-banner span { display: block; margin-top: 4px; max-width: 720px; color: rgba(255,255,255,.84); font-size: 13px; line-height: 1.5; }
+    .global-banner .banner-action { min-height: 36px; padding: 8px 12px; border: 1px solid rgba(255,255,255,.56); border-radius: 8px; background: rgba(255,255,255,.14); color: #fff; font-size: 13px; font-weight: 800; white-space: nowrap; }
+    @media (max-width: 900px) { .global-banner { position: relative; margin: -18px 0 18px; padding: 16px 18px; align-items: flex-start; flex-direction: column; } .global-banner .banner-action { white-space: normal; } }
+  </style>
 </head>
 <body>
-  <main class="phone-shell">
+  <main class="phone-shell"><section class="global-banner" aria-label="全局运营 Banner">
+  <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
+  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
+</section>
     <section class="phone-screen"><div class="eyebrow">销售反馈卡片</div><h1 style="font-size:28px">Dr. Sofia Ramirez</h1><p class="muted">Mexico · Cardiology · Handheld Ultrasound</p><section class="card status-line"><h3>AI 判断理由</h3><p>客户身份明确，临床应用为 Cardiology，已说明需要便携式设备用于诊所筛查，属于有效线索。</p></section><section class="grid"><button class="btn">已联系</button><button class="btn">已报价</button><button class="btn">需跟进</button><button class="btn">无效</button><button class="btn">已成交</button></section><section class="card"><h3>客户判断</h3><div class="grid"><label><input type="radio" name="judge"> 有效客户，继续跟进</label><label><input type="radio" name="judge"> 确认真实需求</label><label><input type="radio" name="judge"> 放入资料库</label><label><input type="radio" name="judge"> 已转代理商</label></div><textarea class="input" rows="4" placeholder="可选备注：客户预算、下一步、风险点"></textarea><button class="btn primary" style="width:100%;margin-top:16px" onclick="showToast(); setTimeout(function(){location.href='阶段1_客户池_客户详情.html'},800)">提交反馈</button><p data-toast class="muted"></p></section></section>
   </main>
   <script>function showToast(){var el=document.querySelector('[data-toast]'); if(el){el.textContent='已提交反馈，系统会同步到报表和客户池';}}</script>

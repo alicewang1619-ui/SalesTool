@@ -151,7 +151,12 @@ tr:last-child td { border-bottom: 0; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .card, .topbar, table { animation: rise-in var(--motion-base) var(--ease-standard) both; }
 @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .main { padding: var(--space-4); } .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } .topbar { flex-direction: column; } }
-@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }</style>
+@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }    .global-banner { position: sticky; top: 0; z-index: 20; min-height: 88px; margin: -32px -32px 24px; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.42); background: linear-gradient(105deg, rgba(17,24,39,.76), rgba(91,75,219,.72)), var(--banner-image, url('')); background-size: cover; background-position: center; color: #fff; box-shadow: 0 12px 32px rgba(17,24,39,.12); }
+    .global-banner strong { display: block; font-size: 20px; line-height: 1.2; letter-spacing: 0; }
+    .global-banner span { display: block; margin-top: 4px; max-width: 720px; color: rgba(255,255,255,.84); font-size: 13px; line-height: 1.5; }
+    .global-banner .banner-action { min-height: 36px; padding: 8px 12px; border: 1px solid rgba(255,255,255,.56); border-radius: 8px; background: rgba(255,255,255,.14); color: #fff; font-size: 13px; font-weight: 800; white-space: nowrap; }
+    @media (max-width: 900px) { .global-banner { position: relative; margin: -18px 0 18px; padding: 16px 18px; align-items: flex-start; flex-direction: column; } .global-banner .banner-action { white-space: normal; } }
+  </style>
 </head>
 <body>
   <div class="app">
@@ -163,10 +168,13 @@ tr:last-child td { border-bottom: 0; }
         <a class="" href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
         <a class="active" href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
         <a class="" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="" href="阶段1_系统配置_国家区域销售映射.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a class="" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
-    <main class="main"><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 报表中心</div><h1>周期报表视图</h1><p class="muted">按日/月/季/年查看询盘量、有效量、国家、渠道、产品和销售反馈。</p></div><div class="filters"><button class="btn" onclick="toast('筛选已更新')"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" onclick="toast('已保存当前操作')"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
+    <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
+  <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
+  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
+</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 报表中心</div><h1>周期报表视图</h1><p class="muted">按日/月/季/年查看询盘量、有效量、国家、渠道、产品和销售反馈。</p></div><div class="filters"><button class="btn" onclick="toast('筛选已更新')"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" onclick="toast('已保存当前操作')"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
     <div class="card metric status-line"><span class="muted">今日询盘</span><strong>42</strong><span class="badge accent">官网 18</span></div>
     <div class="card metric status-line"><span class="muted">有效线索</span><strong>26</strong><span class="badge success">62%</span></div>
     <div class="card metric status-line"><span class="muted">未反馈</span><strong>11</strong><span class="badge warn">48h 3 条</span></div>

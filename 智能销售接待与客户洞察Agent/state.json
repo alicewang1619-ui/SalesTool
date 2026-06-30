@@ -1,9 +1,9 @@
 ﻿{
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-30T02:26:14Z",
+    "last_updated_at_utc":  "2026-06-30T02:54:49Z",
     "current_stage":  "design-complete",
-    "current_substep":  "lead-source-filter-updated",
+    "current_substep":  "customer-source-groups-normalized",
     "completed_stages":  [
                              "prd-master",
                              "ppt-delivery",
@@ -11,14 +11,15 @@
                              "design-II",
                              "html-preview-index",
                              "tdd-master-installed",
-                             "lead-source-filter-update"
+                             "lead-source-filter-update",
+                             "customer-source-groups-normalized"
                          ],
     "skipped_stages":  [
 
                        ],
     "next_action":  {
                         "type":  "review_updated_html_or_start_tdd",
-                        "description":  "线索池列表已补充来源筛选与来源列；可先查看更新后的 HTML 页面，也可在重启/新会话加载 TDD master 后进入测试用例与验收门禁阶段。"
+                        "description":  "客户来源一级分类已统一为网站、邮箱、社媒、线下展会、其他；可查看更新后的线索池 HTML，或进入 TDD master 阶段补测试门禁。"
                     },
     "open_questions":  [
 
@@ -103,6 +104,12 @@
                                    "stage":  "design-iteration",
                                    "decision":  "线索池列表新增来源筛选和来源列，来源支持官网、社媒、邮箱、线下展会聚合筛选，以及官网聊天、官网后台、Facebook、领英、邮箱、线下展会导入具体标签。",
                                    "rationale":  "用户在截图中要求红框处从单一官网聊天扩展为多来源，并能按邮箱、社媒、官网筛选对应客户；Facebook/领英仅作为来源标签或授权归档来源，不改变未授权抓取边界。"
+                               },
+                               {
+                                   "id":  "D-14",
+                                   "stage":  "design-iteration",
+                                   "decision":  "客户来源一级分类固定为网站、邮箱、社媒、线下展会、其他五类。",
+                                   "rationale":  "用户明确提出客户来源要按这 5 个途径分类；具体来源保留为二级标签，避免把 Facebook/领英等具体来源和一级来源混用。"
                                }
                            ],
     "deliverables":  {
@@ -131,8 +138,9 @@
                        "page_html_count":  25,
                        "html_index_links":  33,
                        "html_index_page_cards":  25,
-                       "last_checked_at_utc":  "2026-06-30T02:26:14Z",
-                       "lead_source_filter_html":  "通过：来源列存在；Facebook/领英/邮箱/线下展会导入选项存在；官网/社媒/邮箱过滤结果分别为 3/3/2 条；无 ??? 乱码。"
+                       "last_checked_at_utc":  "2026-06-30T02:54:49Z",
+                       "lead_source_filter_html":  "通过：来源列存在；Facebook/领英/邮箱/线下展会导入选项存在；官网/社媒/邮箱过滤结果分别为 3/3/2 条；无 ??? 乱码。",
+                       "customer_source_groups_html":  "通过：来源筛选项仅为全部来源、网站、邮箱、社媒、线下展会、其他；Chrome 验证网站/邮箱/社媒/线下展会/其他分别筛出 3/2/3/1/1 条；来源列显示一级来源 + 具体来源；无 ??? 乱码。"
                    },
     "user_inputs_log":  [
                             {
@@ -149,6 +157,11 @@
                                 "stage":  "lead-source-filter-update",
                                 "timestamp":  "2026-06-30T02:22:41Z",
                                 "summary":  "用户要求线索池列表增加 Facebook、领英、邮箱、线下展会导入来源选项，表格增加来源列，并支持按邮箱、社媒、官网筛选显示对应客户。"
+                            },
+                            {
+                                "stage":  "customer-source-groups-normalized",
+                                "timestamp":  "2026-06-30T02:43:31Z",
+                                "summary":  "用户明确客户来源一级分类为网站、邮箱、社媒、线下展会、其他。"
                             }
                         ]
 }

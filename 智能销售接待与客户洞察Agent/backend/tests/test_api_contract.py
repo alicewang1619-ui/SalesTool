@@ -6,7 +6,7 @@ import zipfile
 
 from app.database import Base, SessionLocal, engine
 from app.main import app, ensure_sqlite_compatibility
-from app.models import AuditLog, ImportJob, Lead, LoginAttempt, SourceDictionary
+from app.models import AuditLog, ImportJob, Lead, LoginAttempt, SalesFeedback, SalesFeedbackLink, SourceDictionary
 
 
 def make_xlsx(rows: list[list[str]]) -> bytes:
@@ -40,6 +40,8 @@ def client() -> TestClient:
     with SessionLocal() as db:
         db.execute(delete(LoginAttempt))
         db.execute(delete(ImportJob))
+        db.execute(delete(SalesFeedback))
+        db.execute(delete(SalesFeedbackLink))
         db.query(Lead).filter(
             Lead.customer_name.in_(
                 ["Clinica Shanghai", "重复客户", "Excel Clinic", "Clinica Browser Check", "Clinica Andes Pending"]
@@ -603,3 +605,154 @@ def test_pending_assignment_conflict_when_two_admins_assign_same_lead(client: Te
     assert first.status_code == 200
     assert second.status_code == 409
     assert second.json()["detail"]["code"] == "ASSIGNMENT_CONFLICT"
+
+
+def create_feedback_link_for_globalmed(client: TestClient) -> dict[str, object]:
+    headers = auth_headers(client)
+    with SessionLocal() as db:
+        lead = db.query(Lead).filter(Lead.customer_name == "GlobalMed Peru").first()
+        assert lead is not None
+        lead.owner_id = 2
+        db.commit()
+        lead_id = lead.id
+    response = client.post(
+        f"/api/assignments/{lead_id}/assign",
+        json={"owner_id": 2, "expected_owner_id": 2},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_feedback_card_returns_customer_summary_for_valid_link(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+
+    response = client.get(f"/api/feedback-links/{link['feedback_link_token']}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["token"] == link["feedback_link_token"]
+    assert body["lead"]["customer_name"] == "GlobalMed Peru"
+    assert body["lead"]["country"] == "Peru"
+    assert body["lead"]["product"] == "Portable Ultrasound"
+    assert body["owner"]["name"] == "Maria Chen"
+    assert body["status_options"] == ["已联系", "已报价", "需跟进", "无效", "已成交"]
+    assert "有效客户，继续跟进" in body["judgement_options"]
+    assert body["background_summary"]
+    assert body["ai_reason"]
+    assert body["expires_at"]
+
+
+def test_feedback_submit_writes_feedback_updates_lead_and_audit(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+
+    response = client.post(
+        f"/api/feedback-links/{link['feedback_link_token']}/submit",
+        json={
+            "feedback_status": "已联系",
+            "customer_judgement": "有效客户，继续跟进",
+            "remark": "客户希望三天后收到 Portable Ultrasound 对比资料。",
+        },
+        headers={"x-trace-id": "feedback-submit-test"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["feedback_status"] == "已联系"
+    assert body["customer_judgement"] == "有效客户，继续跟进"
+    assert body["remark"].startswith("客户希望三天后")
+    assert body["submitted_at"]
+
+    headers = auth_headers(client)
+    detail = client.get(f"/api/leads/{link['lead_id']}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["assignment"]["status"] == "已联系"
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert any(
+        event["action"] == "sales_feedback_submitted"
+        and event["target_id"] == link["lead_id"]
+        and event["trace_id"] == "feedback-submit-test"
+        for event in audit.json()["items"]
+    )
+
+
+def test_feedback_link_rejects_expired_or_non_owner_link(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+    with SessionLocal() as db:
+        feedback_link = db.query(SalesFeedbackLink).filter(SalesFeedbackLink.token == link["feedback_link_token"]).first()
+        assert feedback_link is not None
+        feedback_link.expires_at = feedback_link.created_at
+        db.commit()
+
+    expired = client.get(f"/api/feedback-links/{link['feedback_link_token']}")
+    assert expired.status_code == 410
+    assert expired.json()["detail"]["code"] == "FEEDBACK_LINK_EXPIRED"
+
+    with SessionLocal() as db:
+        feedback_link = db.query(SalesFeedbackLink).filter(SalesFeedbackLink.token == link["feedback_link_token"]).first()
+        assert feedback_link is not None
+        feedback_link.expires_at = feedback_link.created_at.replace(year=feedback_link.created_at.year + 1)
+        feedback_link.owner_id = 3
+        db.commit()
+
+    forbidden = client.get(f"/api/feedback-links/{link['feedback_link_token']}")
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"]["code"] == "FEEDBACK_LINK_OWNER_MISMATCH"
+
+
+def test_feedback_submit_rejects_expired_link_before_writing_feedback(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+    with SessionLocal() as db:
+        feedback_link = db.query(SalesFeedbackLink).filter(SalesFeedbackLink.token == link["feedback_link_token"]).first()
+        assert feedback_link is not None
+        feedback_link.expires_at = feedback_link.created_at
+        db.commit()
+
+    response = client.post(
+        f"/api/feedback-links/{link['feedback_link_token']}/submit",
+        json={
+            "feedback_status": "已联系",
+            "customer_judgement": "有效客户，继续跟进",
+            "remark": "过期链接不应写入反馈。",
+        },
+    )
+
+    assert response.status_code == 410
+    assert response.json()["detail"]["code"] == "FEEDBACK_LINK_EXPIRED"
+    with SessionLocal() as db:
+        assert db.query(SalesFeedback).filter(SalesFeedback.lead_id == link["lead_id"]).count() == 0
+
+
+def test_feedback_submit_is_idempotent_for_duplicate_clicks(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+    payload = {
+        "feedback_status": "需跟进",
+        "customer_judgement": "确认真实需求",
+        "remark": "第一次点击后页面又连续点了一次提交。",
+    }
+
+    first = client.post(
+        f"/api/feedback-links/{link['feedback_link_token']}/submit",
+        json=payload,
+        headers={"x-trace-id": "feedback-idempotent-test"},
+    )
+    second = client.post(
+        f"/api/feedback-links/{link['feedback_link_token']}/submit",
+        json=payload,
+        headers={"x-trace-id": "feedback-idempotent-test"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]
+    headers = auth_headers(client)
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    submitted_events = [
+        event
+        for event in audit
+        if event["action"] == "sales_feedback_submitted"
+        and event["target_id"] == link["lead_id"]
+        and event["trace_id"] == "feedback-idempotent-test"
+    ]
+    assert len(submitted_events) == 1

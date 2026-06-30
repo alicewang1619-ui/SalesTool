@@ -115,6 +115,30 @@ export type AssignmentConfirmResult = {
   expires_at: string;
 };
 
+export type FeedbackCard = {
+  token: string;
+  lead: Lead;
+  owner: {
+    id: number;
+    name: string;
+  };
+  ai_reason: string;
+  background_summary: string;
+  status_options: string[];
+  judgement_options: string[];
+  expires_at: string;
+  submitted: boolean;
+};
+
+export type FeedbackSubmitResult = {
+  id: number;
+  lead_id: number;
+  feedback_status: string;
+  customer_judgement: string;
+  remark: string;
+  submitted_at: string;
+};
+
 export type DashboardFilters = {
   page?: number;
   pageSize?: number;
@@ -288,6 +312,24 @@ export function confirmPendingAssignment(
   return request<AssignmentConfirmResult>(`/api/assignments/${leadId}/assign`, {
     method: "POST",
     body: JSON.stringify({ owner_id: payload.ownerId, expected_owner_id: payload.expectedOwnerId })
+  });
+}
+
+export function fetchFeedbackCard(token: string): Promise<FeedbackCard> {
+  return request<FeedbackCard>(`/api/feedback-links/${token}`);
+}
+
+export function submitFeedbackCard(
+  token: string,
+  payload: { feedbackStatus: string; customerJudgement: string; remark: string }
+): Promise<FeedbackSubmitResult> {
+  return request<FeedbackSubmitResult>(`/api/feedback-links/${token}/submit`, {
+    method: "POST",
+    body: JSON.stringify({
+      feedback_status: payload.feedbackStatus,
+      customer_judgement: payload.customerJudgement,
+      remark: payload.remark
+    })
   });
 }
 

@@ -102,6 +102,38 @@ class AssignmentConfirmOut(BaseModel):
     expires_at: str
 
 
+class FeedbackOwnerOut(BaseModel):
+    id: int
+    name: str
+
+
+class FeedbackCardOut(BaseModel):
+    token: str
+    lead: LeadOut
+    owner: FeedbackOwnerOut
+    ai_reason: str
+    background_summary: str
+    status_options: list[str]
+    judgement_options: list[str]
+    expires_at: str
+    submitted: bool
+
+
+class FeedbackSubmitRequest(BaseModel):
+    feedback_status: str = Field(min_length=2, max_length=80)
+    customer_judgement: str = Field(min_length=2, max_length=120)
+    remark: str = Field(default="", max_length=1000)
+
+
+class FeedbackSubmitOut(BaseModel):
+    id: int
+    lead_id: int
+    feedback_status: str
+    customer_judgement: str
+    remark: str
+    submitted_at: datetime
+
+
 class ImportFailureOut(BaseModel):
     row_number: int
     customer_name: str

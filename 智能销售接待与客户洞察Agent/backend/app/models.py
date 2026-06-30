@@ -80,6 +80,19 @@ class SalesFeedbackLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class SalesFeedback(Base):
+    __tablename__ = "sales_feedbacks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    link_id: Mapped[int] = mapped_column(ForeignKey("sales_feedback_links.id"), unique=True, nullable=False, index=True)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), nullable=False, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    feedback_status: Mapped[str] = mapped_column(String(80), nullable=False)
+    customer_judgement: Mapped[str] = mapped_column(String(120), nullable=False)
+    remark: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class ImportJob(Base):
     __tablename__ = "import_jobs"
 

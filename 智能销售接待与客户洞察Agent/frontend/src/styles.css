@@ -245,6 +245,91 @@ body {
   color: #6b7689;
 }
 
+.feedback-app {
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.feedback-app .global-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.feedback-phone {
+  width: min(100%, 430px);
+  min-height: calc(100vh - 96px);
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+}
+
+.feedback-loading {
+  display: grid;
+  min-height: 360px;
+  place-items: center;
+}
+
+.feedback-heading {
+  margin-bottom: 16px;
+}
+
+.feedback-heading h1 {
+  margin: 4px 0 4px;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.feedback-card {
+  margin-bottom: 14px;
+  border: 1px solid #e5e9f2;
+  box-shadow: 0 0 0 1px #e5e9f2;
+}
+
+.feedback-fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #eef1f7;
+}
+
+.feedback-fact + .feedback-fact {
+  margin-top: 10px;
+}
+
+.feedback-fact span {
+  color: #6b7689;
+}
+
+.feedback-radio,
+.feedback-choice {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+}
+
+.feedback-radio .ant-radio-button-wrapper {
+  width: 100%;
+  height: 42px;
+  border-inline-start-width: 1px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.feedback-radio .ant-radio-button-wrapper::before {
+  display: none;
+}
+
+.feedback-choice .ant-radio-wrapper {
+  min-height: 40px;
+  margin-inline-end: 0;
+  padding: 9px 12px;
+  border: 1px solid #d9deea;
+  border-radius: 8px;
+  background: #fff;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;
@@ -273,6 +358,10 @@ body {
     align-items: flex-start;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .feedback-app .global-banner {
+    position: relative;
   }
 
   .page-heading,

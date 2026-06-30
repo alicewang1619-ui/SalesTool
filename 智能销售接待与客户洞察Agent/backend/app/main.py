@@ -23,6 +23,7 @@ from .models import (
     ImportJob,
     Lead,
     LoginAttempt,
+    SalesFeedback,
     SalesFeedbackLink,
     SourceDictionary,
     User,
@@ -39,6 +40,10 @@ from .schemas import (
     DashboardOut,
     DashboardTimelineItem,
     DashboardTodoOut,
+    FeedbackCardOut,
+    FeedbackOwnerOut,
+    FeedbackSubmitOut,
+    FeedbackSubmitRequest,
     LeadAssignmentUpdate,
     LeadDetailOut,
     LeadAssignmentOut,
@@ -464,6 +469,110 @@ def pending_assignment_out(db: Session, lead: Lead, reasons: list[str]) -> Pendi
         detail_path=f"/admin/leads/{lead.id}",
         configure_mapping_path=configure_mapping_path,
     )
+
+
+FEEDBACK_STATUS_OPTIONS = ["已联系", "已报价", "需跟进", "无效", "已成交"]
+FEEDBACK_JUDGEMENT_OPTIONS = ["有效客户，继续跟进", "确认真实需求", "放入资料库", "已转代理商"]
+
+
+def load_valid_feedback_context(db: Session, token: str) -> tuple[SalesFeedbackLink, Lead, User]:
+    feedback_link = db.scalar(select(SalesFeedbackLink).where(SalesFeedbackLink.token == token))
+    if not feedback_link:
+        raise HTTPException(status_code=404, detail=error_detail("FEEDBACK_LINK_NOT_FOUND", "Feedback link not found."))
+    if not feedback_link.active or feedback_link.expires_at <= datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=error_detail("FEEDBACK_LINK_EXPIRED", "Feedback link has expired. Request a new link."),
+        )
+    lead = db.get(Lead, feedback_link.lead_id)
+    owner = db.get(User, feedback_link.owner_id)
+    if not lead or not owner or lead.owner_id != feedback_link.owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=error_detail("FEEDBACK_LINK_OWNER_MISMATCH", "Feedback link does not match current owner."),
+        )
+    return feedback_link, lead, owner
+
+
+def feedback_card_out(db: Session, feedback_link: SalesFeedbackLink, lead: Lead, owner: User) -> FeedbackCardOut:
+    detail = build_lead_detail(db, lead)
+    submitted = db.scalar(select(SalesFeedback.id).where(SalesFeedback.link_id == feedback_link.id)) is not None
+    return FeedbackCardOut(
+        token=feedback_link.token,
+        lead=LeadOut.model_validate(lead, from_attributes=True),
+        owner=FeedbackOwnerOut(id=owner.id, name=owner.name),
+        ai_reason=detail.score_reasons[1] if detail.score_reasons else "",
+        background_summary=detail.background_summary,
+        status_options=FEEDBACK_STATUS_OPTIONS,
+        judgement_options=FEEDBACK_JUDGEMENT_OPTIONS,
+        expires_at=feedback_link.expires_at.isoformat(),
+        submitted=submitted,
+    )
+
+
+def feedback_submit_out(feedback: SalesFeedback) -> FeedbackSubmitOut:
+    return FeedbackSubmitOut(
+        id=feedback.id,
+        lead_id=feedback.lead_id,
+        feedback_status=feedback.feedback_status,
+        customer_judgement=feedback.customer_judgement,
+        remark=feedback.remark,
+        submitted_at=feedback.submitted_at,
+    )
+
+
+@app.get("/api/feedback-links/{token}", response_model=FeedbackCardOut)
+def get_feedback_card(token: str, db: Session = Depends(get_db)) -> FeedbackCardOut:
+    feedback_link, lead, owner = load_valid_feedback_context(db, token)
+    return feedback_card_out(db, feedback_link, lead, owner)
+
+
+@app.post("/api/feedback-links/{token}/submit", response_model=FeedbackSubmitOut)
+def submit_feedback_card(
+    token: str,
+    payload: FeedbackSubmitRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> FeedbackSubmitOut:
+    feedback_link, lead, owner = load_valid_feedback_context(db, token)
+    if payload.feedback_status not in FEEDBACK_STATUS_OPTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail("INVALID_FEEDBACK_STATUS", "Feedback status is not supported."),
+        )
+    if payload.customer_judgement not in FEEDBACK_JUDGEMENT_OPTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail("INVALID_CUSTOMER_JUDGEMENT", "Customer judgement is not supported."),
+        )
+
+    existing = db.scalar(select(SalesFeedback).where(SalesFeedback.link_id == feedback_link.id))
+    if existing:
+        return feedback_submit_out(existing)
+
+    feedback = SalesFeedback(
+        link_id=feedback_link.id,
+        lead_id=lead.id,
+        owner_id=owner.id,
+        feedback_status=payload.feedback_status,
+        customer_judgement=payload.customer_judgement,
+        remark=payload.remark.strip(),
+    )
+    lead.feedback_status = payload.feedback_status
+    db.add(feedback)
+    db.flush()
+    add_audit(
+        db,
+        request.state.trace_id,
+        "sales_feedback_submitted",
+        f"Sales feedback submitted for {lead.customer_name}: {payload.feedback_status} / {payload.customer_judgement}.",
+        actor_id=owner.id,
+        target_type="lead",
+        target_id=lead.id,
+    )
+    db.commit()
+    db.refresh(feedback)
+    return feedback_submit_out(feedback)
 
 
 @app.get("/api/assignments/pending", response_model=PendingAssignmentPage)

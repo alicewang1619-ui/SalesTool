@@ -14,3 +14,8 @@
 | PAGE-FEEDBACK-04 | P1 | 重复点击提交 | 连续发送请求 | 后端幂等处理，只保留一次有效反馈和一次审计记录 | 重复提交会污染反馈历史 |
 | PAGE-FEEDBACK-05 | P2 | 手机窄屏输入长备注 | 提交前检查布局 | 按钮、单选项和备注框无重叠，焦点可见 | 移动端布局破坏会阻断销售使用 |
 
+## 当前落地映射（06-30-2026）
+- 后端模型：`SalesFeedbackLink` 负责 7 天安全链接，`SalesFeedback` 负责一次有效提交记录，`link_id` 唯一约束用于幂等。
+- 后端接口：`GET /api/feedback-links/{token}` 返回 H5 卡片数据；`POST /api/feedback-links/{token}/submit` 校验 token、有效期、负责人一致性后写入反馈并更新线索状态。
+- 前端路由：`/feedback/:token` 渲染真实 H5 反馈卡片，包含全局 Banner、客户摘要、AI 判断理由、反馈状态、客户判断、备注和提交反馈。
+- 当前自动化验证：`py -m pytest .\tests -q -k feedback` 为 6 passed；后端全量 `py -m pytest .\tests -q` 为 30 passed；前端 `npm.cmd run build` 通过。

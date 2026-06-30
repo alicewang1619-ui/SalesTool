@@ -9,6 +9,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadImportPage } from "./pages/LeadImportPage";
+import { FeedbackCardPage } from "./pages/FeedbackCardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PendingAssignmentsPage } from "./pages/PendingAssignmentsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -16,6 +17,7 @@ import "./styles.css";
 
 const router = createBrowserRouter([
   { path: "/", element: <LoginPage /> },
+  { path: "/feedback/:token", element: <FeedbackCardPage /> },
   {
     path: "/admin",
     element: <AppShell />,

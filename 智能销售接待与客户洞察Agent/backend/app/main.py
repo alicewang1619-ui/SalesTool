@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, inspect, select, text
+from sqlalchemy import case, func, inspect, select, text
 from sqlalchemy.orm import Session, joinedload
 
 from .config import get_settings
@@ -66,6 +66,16 @@ from .schemas import (
     LoginRequest,
     LoginResponse,
     PageResult,
+    ReportChannelQualityItemOut,
+    ReportChannelQualityOut,
+    ReportGenerationOut,
+    ReportHomeOut,
+    ReportLimitsOut,
+    ReportMetricCardOut,
+    ReportPeriodEntryOut,
+    ReportQueryWindowOut,
+    ReportRetryOut,
+    ReportWebsiteKpiOut,
     SalesUserOut,
 )
 from .security import create_access_token, verify_password
@@ -860,6 +870,141 @@ def dashboard(
             for row in rows
         ],
     )
+
+
+VALID_SCORE_LABELS = ["有效", "鏈夋晥", "valid", "高意向", "高意向"]
+UNFEEDBACK_LABELS = ["未反馈", "鏈弽棣?", "unfeedback"]
+WEBSITE_SOURCE_LABELS = ["网站", "缃戠珯", "website", "官网"]
+
+
+def report_period_window(period: str) -> tuple[str, datetime, datetime]:
+    now = datetime.utcnow()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "month":
+        return period, today.replace(day=1), now
+    if period == "quarter":
+        first_month = ((today.month - 1) // 3) * 3 + 1
+        return period, today.replace(month=first_month, day=1), now
+    if period == "year":
+        return period, today.replace(month=1, day=1), now
+    return "day", today, now
+
+
+def report_count(db: Session, conditions: list[object], *extra_conditions: object) -> int:
+    query = select(func.count()).select_from(Lead)
+    for condition in [*conditions, *extra_conditions]:
+        query = query.where(condition)
+    return db.scalar(query) or 0
+
+
+def pct(part: int, whole: int) -> int:
+    return round((part / whole) * 100) if whole else 0
+
+
+def report_generation(db: Session) -> ReportGenerationOut:
+    updated_at = db.scalar(select(func.max(Lead.created_at))) or datetime.utcnow()
+    return ReportGenerationOut(status="ready", updated_at=updated_at, retry_path="/api/reports/home/retry")
+
+
+@app.get("/api/reports/home", response_model=ReportHomeOut)
+def report_home(
+    request: Request,
+    period: str = Query("day", pattern="^(day|month|quarter|year)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=20),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ReportHomeOut:
+    resolved_period, start_at, end_at = report_period_window(period)
+    conditions: list[object] = [Lead.created_at >= start_at, Lead.created_at <= end_at]
+
+    total = report_count(db, conditions)
+    valid_total = report_count(db, conditions, Lead.score_label.in_(VALID_SCORE_LABELS))
+    unfeedback_total = report_count(db, conditions, Lead.feedback_status.in_(UNFEEDBACK_LABELS))
+    website_total = report_count(db, conditions, Lead.source_category.in_(WEBSITE_SOURCE_LABELS))
+    assigned_total = report_count(db, conditions, Lead.owner_id.is_not(None))
+    feedback_total = db.scalar(
+        select(func.count(func.distinct(SalesFeedback.lead_id)))
+        .select_from(SalesFeedback)
+        .join(Lead, Lead.id == SalesFeedback.lead_id)
+        .where(Lead.created_at >= start_at, Lead.created_at <= end_at)
+    ) or 0
+    customer_total = db.scalar(select(func.count()).select_from(Customer)) or 0
+
+    valid_case = case((Lead.score_label.in_(VALID_SCORE_LABELS), 1), else_=0)
+    channel_query = (
+        select(
+            Lead.source_category,
+            func.count(Lead.id).label("inquiry_count"),
+            func.sum(valid_case).label("valid_count"),
+        )
+        .where(*conditions)
+        .group_by(Lead.source_category)
+        .order_by(func.count(Lead.id).desc(), Lead.source_category.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    channel_total = db.scalar(
+        select(func.count(func.distinct(Lead.source_category))).select_from(Lead).where(*conditions)
+    ) or 0
+    channel_items = [
+        ReportChannelQualityItemOut(
+            source_category=row.source_category,
+            inquiry_count=row.inquiry_count,
+            valid_count=row.valid_count or 0,
+            valid_rate=pct(row.valid_count or 0, row.inquiry_count),
+        )
+        for row in db.execute(channel_query).all()
+    ]
+
+    add_audit(db, request.state.trace_id, "report_home_viewed", "Report home viewed", actor_id=user.id, target_type="report")
+    db.commit()
+
+    return ReportHomeOut(
+        period=resolved_period,
+        query_window=ReportQueryWindowOut(start_at=start_at, end_at=end_at),
+        limits=ReportLimitsOut(page=page, page_size=page_size),
+        metrics=[
+            ReportMetricCardOut(key="today_inquiries", label="今日询盘", value=report_count(db, [Lead.created_at >= report_period_window("day")[1]]), hint="当日进入系统的询盘"),
+            ReportMetricCardOut(key="valid_leads", label="有效线索", value=valid_total, hint="当前周期内有效与高意向线索"),
+            ReportMetricCardOut(key="unfeedback", label="未反馈", value=unfeedback_total, hint="当前周期内未收到销售反馈"),
+            ReportMetricCardOut(key="website_kpi", label="官网 KPI", value=pct(website_total, total), unit="%", hint="官网来源占比"),
+        ],
+        period_entries=[
+            ReportPeriodEntryOut(period="day", label="日报", path="/admin/reports/period?period=day"),
+            ReportPeriodEntryOut(period="month", label="月报", path="/admin/reports/period?period=month"),
+            ReportPeriodEntryOut(period="quarter", label="季报", path="/admin/reports/period?period=quarter"),
+            ReportPeriodEntryOut(period="year", label="年报", path="/admin/reports/period?period=year"),
+        ],
+        channel_quality=ReportChannelQualityOut(total=channel_total, items=channel_items),
+        website_kpi=ReportWebsiteKpiOut(
+            attribution_rate=pct(website_total, total),
+            ai_completion_rate=pct(valid_total, total),
+            assignment_rate=pct(assigned_total, total),
+            sales_feedback_rate=pct(feedback_total, total),
+            entered_customer_pool=customer_total,
+        ),
+        generation=report_generation(db),
+    )
+
+
+@app.post("/api/reports/home/retry", response_model=ReportRetryOut)
+def retry_report_home(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ReportRetryOut:
+    generation = report_generation(db)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "report_home_retry_requested",
+        "Report home aggregation retry requested",
+        actor_id=user.id,
+        target_type="report",
+    )
+    db.commit()
+    return ReportRetryOut(status="queued", updated_at=generation.updated_at, retry_path=generation.retry_path)
 
 
 def customer_conditions(user: User, country: str | None, product: str | None, tier: str | None) -> list[object]:

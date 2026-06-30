@@ -13,6 +13,7 @@ import { LeadImportPage } from "./pages/LeadImportPage";
 import { FeedbackCardPage } from "./pages/FeedbackCardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PendingAssignmentsPage } from "./pages/PendingAssignmentsPage";
+import { ReportsHomePage } from "./pages/ReportsHomePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./styles.css";
 
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: "assignments/pending", element: <PendingAssignmentsPage /> },
       { path: "customers", element: <CustomersPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
+      { path: "reports", element: <ReportsHomePage /> },
       { path: "settings", element: <SettingsPage /> }
     ]
   }

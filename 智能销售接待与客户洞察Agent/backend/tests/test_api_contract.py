@@ -982,3 +982,75 @@ def test_feedback_submit_is_idempotent_for_duplicate_clicks(client: TestClient) 
         and event["trace_id"] == "feedback-idempotent-test"
     ]
     assert len(submitted_events) == 1
+
+
+def assert_no_money_fields(value: object) -> None:
+    forbidden = {"deal_amount", "quote_amount", "revenue", "amount", "成交金额", "报价金额"}
+    text = str(value)
+    for key in forbidden:
+        assert key not in text
+
+
+def test_report_home_returns_non_money_metrics_and_period_entries(client: TestClient) -> None:
+    response = client.get("/api/reports/home", params={"period": "day"}, headers=auth_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert_no_money_fields(body)
+    assert {entry["period"] for entry in body["period_entries"]} == {"day", "month", "quarter", "year"}
+    assert {entry["label"] for entry in body["period_entries"]} == {"日报", "月报", "季报", "年报"}
+    assert all(entry["path"].startswith("/admin/reports/period?period=") for entry in body["period_entries"])
+
+    metric_keys = {metric["key"] for metric in body["metrics"]}
+    assert {"today_inquiries", "valid_leads", "unfeedback", "website_kpi"}.issubset(metric_keys)
+    assert body["metrics"][0]["value"] >= 1
+    assert body["website_kpi"]["entered_customer_pool"] >= 1
+
+
+def test_report_home_channel_quality_is_backend_aggregated_and_limited(client: TestClient) -> None:
+    headers = auth_headers(client)
+    response = client.get(
+        "/api/reports/home",
+        params={"period": "year", "page": 1, "page_size": 2},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["query_window"]["start_at"]
+    assert body["query_window"]["end_at"]
+    assert body["limits"]["page"] == 1
+    assert body["limits"]["page_size"] == 2
+    assert len(body["channel_quality"]["items"]) <= 2
+    assert body["channel_quality"]["total"] >= len(body["channel_quality"]["items"])
+    first = body["channel_quality"]["items"][0]
+    assert {"source_category", "inquiry_count", "valid_count", "valid_rate"}.issubset(first)
+    assert first["inquiry_count"] >= first["valid_count"]
+
+
+def test_report_home_generation_status_retry_and_audit(client: TestClient) -> None:
+    headers = auth_headers(client)
+    response = client.get("/api/reports/home", headers=headers)
+    assert response.status_code == 200
+    generation = response.json()["generation"]
+    assert generation["status"] in {"ready", "generating"}
+    assert generation["updated_at"]
+    assert generation["retry_path"] == "/api/reports/home/retry"
+
+    retry = client.post("/api/reports/home/retry", headers={**headers, "x-trace-id": "report-home-retry-test"})
+    assert retry.status_code == 200
+    assert retry.json()["status"] in {"ready", "queued"}
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert any(
+        event["action"] == "report_home_retry_requested" and event["trace_id"] == "report-home-retry-test"
+        for event in audit.json()["items"]
+    )
+
+
+def test_sales_user_cannot_access_report_home(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+    response = client.get("/api/reports/home", headers=sales_headers)
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "FORBIDDEN"

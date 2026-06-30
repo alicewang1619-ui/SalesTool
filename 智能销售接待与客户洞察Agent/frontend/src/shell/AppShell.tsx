@@ -12,7 +12,7 @@ const items = [
   { key: "/admin/leads", icon: <Database size={18} />, label: "线索池" },
   { key: "/admin/assignments/pending", icon: <ClipboardList size={18} />, label: "待分配" },
   { key: "/admin/customers", icon: <UsersRound size={18} />, label: "客户池" },
-  { key: "reports", icon: <BarChart3 size={18} />, label: "报表" },
+  { key: "/admin/reports", icon: <BarChart3 size={18} />, label: "报表" },
   { key: "/admin/settings", icon: <Settings size={18} />, label: "配置" }
 ];
 
@@ -49,6 +49,8 @@ export function AppShell() {
       ? "/admin/assignments/pending"
       : location.pathname.startsWith("/admin/customers")
         ? "/admin/customers"
+      : location.pathname.startsWith("/admin/reports")
+        ? "/admin/reports"
       : location.pathname;
 
   return (
@@ -62,9 +64,7 @@ export function AppShell() {
           mode="inline"
           selectedKeys={[selectedKey]}
           items={items}
-          onClick={(event) => {
-            if (event.key !== "reports") navigate(event.key);
-          }}
+          onClick={(event) => navigate(event.key)}
         />
       </Sider>
       <Layout>

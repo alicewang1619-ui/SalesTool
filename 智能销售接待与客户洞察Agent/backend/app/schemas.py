@@ -177,6 +177,73 @@ class DashboardOut(BaseModel):
     items: list[DashboardTodoOut]
 
 
+class ReportMetricCardOut(BaseModel):
+    key: str
+    label: str
+    value: int
+    unit: str = ""
+    hint: str = ""
+
+
+class ReportPeriodEntryOut(BaseModel):
+    period: str
+    label: str
+    path: str
+
+
+class ReportQueryWindowOut(BaseModel):
+    start_at: datetime
+    end_at: datetime
+
+
+class ReportLimitsOut(BaseModel):
+    page: int
+    page_size: int
+
+
+class ReportChannelQualityItemOut(BaseModel):
+    source_category: str
+    inquiry_count: int
+    valid_count: int
+    valid_rate: int
+
+
+class ReportChannelQualityOut(BaseModel):
+    total: int
+    items: list[ReportChannelQualityItemOut]
+
+
+class ReportWebsiteKpiOut(BaseModel):
+    attribution_rate: int
+    ai_completion_rate: int
+    assignment_rate: int
+    sales_feedback_rate: int
+    entered_customer_pool: int
+
+
+class ReportGenerationOut(BaseModel):
+    status: str
+    updated_at: datetime
+    retry_path: str
+
+
+class ReportHomeOut(BaseModel):
+    period: str
+    query_window: ReportQueryWindowOut
+    limits: ReportLimitsOut
+    metrics: list[ReportMetricCardOut]
+    period_entries: list[ReportPeriodEntryOut]
+    channel_quality: ReportChannelQualityOut
+    website_kpi: ReportWebsiteKpiOut
+    generation: ReportGenerationOut
+
+
+class ReportRetryOut(BaseModel):
+    status: str
+    updated_at: datetime
+    retry_path: str
+
+
 class CustomerBackgroundSourceOut(BaseModel):
     type: str
     title: str

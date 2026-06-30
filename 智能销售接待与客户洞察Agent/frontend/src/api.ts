@@ -76,6 +76,53 @@ export type DashboardResult = {
   items: DashboardTodo[];
 };
 
+export type ReportPeriod = "day" | "month" | "quarter" | "year";
+
+export type ReportHomeResult = {
+  period: ReportPeriod;
+  query_window: {
+    start_at: string;
+    end_at: string;
+  };
+  limits: {
+    page: number;
+    page_size: number;
+  };
+  metrics: Array<{
+    key: string;
+    label: string;
+    value: number;
+    unit: string;
+    hint: string;
+  }>;
+  period_entries: Array<{
+    period: ReportPeriod;
+    label: string;
+    path: string;
+  }>;
+  channel_quality: {
+    total: number;
+    items: Array<{
+      source_category: string;
+      inquiry_count: number;
+      valid_count: number;
+      valid_rate: number;
+    }>;
+  };
+  website_kpi: {
+    attribution_rate: number;
+    ai_completion_rate: number;
+    assignment_rate: number;
+    sales_feedback_rate: number;
+    entered_customer_pool: number;
+  };
+  generation: {
+    status: "ready" | "generating" | "queued";
+    updated_at: string;
+    retry_path: string;
+  };
+};
+
 export type SourceOption = {
   category: string;
   label: string;
@@ -252,7 +299,8 @@ export type SalesUser = {
   enabled: boolean;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET ?? "").trim();
+const API_BASE = import.meta.env.DEV && DEV_PROXY_TARGET ? "" : (import.meta.env.VITE_API_BASE ?? "").trim();
 
 export function getToken(): string | null {
   return window.localStorage.getItem("ug_token");
@@ -428,6 +476,19 @@ export function fetchDashboard(filters: DashboardFilters = {}): Promise<Dashboar
   if (filters.ownerId) params.set("owner_id", String(filters.ownerId));
   if (filters.cycle && filters.cycle !== "all") params.set("cycle", filters.cycle);
   return request<DashboardResult>(`/api/dashboard?${params.toString()}`);
+}
+
+export function fetchReportHome(filters: { period?: ReportPeriod; page?: number; pageSize?: number } = {}): Promise<ReportHomeResult> {
+  const params = new URLSearchParams({
+    period: filters.period ?? "day",
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 10)
+  });
+  return request<ReportHomeResult>(`/api/reports/home?${params.toString()}`);
+}
+
+export function retryReportHome(): Promise<ReportHomeResult["generation"]> {
+  return request<ReportHomeResult["generation"]>("/api/reports/home/retry", { method: "POST" });
 }
 
 export function fetchCustomer(customerId: string): Promise<Customer> {

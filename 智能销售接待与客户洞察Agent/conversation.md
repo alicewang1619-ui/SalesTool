@@ -444,3 +444,11 @@ V1 收敛：第一版不是做完整客户增长中台，而是做询盘闭环 M
 - 合规边界：客户调研第一版只用客户官网公开信息、人工补充和 AI 摘要，不抓 Facebook/LinkedIn。
 - 再营销：AI 生成草稿，人工确认后通过现有邮箱发送。
 - 下一步：确认技术栈、架构与部署。
+
+## 06-30-2026 08:21 技术栈与架构确认
+
+- 用户回复：继续。
+- 决策结果：V1 技术架构采用 React + Ant Design Pro、Python FastAPI、Postgres、Redis + Celery/RQ、Docker Compose。
+- 架构形态：模块化单体优先，AI 编排先放后端服务内，不单独拆微服务。
+- 部署策略：一台云服务器或内网服务器先部署前端、后端、Postgres、Redis、worker、scheduler，后续可拆出 worker 或报表服务。
+- 下一步：确认安全与运维方案。

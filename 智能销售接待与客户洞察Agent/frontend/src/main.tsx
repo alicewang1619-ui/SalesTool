@@ -5,6 +5,7 @@ import zhCN from "antd/locale/zh_CN";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AppShell } from "./shell/AppShell";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
+import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
@@ -27,6 +28,7 @@ const router = createBrowserRouter([
       { path: "leads/import", element: <LeadImportPage /> },
       { path: "leads/:leadId", element: <LeadDetailPage /> },
       { path: "assignments/pending", element: <PendingAssignmentsPage /> },
+      { path: "customers", element: <CustomersPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
       { path: "settings", element: <SettingsPage /> }
     ]

@@ -196,6 +196,41 @@ class CustomerOut(BaseModel):
     background: CustomerBackgroundOut
 
 
+class CustomerListItem(BaseModel):
+    id: int
+    name: str
+    country: str
+    customer_type: str
+    product: str
+    tier: str
+    owner_id: int | None
+    owner_name: str
+    background_summary: str
+    detail_path: str
+
+
+class CustomerPoolMetrics(BaseModel):
+    total_customers: int
+    high_intent: int
+    active_followup: int
+    repository: int
+
+
+class EmptyStateOut(BaseModel):
+    title: str
+    action_label: str
+    action_path: str
+
+
+class CustomerPage(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    metrics: CustomerPoolMetrics
+    items: list[CustomerListItem]
+    empty_state: EmptyStateOut | None = None
+
+
 class CustomerBackgroundUpdate(BaseModel):
     manual_summary: str = Field(min_length=10, max_length=4000)
 

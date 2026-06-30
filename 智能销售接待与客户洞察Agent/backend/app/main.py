@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, inspect, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .config import get_settings
 from .database import Base, SessionLocal, engine, get_db
@@ -35,11 +35,15 @@ from .schemas import (
     AuditLogPage,
     BannerOut,
     CustomerBackgroundUpdate,
+    CustomerListItem,
     CustomerOut,
+    CustomerPage,
+    CustomerPoolMetrics,
     DashboardMetrics,
     DashboardOut,
     DashboardTimelineItem,
     DashboardTodoOut,
+    EmptyStateOut,
     FeedbackCardOut,
     FeedbackOwnerOut,
     FeedbackSubmitOut,
@@ -852,13 +856,102 @@ def dashboard(
     )
 
 
+def customer_conditions(user: User, country: str | None, product: str | None, tier: str | None) -> list[object]:
+    conditions: list[object] = []
+    if user.role == "sales":
+        conditions.append(Customer.owner_id == user.id)
+    if country:
+        conditions.append(Customer.country == country)
+    if product:
+        conditions.append(Customer.product == product)
+    if tier:
+        conditions.append(Customer.tier == tier)
+    return conditions
+
+
+def customer_item_out(customer: Customer, owner_names: dict[int, str]) -> CustomerListItem:
+    background_summary = ""
+    if customer.background:
+        background_summary = customer.background.manual_summary or customer.background.auto_summary
+    return CustomerListItem(
+        id=customer.id,
+        name=customer.name,
+        country=customer.country,
+        customer_type=customer.customer_type,
+        product=customer.product,
+        tier=customer.tier,
+        owner_id=customer.owner_id,
+        owner_name=owner_names.get(customer.owner_id or 0, "未分配"),
+        background_summary=background_summary,
+        detail_path=f"/admin/customers/{customer.id}",
+    )
+
+
+@app.get("/api/customers", response_model=CustomerPage)
+def list_customers(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    country: str | None = None,
+    product: str | None = None,
+    tier: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> CustomerPage:
+    conditions = customer_conditions(user, country, product, tier)
+    query = select(Customer).options(joinedload(Customer.background))
+    count_query = select(func.count()).select_from(Customer)
+    for condition in conditions:
+        query = query.where(condition)
+        count_query = count_query.where(condition)
+
+    total = db.scalar(count_query) or 0
+    rows = db.scalars(query.order_by(Customer.id.desc()).offset((page - 1) * page_size).limit(page_size)).unique().all()
+    owner_ids = {row.owner_id for row in rows if row.owner_id is not None}
+    owner_names = {
+        owner.id: owner.name
+        for owner in db.scalars(select(User).where(User.id.in_(owner_ids))).all()
+    } if owner_ids else {}
+
+    metric_conditions = customer_conditions(user, None, None, None)
+
+    def metric_count(*extra_conditions) -> int:
+        metric_query = select(func.count()).select_from(Customer)
+        for condition in [*metric_conditions, *extra_conditions]:
+            metric_query = metric_query.where(condition)
+        return db.scalar(metric_query) or 0
+
+    empty_state = None
+    if total == 0:
+        empty_state = EmptyStateOut(title="暂无客户", action_label="返回线索池", action_path="/admin/leads")
+
+    return CustomerPage(
+        page=page,
+        page_size=page_size,
+        total=total,
+        metrics=CustomerPoolMetrics(
+            total_customers=metric_count(),
+            high_intent=metric_count(Customer.tier == "高意向"),
+            active_followup=metric_count(Customer.tier == "有效跟进"),
+            repository=metric_count(Customer.tier == "资料库"),
+        ),
+        items=[customer_item_out(row, owner_names) for row in rows],
+        empty_state=empty_state,
+    )
+
+
 @app.get("/api/customers/{customer_id}", response_model=CustomerOut)
 def get_customer(customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Customer:
     customer = db.get(Customer, customer_id)
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("CUSTOMER_NOT_FOUND", "Customer not found"),
+        )
     if user.role == "sales" and customer.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="No permission to view this customer")
+        raise HTTPException(
+            status_code=403,
+            detail=error_detail("CUSTOMER_FORBIDDEN", "No permission to view this customer"),
+        )
     return customer
 
 

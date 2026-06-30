@@ -11,7 +11,7 @@ const items = [
   { key: "/admin/dashboard", icon: <Home size={18} />, label: "工作台" },
   { key: "/admin/leads", icon: <Database size={18} />, label: "线索池" },
   { key: "/admin/assignments/pending", icon: <ClipboardList size={18} />, label: "待分配" },
-  { key: "/admin/customers/1", icon: <UsersRound size={18} />, label: "客户详情" },
+  { key: "/admin/customers", icon: <UsersRound size={18} />, label: "客户池" },
   { key: "reports", icon: <BarChart3 size={18} />, label: "报表" },
   { key: "/admin/settings", icon: <Settings size={18} />, label: "配置" }
 ];
@@ -47,6 +47,8 @@ export function AppShell() {
     ? "/admin/leads"
     : location.pathname.startsWith("/admin/assignments")
       ? "/admin/assignments/pending"
+      : location.pathname.startsWith("/admin/customers")
+        ? "/admin/customers"
       : location.pathname;
 
   return (

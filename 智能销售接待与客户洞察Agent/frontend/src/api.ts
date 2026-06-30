@@ -173,6 +173,45 @@ export type Customer = {
   };
 };
 
+export type CustomerListItem = {
+  id: number;
+  name: string;
+  country: string;
+  customer_type: string;
+  product: string;
+  tier: string;
+  owner_id: number | null;
+  owner_name: string;
+  background_summary: string;
+  detail_path: string;
+};
+
+export type CustomerPageResult = {
+  page: number;
+  page_size: number;
+  total: number;
+  metrics: {
+    total_customers: number;
+    high_intent: number;
+    active_followup: number;
+    repository: number;
+  };
+  items: CustomerListItem[];
+  empty_state?: {
+    title: string;
+    action_label: string;
+    action_path: string;
+  } | null;
+};
+
+export type CustomerFilters = {
+  page?: number;
+  pageSize?: number;
+  country?: string;
+  product?: string;
+  tier?: string;
+};
+
 export type SalesUser = {
   id: number;
   name: string;
@@ -362,6 +401,17 @@ export function fetchDashboard(filters: DashboardFilters = {}): Promise<Dashboar
 
 export function fetchCustomer(customerId: string): Promise<Customer> {
   return request<Customer>(`/api/customers/${customerId}`);
+}
+
+export function fetchCustomers(filters: CustomerFilters = {}): Promise<CustomerPageResult> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20)
+  });
+  if (filters.country) params.set("country", filters.country);
+  if (filters.product) params.set("product", filters.product);
+  if (filters.tier) params.set("tier", filters.tier);
+  return request<CustomerPageResult>(`/api/customers?${params.toString()}`);
 }
 
 export function updateCustomerBackground(customerId: string, manualSummary: string): Promise<Customer> {

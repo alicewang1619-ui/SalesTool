@@ -6,7 +6,17 @@ import zipfile
 
 from app.database import Base, SessionLocal, engine
 from app.main import app, ensure_sqlite_compatibility
-from app.models import AuditLog, ImportJob, Lead, LoginAttempt, SalesFeedback, SalesFeedbackLink, SourceDictionary
+from app.models import (
+    AuditLog,
+    Customer,
+    CustomerBackground,
+    ImportJob,
+    Lead,
+    LoginAttempt,
+    SalesFeedback,
+    SalesFeedbackLink,
+    SourceDictionary,
+)
 
 
 def make_xlsx(rows: list[list[str]]) -> bytes:
@@ -42,6 +52,18 @@ def client() -> TestClient:
         db.execute(delete(ImportJob))
         db.execute(delete(SalesFeedback))
         db.execute(delete(SalesFeedbackLink))
+        test_customer_names = [
+            "Dr. Sofia Ramirez",
+            "MedSupply Africa",
+            "Clinica Andes",
+            "Customer Empty Probe",
+        ]
+        test_customer_ids = [
+            item.id for item in db.query(Customer).filter(Customer.name.in_(test_customer_names)).all()
+        ]
+        if test_customer_ids:
+            db.query(CustomerBackground).filter(CustomerBackground.customer_id.in_(test_customer_ids)).delete(synchronize_session=False)
+            db.query(Customer).filter(Customer.id.in_(test_customer_ids)).delete(synchronize_session=False)
         db.query(Lead).filter(
             Lead.customer_name.in_(
                 ["Clinica Shanghai", "重复客户", "Excel Clinic", "Clinica Browser Check", "Clinica Andes Pending"]
@@ -318,6 +340,139 @@ def test_sales_user_cannot_update_customer_background(client: TestClient) -> Non
         headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"),
     )
     assert response.status_code == 403
+
+
+def seed_customer_pool_variants() -> None:
+    with SessionLocal() as db:
+        maria_id = 2
+        rows = [
+            ("Dr. Sofia Ramirez", "Mexico", "Doctor", "Handheld Ultrasound", "有效跟进", maria_id, "客户已联系，正在确认诊所筛查应用。"),
+            ("MedSupply Africa", "Kenya", "代理商", "Portable Ultrasound", "资料库", None, "资料库客户，等待后续再营销触达。"),
+            ("Clinica Andes", "Chile", "Clinic", "Sonos Max", "已转代理商", maria_id, "已转给当地代理商跟进，后续只保留状态追踪。"),
+        ]
+        for name, country, customer_type, product, tier, owner_id, summary in rows:
+            customer = Customer(
+                name=name,
+                country=country,
+                customer_type=customer_type,
+                product=product,
+                tier=tier,
+                owner_id=owner_id,
+            )
+            db.add(customer)
+            db.flush()
+            db.add(
+                CustomerBackground(
+                    customer_id=customer.id,
+                    auto_summary=summary,
+                    manual_summary=None,
+                    evidence=f"{name} 的官网公开信息与销售反馈记录。",
+                    confidence="中",
+                )
+            )
+        db.commit()
+
+
+def test_customer_pool_lists_statuses_with_pagination_and_metrics(client: TestClient) -> None:
+    seed_customer_pool_variants()
+    headers = auth_headers(client)
+
+    response = client.get("/api/customers", params={"page": 1, "page_size": 2}, headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["page"] == 1
+    assert body["page_size"] == 2
+    assert body["total"] >= 4
+    assert len(body["items"]) == 2
+    assert {"高意向", "有效跟进", "资料库", "已转代理商"} <= {item["tier"] for item in client.get("/api/customers", params={"page_size": 20}, headers=headers).json()["items"]}
+    assert {"total_customers", "high_intent", "active_followup", "repository"} <= set(body["metrics"])
+    first = body["items"][0]
+    assert {"id", "name", "country", "customer_type", "product", "tier", "owner_name", "detail_path", "background_summary"} <= set(first)
+    assert first["detail_path"] == f"/admin/customers/{first['id']}"
+
+
+def test_customer_pool_respects_sales_scope(client: TestClient) -> None:
+    seed_customer_pool_variants()
+    response = client.get(
+        "/api/customers",
+        params={"page_size": 20},
+        headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"),
+    )
+
+    assert response.status_code == 200
+    names = {item["name"] for item in response.json()["items"]}
+    assert {"GlobalMed Peru", "Dr. Sofia Ramirez", "Clinica Andes"} <= names
+    assert "MedSupply Africa" not in names
+
+
+def test_customer_pool_detail_path_opens_real_customer_detail(client: TestClient) -> None:
+    headers = auth_headers(client)
+    response = client.get("/api/customers", params={"page_size": 20}, headers=headers)
+    target = next(item for item in response.json()["items"] if item["name"] == "GlobalMed Peru")
+
+    detail = client.get(target["detail_path"].replace("/admin", "/api"), headers=headers)
+
+    assert detail.status_code == 200
+    assert detail.json()["id"] == target["id"]
+    assert detail.json()["background"]["auto_summary"]
+
+
+def test_customer_pool_combined_filters_are_backend_paginated(client: TestClient) -> None:
+    seed_customer_pool_variants()
+    headers = auth_headers(client)
+
+    response = client.get(
+        "/api/customers",
+        params={
+            "country": "Mexico",
+            "product": "Handheld Ultrasound",
+            "tier": "有效跟进",
+            "page": 1,
+            "page_size": 10,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["name"] == "Dr. Sofia Ramirez"
+    assert body["items"][0]["country"] == "Mexico"
+    assert body["items"][0]["product"] == "Handheld Ultrasound"
+    assert body["items"][0]["tier"] == "有效跟进"
+
+
+def test_customer_pool_empty_filter_returns_empty_state_payload(client: TestClient) -> None:
+    headers = auth_headers(client)
+
+    response = client.get("/api/customers", params={"tier": "撤单/流失", "country": "Atlantis"}, headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 0
+    assert body["items"] == []
+    assert body["empty_state"]["title"] == "暂无客户"
+    assert body["empty_state"]["action_path"] == "/admin/leads"
+
+
+def test_customer_pool_errors_are_structured(client: TestClient) -> None:
+    unauthenticated = client.get("/api/customers")
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json()["detail"]["code"] == "UNAUTHENTICATED"
+
+    headers = auth_headers(client)
+    missing = client.get("/api/customers/999999", headers=headers)
+    assert missing.status_code == 404
+    assert missing.json()["detail"]["code"] == "CUSTOMER_NOT_FOUND"
+
+    forbidden = client.get(
+        "/api/customers/1",
+        headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"),
+    )
+    assert forbidden.status_code in {200, 403}
+    if forbidden.status_code == 403:
+        assert forbidden.json()["detail"]["code"] == "CUSTOMER_FORBIDDEN"
 
 
 def test_channel_import_uploads_csv_to_task_and_persists_success_rows(client: TestClient) -> None:

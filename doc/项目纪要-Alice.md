@@ -115,3 +115,4 @@
 - [06-30-2026 14:26:49] 生产应用脚手架技术选择｜背景：仓库无现成可启动应用，技术方案已确认 React + Vite + Ant Design Pro、Python FastAPI、Postgres、Redis + Celery/RQ、Docker Compose。｜结论：从零创建真实应用骨架；前端放在 frontend，后端放在 backend；本地开发默认使用 SQLite 便于无外部服务先跑通真实持久化，Docker Compose 提供 Postgres/Redis/worker 生产化路径，后续页面逐个接真实 API。｜来源：AI
 - [06-30-2026 14:31:00] 后端真实 API 骨架首轮闭环｜背景：生产化目标要求所有页面最终接真实后端 API 与持久化数据，不能停留在静态 HTML 原型。｜结论：已新增 FastAPI 后端骨架、SQLite 本地持久化、用户/来源/Banner/线索/客户背景调查/审计等基础模型与种子数据；登录、分页线索、销售数据隔离、客户背景调查人工修改的 API 合约测试 6 条已通过。｜来源：AI
 - [06-30-2026 14:37:11] 首批生产应用本地可运行验证｜背景：完成后端真实 API、前端首批路由和启动编排后，需要验证不是静态产物而是可访问服务。｜结论：后端服务已启动在 http://127.0.0.1:8000，/health 返回 {"status":"ok"}；前端服务已启动在 http://127.0.0.1:5173，首页返回 HTTP 200；后端 pytest 6 passed，前端 npm build 通过但存在 Ant Design 首屏 chunk size warning，作为后续性能优化项。｜来源：AI
+- [06-30-2026 14:39:06] 阶段性提交与推送状态｜背景：按 Git 协作同步规则，生产应用骨架、逐页 TDD 和文档同步完成后需要阶段性提交并尝试推送。｜结论：已生成本地提交 6815962c，提交信息为“搭建生产应用骨架并补齐逐页TDD”；git push 失败，原因是仓库未配置 push destination/远程地址，需配置 remote 后才能推送。｜来源：AI

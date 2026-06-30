@@ -351,6 +351,39 @@ class ReportMetricDetailOut(BaseModel):
     empty_state: ReportMetricDetailEmptyStateOut | None = None
 
 
+class ReportExportContextOut(BaseModel):
+    period: str
+    query_window: ReportQueryWindowOut
+    filters: ReportPeriodFiltersOut
+    fields: list[str]
+    desensitization: str
+    excludes: list[str]
+    estimated_rows: int
+    confirm_required: bool
+    cancel_path: str
+
+
+class ReportExportCreateRequest(BaseModel):
+    period: str = Field(default="day", pattern="^(day|month|quarter|year)$")
+    country: str | None = None
+    source_category: str | None = None
+    product: str | None = None
+    feedback_status: str | None = None
+
+
+class ReportExportTaskOut(BaseModel):
+    task_id: str
+    status: str
+    period: str
+    filters: ReportPeriodFiltersOut
+    row_count: int
+    fields: list[str]
+    desensitization: str
+    excludes: list[str]
+    download_path: str
+    audit_action: str
+
+
 class CustomerBackgroundSourceOut(BaseModel):
     type: str
     title: str

@@ -111,6 +111,21 @@ class ImportJob(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ReportExportJob(Base):
+    __tablename__ = "report_export_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)
+    filters_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    fields_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    file_content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="ready")
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Customer(Base):
     __tablename__ = "customers"
 

@@ -241,6 +241,39 @@ export type ReportMetricsDetailResult = {
   } | null;
 };
 
+export type ReportExportContextResult = {
+  period: ReportPeriod;
+  query_window: {
+    start_at: string;
+    end_at: string;
+  };
+  filters: {
+    country: string | null;
+    source_category: string | null;
+    product: string | null;
+    feedback_status: string | null;
+  };
+  fields: string[];
+  desensitization: string;
+  excludes: string[];
+  estimated_rows: number;
+  confirm_required: boolean;
+  cancel_path: string;
+};
+
+export type ReportExportTaskResult = {
+  task_id: string;
+  status: string;
+  period: ReportPeriod;
+  filters: ReportExportContextResult["filters"];
+  row_count: number;
+  fields: string[];
+  desensitization: string;
+  excludes: string[];
+  download_path: string;
+  audit_action: string;
+};
+
 export type SourceOption = {
   category: string;
   label: string;
@@ -663,6 +696,55 @@ export function fetchReportMetricsDetail(
   if (filters.product) params.set("product", filters.product);
   if (filters.feedbackStatus) params.set("feedback_status", filters.feedbackStatus);
   return request<ReportMetricsDetailResult>(`/api/reports/metrics?${params.toString()}`);
+}
+
+export function fetchReportExportContext(
+  filters: {
+    period?: ReportPeriod;
+    country?: string;
+    sourceCategory?: string;
+    product?: string;
+    feedbackStatus?: string;
+  } = {}
+): Promise<ReportExportContextResult> {
+  const params = new URLSearchParams({ period: filters.period ?? "day" });
+  if (filters.country) params.set("country", filters.country);
+  if (filters.sourceCategory) params.set("source_category", filters.sourceCategory);
+  if (filters.product) params.set("product", filters.product);
+  if (filters.feedbackStatus) params.set("feedback_status", filters.feedbackStatus);
+  return request<ReportExportContextResult>(`/api/reports/export/context?${params.toString()}`);
+}
+
+export function createReportExport(payload: {
+  period?: ReportPeriod;
+  country?: string;
+  sourceCategory?: string;
+  product?: string;
+  feedbackStatus?: string;
+}): Promise<ReportExportTaskResult> {
+  return request<ReportExportTaskResult>("/api/reports/export", {
+    method: "POST",
+    body: JSON.stringify({
+      period: payload.period ?? "day",
+      country: payload.country || null,
+      source_category: payload.sourceCategory || null,
+      product: payload.product || null,
+      feedback_status: payload.feedbackStatus || null
+    })
+  });
+}
+
+export async function downloadReportExport(taskId: string): Promise<string> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_BASE}/api/reports/export/${taskId}/download`, { headers });
+  if (!response.ok) {
+    throw new Error("报表导出下载失败");
+  }
+  return response.text();
 }
 
 export function fetchCustomer(customerId: string): Promise<Customer> {

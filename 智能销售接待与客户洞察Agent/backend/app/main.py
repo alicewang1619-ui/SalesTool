@@ -24,6 +24,7 @@ from .models import (
     ImportJob,
     Lead,
     LoginAttempt,
+    ReportExportJob,
     SalesFeedback,
     SalesFeedbackLink,
     SourceDictionary,
@@ -78,6 +79,9 @@ from .schemas import (
     ReportMetricDetailGroupItemOut,
     ReportMetricDetailLeadItemOut,
     ReportMetricDetailOut,
+    ReportExportContextOut,
+    ReportExportCreateRequest,
+    ReportExportTaskOut,
     ReportMetricCardOut,
     ReportPeriodBreakdownsOut,
     ReportPeriodDownstreamOut,
@@ -1307,6 +1311,182 @@ def report_metrics_detail(
             excludes=["money_metrics"],
         ),
         empty_state=empty_state,
+    )
+
+
+REPORT_EXPORT_FIELDS = ["客户名称", "国家", "来源", "具体来源", "产品", "评分", "反馈", "负责人"]
+REPORT_EXPORT_DESENSITIZATION = "导出客户联系信息时按角色权限脱敏"
+REPORT_EXPORT_EXCLUDES = ["money_metrics", "raw_inquiry", "conversation_history"]
+REPORT_EXPORT_LIMIT = 5000
+
+
+def report_export_filters(
+    period: str,
+    country: str | None,
+    source_category: str | None,
+    product: str | None,
+    feedback_status: str | None,
+) -> tuple[str, datetime, datetime, ReportPeriodFiltersOut, list[object]]:
+    resolved_period, start_at, end_at = report_period_window(period)
+    filters = ReportPeriodFiltersOut(
+        country=country,
+        source_category=source_category,
+        product=product,
+        feedback_status=feedback_status,
+    )
+    conditions = report_period_conditions(start_at, end_at, country, source_category, product, feedback_status)
+    return resolved_period, start_at, end_at, filters, conditions
+
+
+def report_export_rows(db: Session, conditions: list[object]) -> list[Lead]:
+    return db.scalars(
+        select(Lead)
+        .where(*conditions)
+        .order_by(Lead.created_at.desc(), Lead.id.desc())
+        .limit(REPORT_EXPORT_LIMIT)
+    ).all()
+
+
+def render_report_export_csv(db: Session, rows: list[Lead]) -> str:
+    owner_ids = {row.owner_id for row in rows if row.owner_id is not None}
+    owner_names = {
+        owner.id: owner.name
+        for owner in db.scalars(select(User).where(User.id.in_(owner_ids))).all()
+    } if owner_ids else {}
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(REPORT_EXPORT_FIELDS)
+    for row in rows:
+        writer.writerow(
+            [
+                row.customer_name,
+                row.country,
+                row.source_category,
+                row.source_label,
+                row.product,
+                row.score_label,
+                row.feedback_status,
+                owner_names.get(row.owner_id or 0, "未分配"),
+            ]
+        )
+    return output.getvalue()
+
+
+@app.get("/api/reports/export/context", response_model=ReportExportContextOut)
+def report_export_context(
+    request: Request,
+    period: str = Query("day", pattern="^(day|month|quarter|year)$"),
+    country: str | None = None,
+    source_category: str | None = None,
+    product: str | None = None,
+    feedback_status: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ReportExportContextOut:
+    resolved_period, start_at, end_at, filters, conditions = report_export_filters(
+        period,
+        country,
+        source_category,
+        product,
+        feedback_status,
+    )
+    add_audit(
+        db,
+        request.state.trace_id,
+        "report_export_context_viewed",
+        f"Report export context viewed: {resolved_period}",
+        actor_id=user.id,
+        target_type="report_export",
+    )
+    db.commit()
+    return ReportExportContextOut(
+        period=resolved_period,
+        query_window=ReportQueryWindowOut(start_at=start_at, end_at=end_at),
+        filters=filters,
+        fields=REPORT_EXPORT_FIELDS,
+        desensitization=REPORT_EXPORT_DESENSITIZATION,
+        excludes=REPORT_EXPORT_EXCLUDES,
+        estimated_rows=report_count(db, conditions),
+        confirm_required=True,
+        cancel_path=f"/admin/reports/period?period={resolved_period}",
+    )
+
+
+@app.post("/api/reports/export", response_model=ReportExportTaskOut, status_code=status.HTTP_201_CREATED)
+def create_report_export(
+    payload: ReportExportCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ReportExportTaskOut:
+    resolved_period, _start_at, _end_at, filters, conditions = report_export_filters(
+        payload.period,
+        payload.country,
+        payload.source_category,
+        payload.product,
+        payload.feedback_status,
+    )
+    rows = report_export_rows(db, conditions)
+    task_id = uuid4().hex
+    csv_content = render_report_export_csv(db, rows)
+    job = ReportExportJob(
+        task_id=task_id,
+        period=resolved_period,
+        filters_json=json.dumps(filters.model_dump(exclude_none=True), ensure_ascii=False),
+        fields_json=json.dumps(REPORT_EXPORT_FIELDS, ensure_ascii=False),
+        row_count=len(rows),
+        file_content=csv_content,
+        status="ready",
+        created_by=user.id,
+    )
+    db.add(job)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "report_export_created",
+        f"Report export created: {resolved_period}, rows={len(rows)}",
+        actor_id=user.id,
+        target_type="report_export",
+    )
+    db.commit()
+    return ReportExportTaskOut(
+        task_id=task_id,
+        status=job.status,
+        period=resolved_period,
+        filters=filters,
+        row_count=job.row_count,
+        fields=REPORT_EXPORT_FIELDS,
+        desensitization=REPORT_EXPORT_DESENSITIZATION,
+        excludes=REPORT_EXPORT_EXCLUDES,
+        download_path=f"/api/reports/export/{task_id}/download",
+        audit_action="report_export_created",
+    )
+
+
+@app.get("/api/reports/export/{task_id}/download")
+def download_report_export(
+    task_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> Response:
+    job = db.scalar(select(ReportExportJob).where(ReportExportJob.task_id == task_id))
+    if not job:
+        raise HTTPException(status_code=404, detail=error_detail("REPORT_EXPORT_NOT_FOUND", "Report export task not found"))
+    add_audit(
+        db,
+        request.state.trace_id,
+        "report_export_downloaded",
+        f"Report export downloaded: {task_id}",
+        actor_id=user.id,
+        target_type="report_export",
+        target_id=job.id,
+    )
+    db.commit()
+    return Response(
+        content=job.file_content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="report-export-{task_id}.csv"'},
     )
 
 

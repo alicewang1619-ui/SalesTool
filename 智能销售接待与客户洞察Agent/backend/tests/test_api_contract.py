@@ -1235,3 +1235,97 @@ def test_sales_user_cannot_access_report_metrics_detail(client: TestClient) -> N
 
     assert response.status_code == 403
     assert response.json()["detail"]["code"] == "FORBIDDEN"
+
+
+def test_report_export_context_shows_confirmation_scope_fields_and_no_money(client: TestClient) -> None:
+    response = client.get(
+        "/api/reports/export/context",
+        params={"period": "month", "country": "Peru"},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["period"] == "month"
+    assert body["filters"]["country"] == "Peru"
+    assert body["confirm_required"] is True
+    assert body["estimated_rows"] >= 1
+    assert "客户名称" in body["fields"]
+    assert "成交金额" not in " ".join(body["fields"])
+    assert "报价金额" not in " ".join(body["fields"])
+    assert body["desensitization"] == "导出客户联系信息时按角色权限脱敏"
+    assert_no_money_fields(body)
+
+
+def test_report_export_confirm_creates_task_and_audit(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "report-export-create-test"}
+    response = client.post(
+        "/api/reports/export",
+        json={"period": "year", "country": "Peru", "source_category": "网站"},
+        headers=headers,
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["task_id"]
+    assert body["status"] == "ready"
+    assert body["period"] == "year"
+    assert body["row_count"] >= 1
+    assert body["download_path"] == f"/api/reports/export/{body['task_id']}/download"
+    assert body["audit_action"] == "report_export_created"
+    assert_no_money_fields(body)
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert audit.status_code == 200
+    assert any(
+        event["action"] == "report_export_created" and event["trace_id"] == "report-export-create-test"
+        for event in audit.json()["items"]
+    )
+
+
+def test_report_export_download_is_desensitized_and_excludes_unauthorized_fields(client: TestClient) -> None:
+    headers = auth_headers(client)
+    created = client.post(
+        "/api/reports/export",
+        json={"period": "year", "country": "Peru"},
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+    task_id = created.json()["task_id"]
+    download = client.get(f"/api/reports/export/{task_id}/download", headers=headers)
+
+    assert download.status_code == 200
+    assert download.headers["content-type"].startswith("text/csv")
+    csv_text = download.text
+    assert "GlobalMed Peru" in csv_text
+    assert "客户名称" in csv_text
+    assert "成交金额" not in csv_text
+    assert "报价金额" not in csv_text
+    assert "raw_inquiry" not in csv_text
+    assert "conversation_history" not in csv_text
+
+
+def test_sales_user_cannot_access_report_export(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+
+    context = client.get("/api/reports/export/context", headers=sales_headers)
+    created = client.post("/api/reports/export", json={"period": "day"}, headers=sales_headers)
+
+    assert context.status_code == 403
+    assert created.status_code == 403
+    assert context.json()["detail"]["code"] == "FORBIDDEN"
+    assert created.json()["detail"]["code"] == "FORBIDDEN"
+
+
+def test_report_export_context_does_not_create_task_until_confirmed(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "report-export-cancel-test"}
+    response = client.get("/api/reports/export/context", params={"period": "year"}, headers=headers)
+
+    assert response.status_code == 200
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert audit.status_code == 200
+    assert not any(
+        event["action"] == "report_export_created" and event["trace_id"] == "report-export-cancel-test"
+        for event in audit.json()["items"]
+    )

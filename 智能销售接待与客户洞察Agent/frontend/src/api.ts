@@ -69,6 +69,12 @@ export type DashboardFilters = {
   cycle?: "today" | "all";
 };
 
+export type LeadFilters = {
+  page?: number;
+  pageSize?: number;
+  sourceCategory?: string;
+};
+
 export type Customer = {
   id: number;
   name: string;
@@ -148,12 +154,19 @@ export function fetchBanner(): Promise<Banner> {
   return request<Banner>("/api/banner");
 }
 
-export function fetchLeads(sourceCategory?: string): Promise<PageResult<Lead>> {
-  const params = new URLSearchParams({ page: "1", page_size: "20" });
-  if (sourceCategory) {
-    params.set("source_category", sourceCategory);
+export function fetchLeads(filters: LeadFilters = {}): Promise<PageResult<Lead>> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20)
+  });
+  if (filters.sourceCategory) {
+    params.set("source_category", filters.sourceCategory);
   }
   return request<PageResult<Lead>>(`/api/leads?${params.toString()}`);
+}
+
+export function fetchLead(leadId: number): Promise<Lead> {
+  return request<Lead>(`/api/leads/${leadId}`);
 }
 
 export function fetchSourceDictionary(): Promise<SourceOption[]> {

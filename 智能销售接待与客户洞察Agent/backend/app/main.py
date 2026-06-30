@@ -180,6 +180,16 @@ def list_leads(
     return PageResult(page=page, page_size=page_size, total=total, items=[LeadOut.model_validate(row, from_attributes=True) for row in rows])
 
 
+@app.get("/api/leads/{lead_id}", response_model=LeadOut)
+def get_lead(lead_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Lead:
+    lead = db.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="线索不存在")
+    if user.role == "sales" and lead.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="无权查看该线索")
+    return lead
+
+
 @app.get("/api/dashboard", response_model=DashboardOut)
 def dashboard(
     request: Request,

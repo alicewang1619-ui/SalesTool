@@ -75,6 +75,37 @@ def test_leads_are_paginated_and_source_filtered(client: TestClient) -> None:
     assert all(item["source_category"] == "网站" for item in body["items"])
 
 
+def test_source_dictionary_drives_leads_filter_options(client: TestClient) -> None:
+    headers = auth_headers(client)
+    response = client.get("/api/source-dictionary", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    categories = {item["category"] for item in body}
+    labels = {item["label"] for item in body}
+    leads = client.get("/api/leads", params={"page_size": 20}, headers=headers).json()["items"]
+
+    assert len(categories) >= 5
+    assert "官网邮箱" in labels
+    assert {item["source_category"] for item in leads} <= categories
+
+
+def test_lead_detail_returns_same_record_and_respects_sales_scope(client: TestClient) -> None:
+    admin_headers = auth_headers(client)
+    list_response = client.get("/api/leads", params={"page_size": 10}, headers=admin_headers)
+    assert list_response.status_code == 200
+    target = next(item for item in list_response.json()["items"] if item["customer_name"] == "GlobalMed Peru")
+
+    detail_response = client.get(f"/api/leads/{target['id']}", headers=admin_headers)
+    assert detail_response.status_code == 200
+    assert detail_response.json()["id"] == target["id"]
+    assert detail_response.json()["customer_name"] == target["customer_name"]
+
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+    assert client.get(f"/api/leads/{target['id']}", headers=sales_headers).status_code == 200
+    forbidden = next(item for item in list_response.json()["items"] if item["customer_name"] == "Al Noor Hospital")
+    assert client.get(f"/api/leads/{forbidden['id']}", headers=sales_headers).status_code == 403
+
+
 def test_sales_user_only_sees_owned_leads(client: TestClient) -> None:
     response = client.get("/api/leads", headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"))
     assert response.status_code == 200

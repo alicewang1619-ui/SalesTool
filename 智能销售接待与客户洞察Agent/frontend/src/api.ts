@@ -163,14 +163,45 @@ export type Customer = {
   customer_type: string;
   product: string;
   tier: string;
+  owner_id: number | null;
+  owner_name: string;
+  can_edit_background: boolean;
+  detail_path: string;
   background: {
     auto_summary: string;
     manual_summary: string | null;
+    current_summary: string;
     evidence: string;
+    sources: Array<{
+      type: string;
+      title: string;
+      detail: string;
+    }>;
     confidence: string;
     updated_by: string;
     updated_at: string;
   };
+  lead_history: Array<{
+    id: number;
+    customer_name: string;
+    source: string;
+    product: string;
+    feedback_status: string;
+    owner_name: string;
+    created_at: string;
+  }>;
+  feedback_records: Array<{
+    status: string;
+    judgement: string;
+    remark: string;
+    owner_name: string;
+    happened_at: string;
+  }>;
+  timeline: Array<{
+    status: string;
+    summary: string;
+    happened_at: string;
+  }>;
 };
 
 export type CustomerListItem = {

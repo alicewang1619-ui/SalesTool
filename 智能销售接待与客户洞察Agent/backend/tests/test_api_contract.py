@@ -76,6 +76,10 @@ def client() -> TestClient:
         if globalmed:
             globalmed.owner_id = 2
             globalmed.feedback_status = "未反馈"
+        globalmed_customer = db.query(Customer).filter(Customer.name == "GlobalMed Peru").first()
+        if globalmed_customer and globalmed_customer.background:
+            globalmed_customer.background.manual_summary = None
+            globalmed_customer.background.updated_by = "system"
         al_noor = db.query(Lead).filter(Lead.customer_name == "Al Noor Hospital").first()
         if al_noor:
             al_noor.owner_id = None
@@ -473,6 +477,73 @@ def test_customer_pool_errors_are_structured(client: TestClient) -> None:
     assert forbidden.status_code in {200, 403}
     if forbidden.status_code == 403:
         assert forbidden.json()["detail"]["code"] == "CUSTOMER_FORBIDDEN"
+
+
+def test_customer_detail_returns_background_sources_history_and_timeline(client: TestClient) -> None:
+    headers = auth_headers(client)
+
+    response = client.get("/api/customers/1", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "GlobalMed Peru"
+    assert body["owner_name"] == "Maria Chen"
+    assert body["can_edit_background"] is True
+    assert body["detail_path"] == "/admin/customers/1"
+    assert body["background"]["current_summary"] == body["background"]["auto_summary"]
+    assert body["background"]["sources"]
+    assert {"type", "title", "detail"} <= set(body["background"]["sources"][0])
+    assert any(item["customer_name"] == "GlobalMed Peru" for item in body["lead_history"])
+    assert body["feedback_records"]
+    assert {"status", "summary", "happened_at"} <= set(body["timeline"][0])
+
+
+def test_customer_detail_background_manual_update_preserves_auto_version_and_audits(client: TestClient) -> None:
+    headers = auth_headers(client)
+    original = client.get("/api/customers/1", headers=headers).json()["background"]["auto_summary"]
+    manual_summary = "人工修订：GlobalMed Peru 需要在三天后跟进便携式超声方案，并补充区域诊所案例。"
+
+    response = client.put(
+        "/api/customers/1/background",
+        json={"manual_summary": manual_summary},
+        headers={**headers, "x-trace-id": "customer-background-edit-test"},
+    )
+
+    assert response.status_code == 200
+    background = response.json()["background"]
+    assert background["auto_summary"] == original
+    assert background["manual_summary"] == manual_summary
+    assert background["current_summary"] == manual_summary
+    assert background["updated_by"] == "Alice Admin"
+
+    refreshed = client.get("/api/customers/1", headers=headers).json()
+    assert refreshed["background"]["current_summary"] == manual_summary
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "update_customer_background"
+        and event["target_id"] == 1
+        and event["trace_id"] == "customer-background-edit-test"
+        for event in audit
+    )
+
+
+def test_customer_detail_sales_user_can_view_owned_customer_but_cannot_edit_background(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+
+    detail = client.get("/api/customers/1", headers=sales_headers)
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body["name"] == "GlobalMed Peru"
+    assert body["can_edit_background"] is False
+    assert body["background"]["current_summary"]
+
+    blocked = client.put(
+        "/api/customers/1/background",
+        json={"manual_summary": "销售尝试修改客户背景调查，应被后台拒绝。"},
+        headers=sales_headers,
+    )
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"]["code"] == "FORBIDDEN"
 
 
 def test_channel_import_uploads_csv_to_task_and_persists_success_rows(client: TestClient) -> None:

@@ -35,10 +35,16 @@ from .schemas import (
     AuditLogPage,
     BannerOut,
     CustomerBackgroundUpdate,
+    CustomerBackgroundOut,
+    CustomerBackgroundSourceOut,
+    CustomerDetailOut,
+    CustomerFeedbackRecordOut,
+    CustomerLeadHistoryOut,
     CustomerListItem,
     CustomerOut,
     CustomerPage,
     CustomerPoolMetrics,
+    CustomerTimelineItemOut,
     DashboardMetrics,
     DashboardOut,
     DashboardTimelineItem,
@@ -887,6 +893,127 @@ def customer_item_out(customer: Customer, owner_names: dict[int, str]) -> Custom
     )
 
 
+def background_sources(evidence: str) -> list[CustomerBackgroundSourceOut]:
+    parts = [part.strip() for part in evidence.replace("\n", "；").split("；") if part.strip()]
+    if not parts and evidence.strip():
+        parts = [evidence.strip()]
+    sources: list[CustomerBackgroundSourceOut] = []
+    for index, part in enumerate(parts, start=1):
+        lower_part = part.lower()
+        if "email" in lower_part or "mail" in lower_part or "邮箱" in part:
+            source_type = "email"
+        elif "website" in lower_part or "官网" in part or "网站" in part:
+            source_type = "website"
+        elif "sales" in lower_part or "销售" in part:
+            source_type = "sales_feedback"
+        else:
+            source_type = "manual_or_public"
+        sources.append(CustomerBackgroundSourceOut(type=source_type, title=f"Source {index}", detail=part))
+    return sources
+
+
+def build_customer_detail(db: Session, customer: Customer, user: User) -> CustomerDetailOut:
+    owner = db.get(User, customer.owner_id) if customer.owner_id else None
+    background = customer.background
+    if not background:
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("CUSTOMER_BACKGROUND_NOT_FOUND", "Customer background not found"),
+        )
+
+    leads = db.scalars(
+        select(Lead).where(Lead.customer_name == customer.name).order_by(Lead.created_at.desc(), Lead.id.desc())
+    ).all()
+    lead_ids = [lead.id for lead in leads]
+    owner_ids = {lead.owner_id for lead in leads if lead.owner_id is not None}
+    feedbacks = (
+        db.scalars(select(SalesFeedback).where(SalesFeedback.lead_id.in_(lead_ids)).order_by(SalesFeedback.submitted_at.desc())).all()
+        if lead_ids
+        else []
+    )
+    owner_ids.update(feedback.owner_id for feedback in feedbacks if feedback.owner_id is not None)
+    owner_names = {
+        row.id: row.name
+        for row in db.scalars(select(User).where(User.id.in_(owner_ids))).all()
+    } if owner_ids else {}
+
+    lead_history = [
+        CustomerLeadHistoryOut(
+            id=lead.id,
+            customer_name=lead.customer_name,
+            source=f"{lead.source_category} / {lead.source_label}",
+            product=lead.product,
+            feedback_status=lead.feedback_status,
+            owner_name=owner_names.get(lead.owner_id or 0, "Unassigned"),
+            created_at=lead.created_at,
+        )
+        for lead in leads
+    ]
+    feedback_records = [
+        CustomerFeedbackRecordOut(
+            status=feedback.feedback_status,
+            judgement=feedback.customer_judgement,
+            remark=feedback.remark,
+            owner_name=owner_names.get(feedback.owner_id, "Unknown"),
+            happened_at=feedback.submitted_at,
+        )
+        for feedback in feedbacks
+    ]
+    if not feedback_records:
+        feedback_records = [
+            CustomerFeedbackRecordOut(
+                status=lead.feedback_status,
+                judgement=lead.score_label,
+                remark=f"Lead source: {lead.source_category} / {lead.source_label}",
+                owner_name=owner_names.get(lead.owner_id or 0, "Unassigned"),
+                happened_at=lead.created_at,
+            )
+            for lead in leads
+        ]
+    timeline = [
+        CustomerTimelineItemOut(
+            status="background_updated",
+            summary=f"Background investigation updated by {background.updated_by}",
+            happened_at=background.updated_at,
+        )
+    ]
+    timeline.extend(
+        CustomerTimelineItemOut(
+            status=record.status,
+            summary=f"{record.owner_name}: {record.judgement}",
+            happened_at=record.happened_at,
+        )
+        for record in feedback_records
+    )
+    timeline = sorted(timeline, key=lambda item: item.happened_at, reverse=True)
+
+    return CustomerDetailOut(
+        id=customer.id,
+        name=customer.name,
+        country=customer.country,
+        customer_type=customer.customer_type,
+        product=customer.product,
+        tier=customer.tier,
+        owner_id=customer.owner_id,
+        owner_name=owner.name if owner else "未分配",
+        can_edit_background=user.role in {"admin", "ops"},
+        detail_path=f"/admin/customers/{customer.id}",
+        background=CustomerBackgroundOut(
+            auto_summary=background.auto_summary,
+            manual_summary=background.manual_summary,
+            current_summary=background.manual_summary or background.auto_summary,
+            evidence=background.evidence,
+            sources=background_sources(background.evidence),
+            confidence=background.confidence,
+            updated_by=background.updated_by,
+            updated_at=background.updated_at,
+        ),
+        lead_history=lead_history,
+        feedback_records=feedback_records,
+        timeline=timeline,
+    )
+
+
 @app.get("/api/customers", response_model=CustomerPage)
 def list_customers(
     page: int = Query(1, ge=1),
@@ -939,8 +1066,8 @@ def list_customers(
     )
 
 
-@app.get("/api/customers/{customer_id}", response_model=CustomerOut)
-def get_customer(customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Customer:
+@app.get("/api/customers/{customer_id}", response_model=CustomerDetailOut)
+def get_customer(customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> CustomerDetailOut:
     customer = db.get(Customer, customer_id)
     if not customer:
         raise HTTPException(
@@ -952,33 +1079,37 @@ def get_customer(customer_id: int, db: Session = Depends(get_db), user: User = D
             status_code=403,
             detail=error_detail("CUSTOMER_FORBIDDEN", "No permission to view this customer"),
         )
-    return customer
+    return build_customer_detail(db, customer, user)
 
 
-@app.put("/api/customers/{customer_id}/background", response_model=CustomerOut)
+@app.put("/api/customers/{customer_id}/background", response_model=CustomerDetailOut)
 def update_customer_background(
     customer_id: int,
     payload: CustomerBackgroundUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ops),
-) -> Customer:
+) -> CustomerDetailOut:
     customer = db.get(Customer, customer_id)
     if not customer or not customer.background:
-        raise HTTPException(status_code=404, detail="Customer background not found")
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("CUSTOMER_BACKGROUND_NOT_FOUND", "Customer background not found"),
+        )
     customer.background.manual_summary = payload.manual_summary
     customer.background.updated_by = user.name
-    db.add(
-        AuditLog(
-            actor_id=user.id,
-            action="update_customer_background",
-            target_type="customer",
-            target_id=customer.id,
-            detail="Customer background manually updated",
-        )
+    add_audit(
+        db,
+        request.state.trace_id,
+        "update_customer_background",
+        "Customer background manually updated",
+        actor_id=user.id,
+        target_type="customer",
+        target_id=customer.id,
     )
     db.commit()
     db.refresh(customer)
-    return customer
+    return build_customer_detail(db, customer, user)
 
 
 @app.get("/api/settings/summary")

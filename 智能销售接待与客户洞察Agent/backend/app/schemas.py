@@ -177,10 +177,18 @@ class DashboardOut(BaseModel):
     items: list[DashboardTodoOut]
 
 
+class CustomerBackgroundSourceOut(BaseModel):
+    type: str
+    title: str
+    detail: str
+
+
 class CustomerBackgroundOut(BaseModel):
     auto_summary: str
     manual_summary: str | None
+    current_summary: str = ""
     evidence: str
+    sources: list[CustomerBackgroundSourceOut] = Field(default_factory=list)
     confidence: str
     updated_by: str
     updated_at: datetime
@@ -194,6 +202,40 @@ class CustomerOut(BaseModel):
     product: str
     tier: str
     background: CustomerBackgroundOut
+
+
+class CustomerLeadHistoryOut(BaseModel):
+    id: int
+    customer_name: str
+    source: str
+    product: str
+    feedback_status: str
+    owner_name: str
+    created_at: datetime
+
+
+class CustomerFeedbackRecordOut(BaseModel):
+    status: str
+    judgement: str
+    remark: str
+    owner_name: str
+    happened_at: datetime
+
+
+class CustomerTimelineItemOut(BaseModel):
+    status: str
+    summary: str
+    happened_at: datetime
+
+
+class CustomerDetailOut(CustomerOut):
+    owner_id: int | None
+    owner_name: str
+    can_edit_background: bool
+    detail_path: str
+    lead_history: list[CustomerLeadHistoryOut]
+    feedback_records: list[CustomerFeedbackRecordOut]
+    timeline: list[CustomerTimelineItemOut]
 
 
 class CustomerListItem(BaseModel):

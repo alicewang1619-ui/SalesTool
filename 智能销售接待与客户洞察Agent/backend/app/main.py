@@ -104,12 +104,12 @@ def ensure_sqlite_compatibility() -> None:
                 ),
                 {
                     "customer_name": "GlobalMed Peru",
-                    "raw_inquiry": "瀹㈡埛鍘熸枃锛歐e distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics.",
+                    "raw_inquiry": "Original inquiry: We distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics.",
                     "conversation_history": json.dumps(
                         [
-                            "瀹㈡埛璇㈤棶 portable ultrasound 浠ｇ悊缁勫悎涓庡尯鍩熻瘖鎵€搴旂敤銆?,
-                            "AI 杩介棶鍥藉銆佸鎴疯韩浠藉拰搴旂敤鍦烘櫙鍚庣‘璁ゅ叾涓?Peru 浠ｇ悊鍟嗐€?,
-                            "瀹㈡埛琛ㄧず甯屾湜涓夊ぉ鍐呮敹鍒颁骇鍝佸姣旇祫鏂欍€?
+                            "Customer asked about portable ultrasound for regional clinics.",
+                            "AI confirmed Peru distributor context after follow-up.",
+                            "Customer expects product comparison materials within three days.",
                         ],
                         ensure_ascii=False,
                     ),
@@ -126,12 +126,12 @@ def ensure_sqlite_compatibility() -> None:
                 ),
                 {
                     "customer_name": "Al Noor Hospital",
-                    "raw_inquiry": "瀹㈡埛鍘熸枃锛歄ur hospital is reviewing trolley ultrasound systems for emergency and radiology departments.",
+                    "raw_inquiry": "Original inquiry: Our hospital is reviewing trolley ultrasound systems for emergency and radiology departments.",
                     "conversation_history": json.dumps(
                         [
-                            "閭璇㈢洏璇存槑鍖婚櫌姝ｅ湪璇勪及 trolley ultrasound銆?,
-                            "AI 浠庨偖绠辩鍚嶅拰鍥藉瀛楁璇嗗埆 UAE Hospital銆?,
-                            "绯荤粺鏍囪涓洪渶璺熻繘锛岀瓑寰呰繍钀ュ垎閰嶉攢鍞礋璐ｄ汉銆?
+                            "Email inquiry says the hospital is reviewing trolley ultrasound.",
+                            "AI identified UAE hospital context from country and signature fields.",
+                            "System marks the lead as needing follow-up and pending sales assignment.",
                         ],
                         ensure_ascii=False,
                     ),
@@ -276,13 +276,13 @@ def process_import_job(db: Session, job: ImportJob) -> None:
             Lead(
                 customer_name=customer_name,
                 country=clean["country"],
-                customer_type=clean["customer_type"] or "寰呰ˉ鍏?,
-                product=clean["product"] or "寰呰ˉ鍏?,
+                customer_type=clean["customer_type"] or "pending",
+                product=clean["product"] or "pending",
                 source_category=clean["source_category"],
                 source_label=clean["source_label"],
-                score_label="寰呰ˉ鍏?,
-                feedback_status="鏈垎鍙?,
-                raw_inquiry=f"瀵煎叆鏉ユ簮锛歿clean['source_category']} / {clean['source_label']}",
+                score_label="pending",
+                feedback_status="unassigned",
+                raw_inquiry=f"Import source: {clean['source_category']} / {clean['source_label']}",
                 conversation_history="[]",
             )
         )
@@ -305,7 +305,7 @@ def process_import_job_task(task_id: str, trace_id: str, actor_id: int) -> None:
             db,
             trace_id,
             "import_job_completed",
-            f"瀵煎叆浠诲姟 {job.task_id} 瀹屾垚锛屾垚鍔?{job.success_rows} 琛岋紝澶辫触 {job.failed_rows} 琛?,
+            f"Import job {job.task_id} completed: {job.success_rows} success, {job.failed_rows} failed.",
             actor_id=actor_id,
             target_type="import_job",
             target_id=job.id,

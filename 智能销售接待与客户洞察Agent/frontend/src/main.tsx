@@ -12,6 +12,7 @@ import { LeadsPage } from "./pages/LeadsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadImportPage } from "./pages/LeadImportPage";
 import { FeedbackCardPage } from "./pages/FeedbackCardPage";
+import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PendingAssignmentsPage } from "./pages/PendingAssignmentsPage";
 import { ReportsHomePage } from "./pages/ReportsHomePage";
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
       { path: "reports/period", element: <ReportsPeriodPage /> },
       { path: "reports/metrics", element: <ReportsMetricsPage /> },
       { path: "reports/export", element: <ReportsExportPage /> },
+      { path: "forbidden", element: <ForbiddenPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "settings/country-sales", element: <CountrySalesMappingPage /> },
       { path: "settings/product-knowledge", element: <ProductKnowledgePage /> }

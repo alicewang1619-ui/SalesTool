@@ -20,6 +20,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sessionState, setSessionState] = useState<"checking" | "valid" | "expired">("checking");
+  const [user, setUser] = useState<{ role: string } | null>(null);
 
   useEffect(() => {
     if (!getToken()) {
@@ -28,8 +29,11 @@ export function AppShell() {
     }
     let alive = true;
     fetchMe()
-      .then(() => {
-        if (alive) setSessionState("valid");
+      .then((currentUser) => {
+        if (alive) {
+          setUser(currentUser);
+          setSessionState("valid");
+        }
       })
       .catch(() => {
         clearSession();
@@ -42,6 +46,14 @@ export function AppShell() {
 
   if (sessionState === "expired") {
     return <Navigate to="/?reason=expired" replace />;
+  }
+  const salesRestricted =
+    user?.role === "sales" &&
+    !location.pathname.startsWith("/admin/forbidden") &&
+    ["/admin/settings", "/admin/reports", "/admin/assignments"].some((path) => location.pathname.startsWith(path));
+  if (salesRestricted) {
+    const from = `${location.pathname}${location.search}`;
+    return <Navigate to={`/admin/forbidden?from=${encodeURIComponent(from)}&reason=FORBIDDEN`} replace />;
   }
   const selectedKey = location.pathname.startsWith("/admin/leads")
     ? "/admin/leads"
@@ -70,7 +82,7 @@ export function AppShell() {
       <Layout>
         <GlobalBanner />
         <Content className="page-content">
-          <Outlet />
+          {sessionState === "valid" ? <Outlet /> : <div className="muted">正在校验会话</div>}
         </Content>
       </Layout>
     </Layout>

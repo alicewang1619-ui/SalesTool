@@ -58,6 +58,7 @@ from .schemas import (
     FeedbackOwnerOut,
     FeedbackSubmitOut,
     FeedbackSubmitRequest,
+    ForbiddenContextOut,
     LeadAssignmentUpdate,
     LeadDetailOut,
     LeadAssignmentOut,
@@ -471,6 +472,32 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 @app.get("/api/me", response_model=SalesUserOut)
 def me(user: User = Depends(current_user)) -> User:
     return user
+
+
+def safe_return_path(path: str) -> str:
+    if not path.startswith("/") or path.startswith("//"):
+        return "/admin/dashboard"
+    return path
+
+
+@app.get("/api/forbidden/context", response_model=ForbiddenContextOut)
+def forbidden_context(
+    request: Request,
+    from_path: str = Query(default="/admin/dashboard", alias="from", max_length=300),
+    reason: str = Query(default="FORBIDDEN", max_length=80),
+    trace_id: str | None = Query(default=None, max_length=64),
+    user: User = Depends(current_user),
+) -> ForbiddenContextOut:
+    return ForbiddenContextOut(
+        title="无权限访问该页面",
+        message="当前账号没有执行该操作或查看该页面的权限。系统已记录本次访问，可联系管理员处理。",
+        reason_code=reason,
+        role=user.role,
+        from_path=safe_return_path(from_path),
+        trace_id=trace_id or request.state.trace_id,
+        default_home_path="/admin/dashboard",
+        support_action="联系管理员开通权限或重新分配负责人",
+    )
 
 
 @app.get("/api/banner", response_model=BannerOut)

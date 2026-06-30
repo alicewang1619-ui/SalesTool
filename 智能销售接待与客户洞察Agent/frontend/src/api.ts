@@ -563,6 +563,17 @@ export type ProductKnowledgeContext = {
   rendered_prompt: string;
 };
 
+export type ForbiddenContext = {
+  title: string;
+  message: string;
+  reason_code: string;
+  role: string;
+  from_path: string;
+  trace_id: string;
+  default_home_path: string;
+  support_action: string;
+};
+
 const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET ?? "").trim();
 const API_BASE = import.meta.env.DEV && DEV_PROXY_TARGET ? "" : (import.meta.env.VITE_API_BASE ?? "").trim();
 
@@ -582,6 +593,27 @@ export function clearSession(): void {
   window.localStorage.removeItem("ug_role");
 }
 
+function forbiddenCode(rawDetail: unknown): string {
+  if (typeof rawDetail === "object" && rawDetail !== null && "code" in rawDetail && typeof rawDetail.code === "string") {
+    return rawDetail.code;
+  }
+  return "FORBIDDEN";
+}
+
+function redirectForbiddenIfNeeded(status: number, rawDetail: unknown, traceId: string | null): void {
+  if (status !== 403 || !window.location.pathname.startsWith("/admin") || window.location.pathname.startsWith("/admin/forbidden")) {
+    return;
+  }
+  const params = new URLSearchParams({
+    from: `${window.location.pathname}${window.location.search}`,
+    reason: forbiddenCode(rawDetail)
+  });
+  if (traceId) {
+    params.set("trace_id", traceId);
+  }
+  window.location.assign(`/admin/forbidden?${params.toString()}`);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
@@ -598,6 +630,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const error = new Error(message) as Error & { traceId?: string };
     error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
     const traceId = response.headers.get("x-trace-id");
+    redirectForbiddenIfNeeded(response.status, rawDetail, traceId);
     if (traceId) {
       error.traceId = traceId;
     }
@@ -621,6 +654,7 @@ async function requestForm<T>(path: string, body: FormData): Promise<T> {
     const error = new Error(message) as Error & { traceId?: string };
     error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
     const traceId = response.headers.get("x-trace-id");
+    redirectForbiddenIfNeeded(response.status, rawDetail, traceId);
     if (traceId) {
       error.traceId = traceId;
     }
@@ -969,6 +1003,17 @@ export function updateProductKnowledgeStatus(id: number, status: string): Promis
 
 export function fetchProductKnowledgeContext(): Promise<ProductKnowledgeContext> {
   return request<ProductKnowledgeContext>("/api/ai/product-knowledge/context");
+}
+
+export function fetchForbiddenContext(params: { from?: string; reason?: string; traceId?: string } = {}): Promise<ForbiddenContext> {
+  const search = new URLSearchParams({
+    from: params.from || "/admin/dashboard",
+    reason: params.reason || "FORBIDDEN"
+  });
+  if (params.traceId) {
+    search.set("trace_id", params.traceId);
+  }
+  return request<ForbiddenContext>(`/api/forbidden/context?${search.toString()}`);
 }
 
 export function fetchSalesUsers(): Promise<SalesUser[]> {

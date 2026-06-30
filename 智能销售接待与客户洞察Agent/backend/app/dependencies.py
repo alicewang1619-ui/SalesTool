@@ -1,8 +1,8 @@
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import User
+from .models import AuditLog, User
 from .security import decode_access_token
 
 
@@ -33,8 +33,24 @@ def current_user(authorization: str | None = Header(default=None), db: Session =
     return user
 
 
-def require_admin_or_ops(user: User = Depends(current_user)) -> User:
+def require_admin_or_ops(
+    request: Request,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> User:
     if user.role not in {"admin", "ops"}:
+        trace_id = getattr(request.state, "trace_id", "") or request.headers.get("x-trace-id") or ""
+        db.add(
+            AuditLog(
+                actor_id=user.id,
+                action="permission_denied",
+                target_type="permission",
+                target_id=None,
+                trace_id=trace_id,
+                detail=f"{user.email} denied {request.method} {request.url.path}",
+            )
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=error_detail("FORBIDDEN", "无权限访问该配置"),

@@ -413,6 +413,26 @@ body {
   margin-bottom: 16px;
 }
 
+.forbidden-page {
+  min-height: calc(100vh - 180px);
+  display: grid;
+  place-items: center;
+}
+
+.forbidden-card {
+  width: min(760px, 100%);
+}
+
+.forbidden-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #5b4be8;
+  background: rgba(91, 75, 232, 0.1);
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;

@@ -1758,3 +1758,49 @@ def test_sales_user_cannot_access_product_knowledge_settings(client: TestClient)
     assert overview.status_code == 403
     assert saved.status_code == 403
     assert context.status_code == 403
+
+
+def test_forbidden_context_returns_role_home_reason_and_trace(client: TestClient) -> None:
+    headers = {**auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"), "x-trace-id": "forbidden-context-test"}
+
+    response = client.get(
+        "/api/forbidden/context",
+        params={"from": "/admin/settings", "reason": "FORBIDDEN", "trace_id": "settings-denied-trace"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["title"] == "无权限访问该页面"
+    assert body["message"]
+    assert body["role"] == "sales"
+    assert body["from_path"] == "/admin/settings"
+    assert body["trace_id"] == "settings-denied-trace"
+    assert body["default_home_path"] == "/admin/dashboard"
+    assert body["support_action"] == "联系管理员开通权限或重新分配负责人"
+
+
+def test_forbidden_context_distinguishes_expired_session_from_403(client: TestClient) -> None:
+    response = client.get("/api/forbidden/context", params={"from": "/admin/settings"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "UNAUTHENTICATED"
+
+
+def test_sales_forbidden_settings_api_writes_security_audit(client: TestClient) -> None:
+    sales_headers = {**auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"), "x-trace-id": "forbidden-settings-test"}
+
+    denied = client.get("/api/settings/overview", headers=sales_headers)
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "FORBIDDEN"
+    assert denied.headers["x-trace-id"] == "forbidden-settings-test"
+
+    audit = client.get("/api/audit-logs", headers=auth_headers(client))
+    assert audit.status_code == 200
+    assert any(
+        event["action"] == "permission_denied"
+        and event["trace_id"] == "forbidden-settings-test"
+        and "/api/settings/overview" in event["detail"]
+        for event in audit.json()["items"]
+    )

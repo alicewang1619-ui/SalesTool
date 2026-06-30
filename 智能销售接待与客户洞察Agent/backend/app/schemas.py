@@ -625,6 +625,17 @@ class ProductKnowledgeContextOut(BaseModel):
     rendered_prompt: str
 
 
+class ForbiddenContextOut(BaseModel):
+    title: str
+    message: str
+    reason_code: str
+    role: str
+    from_path: str
+    trace_id: str
+    default_home_path: str
+    support_action: str
+
+
 class AuditLogOut(BaseModel):
     id: int
     action: str

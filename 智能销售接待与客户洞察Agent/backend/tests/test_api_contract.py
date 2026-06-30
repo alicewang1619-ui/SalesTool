@@ -41,7 +41,9 @@ def client() -> TestClient:
         db.execute(delete(LoginAttempt))
         db.execute(delete(ImportJob))
         db.query(Lead).filter(
-            Lead.customer_name.in_(["Clinica Shanghai", "重复客户", "Excel Clinic", "Clinica Browser Check"])
+            Lead.customer_name.in_(
+                ["Clinica Shanghai", "重复客户", "Excel Clinic", "Clinica Browser Check", "Clinica Andes Pending"]
+            )
         ).delete(synchronize_session=False)
         disabled = db.query(SourceDictionary).filter(SourceDictionary.category == "停用来源", SourceDictionary.label == "旧展会").first()
         if not disabled:
@@ -443,3 +445,123 @@ def test_channel_import_failure_rows_are_downloadable_and_retry_is_idempotent(cl
 
     audit = client.get("/api/audit-logs", headers=headers)
     assert any(event["action"] == "import_job_retried" and event["target_type"] == "import_job" for event in audit.json()["items"])
+
+
+def test_pending_assignments_list_unassigned_and_mapping_failures_with_pagination(client: TestClient) -> None:
+    headers = auth_headers(client)
+    with SessionLocal() as db:
+        db.add(
+            Lead(
+                customer_name="Clinica Andes Pending",
+                country="Chile",
+                customer_type="Clinic",
+                product="Sonos Max",
+                source_category="缃戠珯",
+                source_label="瀹樼綉鑱婂ぉ",
+                score_label="寰呰ˉ鍏?",
+                feedback_status="鏈垎鍙?",
+                raw_inquiry="Chile clinic needs assignment mapping.",
+                conversation_history="[]",
+                owner_id=None,
+            )
+        )
+        db.commit()
+
+    response = client.get("/api/assignments/pending", params={"page": 1, "page_size": 2}, headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["page"] == 1
+    assert body["page_size"] == 2
+    assert body["total"] >= 2
+    assert len(body["items"]) == 2
+    first = body["items"][0]
+    assert {
+        "id",
+        "customer_name",
+        "country",
+        "customer_type",
+        "product",
+        "score_label",
+        "feedback_status",
+        "pending_reasons",
+        "detail_path",
+        "configure_mapping_path",
+    } <= set(first)
+    chile = next(item for item in body["items"] if item["customer_name"] == "Clinica Andes Pending")
+    assert "COUNTRY_MAPPING_MISSING" in chile["pending_reasons"]
+    assert chile["configure_mapping_path"] == "/admin/settings?section=country-sales&pending_country=Chile"
+
+
+def test_pending_assignment_confirm_writes_owner_feedback_link_and_audit(client: TestClient) -> None:
+    headers = auth_headers(client)
+    target = next(
+        item
+        for item in client.get("/api/assignments/pending", headers=headers).json()["items"]
+        if item["customer_name"] == "Al Noor Hospital"
+    )
+
+    response = client.post(
+        f"/api/assignments/{target['id']}/assign",
+        json={"owner_id": 2, "expected_owner_id": None},
+        headers={**headers, "x-trace-id": "pending-assignment-test"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lead_id"] == target["id"]
+    assert body["owner_id"] == 2
+    assert body["owner_name"] == "Maria Chen"
+    assert body["feedback_link_token"]
+    assert body["feedback_link_path"].startswith("/feedback/")
+    assert body["expires_at"].endswith("+00:00")
+
+    detail = client.get(f"/api/leads/{target['id']}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["assignment"]["owner_id"] == 2
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert any(
+        event["action"] == "pending_assignment_confirmed"
+        and event["target_id"] == target["id"]
+        and event["trace_id"] == "pending-assignment-test"
+        for event in audit.json()["items"]
+    )
+
+
+def test_sales_user_cannot_access_pending_assignments(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+
+    list_response = client.get("/api/assignments/pending", headers=sales_headers)
+    assign_response = client.post(
+        "/api/assignments/1/assign",
+        json={"owner_id": 2, "expected_owner_id": None},
+        headers=sales_headers,
+    )
+
+    assert list_response.status_code == 403
+    assert assign_response.status_code == 403
+
+
+def test_pending_assignment_conflict_when_two_admins_assign_same_lead(client: TestClient) -> None:
+    headers = auth_headers(client)
+    target = next(
+        item
+        for item in client.get("/api/assignments/pending", headers=headers).json()["items"]
+        if item["customer_name"] == "Al Noor Hospital"
+    )
+
+    first = client.post(
+        f"/api/assignments/{target['id']}/assign",
+        json={"owner_id": 2, "expected_owner_id": None},
+        headers=headers,
+    )
+    second = client.post(
+        f"/api/assignments/{target['id']}/assign",
+        json={"owner_id": 2, "expected_owner_id": None},
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert second.json()["detail"]["code"] == "ASSIGNMENT_CONFLICT"

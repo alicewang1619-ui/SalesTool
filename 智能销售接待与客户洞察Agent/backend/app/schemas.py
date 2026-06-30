@@ -73,6 +73,33 @@ class PageResult(BaseModel):
     items: list[LeadOut]
 
 
+class PendingAssignmentOut(LeadOut):
+    pending_reasons: list[str]
+    detail_path: str
+    configure_mapping_path: str | None = None
+
+
+class PendingAssignmentPage(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    items: list[PendingAssignmentOut]
+
+
+class AssignmentConfirmRequest(BaseModel):
+    owner_id: int
+    expected_owner_id: int | None = None
+
+
+class AssignmentConfirmOut(BaseModel):
+    lead_id: int
+    owner_id: int
+    owner_name: str
+    feedback_link_token: str
+    feedback_link_path: str
+    expires_at: str
+
+
 class ImportFailureOut(BaseModel):
     row_number: int
     customer_name: str

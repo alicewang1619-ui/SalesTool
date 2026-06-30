@@ -2,7 +2,7 @@ import json
 
 from sqlalchemy.orm import Session
 
-from .models import Banner, Customer, CustomerBackground, Lead, SourceDictionary, User
+from .models import Banner, CountrySalesMapping, Customer, CustomerBackground, Lead, SourceDictionary, User
 from .security import hash_password
 
 
@@ -26,6 +26,8 @@ def seed_data(db: Session) -> None:
     )
     db.add_all([admin, sales])
     db.flush()
+
+    db.add(CountrySalesMapping(country="Peru", sales_user_id=sales.id, active=True))
 
     db.add(
         Banner(

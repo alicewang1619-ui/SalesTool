@@ -58,6 +58,28 @@ class Lead(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class CountrySalesMapping(Base):
+    __tablename__ = "country_sales_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    country: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    sales_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SalesFeedbackLink(Base):
+    __tablename__ = "sales_feedback_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), nullable=False, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class ImportJob(Base):
     __tablename__ = "import_jobs"
 

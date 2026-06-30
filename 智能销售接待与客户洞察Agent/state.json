@@ -1,7 +1,7 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-30T00:48:45Z",
+    "last_updated_at_utc":  "2026-06-30T00:56:29Z",
     "current_stage":  "design-I",
     "current_substep":  "final-blueprint-confirmation",
     "completed_stages":  [
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "user_decision",
-                        "description":  "等待用户确认 design master 总蓝图：确认后进入阶段 II 静默批量产出 DESIGN、tokens、页面清单、页面文档、HTML 和技术方案。"
+                        "description":  "已补充官网渠道 KPI 归因口径；等待用户确认 design master 总蓝图，确认后进入阶段 II 静默批量产出 DESIGN、tokens、页面清单、页面文档、HTML 和技术方案。"
                     },
     "open_questions":  [
                            {
@@ -119,6 +119,12 @@
                                    "decision":  "安全与运维确认为自建账号 RBAC、敏感数据权限控制与导出脱敏、销售反馈链接 7 天有效、每日自动备份保留 30 天、关键操作审计、软删和再营销退订/不再联系标记。",
                                    "stage":  "design-I",
                                    "rationale":  "PRD 明确 PII 权限控制、反馈链接有效期、再营销人工确认、退订禁发、配置变更记录操作人和时间；用户在推荐后回复“可以，继续”。"
+                               },
+                               {
+                                   "id":  "D-13",
+                                   "decision":  "网站 KPI 口径确认为系统对官网渠道做 KPI 归因，不把网站本身作为独立 KPI 系统。",
+                                   "stage":  "design-I",
+                                   "rationale":  "PRD 已要求 P0 官网渠道进入统一线索池和非金额型报表；用户在总蓝图确认前表示不确定网站是否可以做 KPI，因此补充官网渠道询盘量、有效率、响应时效、分发时效和销售反馈率等归因指标。"
                                }
                            ],
     "category":  "saas",
@@ -416,6 +422,11 @@
                                 "stage":  "design-I",
                                 "timestamp":  "2026-06-30T00:48:45Z",
                                 "summary":  "用户回复“可以，继续”，确认安全运维方案：PC 后台自建账号 + RBAC，客户敏感信息权限控制与导出脱敏，销售反馈链接 7 天有效，数据库每日备份保留 30 天，关键操作审计，线索/客户软删，再营销邮件带退订/不再联系标记。"
+                            },
+                            {
+                                "stage":  "design-I",
+                                "timestamp":  "2026-06-30T00:56:29Z",
+                                "summary":  "用户表示先继续，但不确定网站是否可以做 KPI。已补充口径：网站不单独做 KPI 系统，系统对官网渠道做归因统计，包括官网询盘量、有效率、AI 补全率、响应/分发时效、销售反馈率、未反馈数、客户池和再营销待办进入量；仍不统计成交金额和报价金额。"
                             }
                         ]
 }

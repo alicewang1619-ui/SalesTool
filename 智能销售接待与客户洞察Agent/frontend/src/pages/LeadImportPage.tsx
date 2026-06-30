@@ -3,7 +3,7 @@ import type { UploadProps } from "antd";
 import { Download, RefreshCw, UploadCloud } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { createImportJob, downloadImportFailures, retryImportJob, type ImportFailure, type ImportJob } from "../api";
+import { createImportJob, downloadImportFailures, fetchImportJob, retryImportJob, type ImportFailure, type ImportJob } from "../api";
 
 const reasonLabel: Record<string, string> = {
   DUPLICATE_CUSTOMER: "重复客户",
@@ -18,6 +18,18 @@ export function LeadImportPage() {
   const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const pollImportJob = async (taskId: string) => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const latest = await fetchImportJob(taskId);
+      setJob(latest);
+      if (latest.status === "completed") {
+        message.success(`导入任务已完成：成功 ${latest.success_rows} 行，失败 ${latest.failed_rows} 行`);
+        return;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+    }
+  };
+
   const uploadProps: UploadProps = {
     accept: ".csv,.xlsx",
     maxCount: 1,
@@ -28,7 +40,8 @@ export function LeadImportPage() {
       try {
         const created = await createImportJob(file);
         setJob(created);
-        message.success(`导入任务已完成：成功 ${created.success_rows} 行，失败 ${created.failed_rows} 行`);
+        message.success("导入任务已创建，正在查询处理进度");
+        await pollImportJob(created.task_id);
       } catch (err) {
         setError(err instanceof Error ? err.message : "导入失败");
       } finally {

@@ -14,3 +14,11 @@
 | PAGE-IMPORT-04 | P1 | 导入任务中途失败 | 查询任务 | 页面显示失败原因、已处理数量和重试入口，重试幂等 | 长任务无恢复会导致批量导入卡死 |
 | PAGE-IMPORT-05 | P2 | 字典中停用某来源 | 打开导入映射 | 停用来源不可选，历史记录仍可展示来源名称 | 字典状态未生效会导入错误来源 |
 
+
+## 生产化 TDD 补充（06-30-2026）
+
+- `PAGE-IMPORT-01` 已落为后端契约测试：`POST /api/import-jobs` 使用 multipart 文件上传，返回 `task_id`，任务状态可通过 `GET /api/import-jobs/{task_id}` 查询。
+- `PAGE-IMPORT-02` 已覆盖重复客户、缺失国家、停用来源三类行级失败；成功行持久化到 `Lead`，失败行保存到 `ImportJob.failures_json`。
+- `PAGE-IMPORT-03` 已覆盖非法格式文件拒绝，API 返回 `INVALID_IMPORT_FILE`，且写入 `import_rejected` 审计日志，不进入处理流程。
+- `PAGE-IMPORT-04` 已覆盖失败行下载与重试任务：`GET /api/import-jobs/{task_id}/failed-rows` 返回 CSV，`POST /api/import-jobs/{task_id}/retry` 幂等返回同一任务。
+- `PAGE-IMPORT-05` 已通过停用来源字典行级校验覆盖，停用来源不会被导入为有效线索。

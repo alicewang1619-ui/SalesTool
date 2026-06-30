@@ -4,7 +4,7 @@ from sqlalchemy import delete
 
 from app.database import Base, SessionLocal, engine
 from app.main import app, ensure_sqlite_compatibility
-from app.models import Lead, LoginAttempt
+from app.models import AuditLog, ImportJob, Lead, LoginAttempt, SourceDictionary
 
 
 @pytest.fixture()
@@ -13,6 +13,11 @@ def client() -> TestClient:
     ensure_sqlite_compatibility()
     with SessionLocal() as db:
         db.execute(delete(LoginAttempt))
+        db.execute(delete(ImportJob))
+        db.query(Lead).filter(Lead.customer_name.in_(["Clinica Shanghai", "重复客户"])).delete(synchronize_session=False)
+        disabled = db.query(SourceDictionary).filter(SourceDictionary.category == "停用来源", SourceDictionary.label == "旧展会").first()
+        if not disabled:
+            db.add(SourceDictionary(category="停用来源", label="旧展会", enabled=False))
         globalmed = db.query(Lead).filter(Lead.customer_name == "GlobalMed Peru").first()
         if globalmed:
             globalmed.owner_id = 2
@@ -281,3 +286,88 @@ def test_sales_user_cannot_update_customer_background(client: TestClient) -> Non
         headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"),
     )
     assert response.status_code == 403
+
+
+def test_channel_import_uploads_csv_to_task_and_persists_success_rows(client: TestClient) -> None:
+    headers = auth_headers(client)
+    csv_body = "\n".join(
+        [
+            "customer_name,country,customer_type,product,source_category,source_label",
+            "Clinica Shanghai,China,Clinic,Portable Ultrasound,网站,官网聊天",
+            "重复客户,Peru,代理商,Handheld Ultrasound,网站,官网聊天",
+            "重复客户,Peru,代理商,Handheld Ultrasound,网站,官网聊天",
+            "缺国家,,Hospital,Trolley Ultrasound,邮箱,官网邮箱",
+            "停用来源客户,China,Clinic,Portable Ultrasound,停用来源,旧展会",
+        ]
+    )
+
+    response = client.post(
+        "/api/import-jobs",
+        files={"file": ("leads.csv", csv_body.encode("utf-8"), "text/csv")},
+        headers={**headers, "x-trace-id": "import-success-test"},
+    )
+
+    assert response.status_code == 201
+    created = response.json()
+    assert created["task_id"]
+    assert created["filename"] == "leads.csv"
+    assert created["status"] in {"queued", "processing", "completed"}
+
+    job = client.get(f"/api/import-jobs/{created['task_id']}", headers=headers)
+    assert job.status_code == 200
+    body = job.json()
+    assert body["status"] == "completed"
+    assert body["total_rows"] == 5
+    assert body["success_rows"] == 2
+    assert body["failed_rows"] == 3
+    assert any(item["reason"] == "DUPLICATE_CUSTOMER" and item["customer_name"] == "重复客户" for item in body["failures"])
+    assert any(item["reason"] == "MISSING_COUNTRY" and item["row_number"] == 4 for item in body["failures"])
+    assert any(item["reason"] == "SOURCE_DISABLED" and item["customer_name"] == "停用来源客户" for item in body["failures"])
+
+    leads = client.get("/api/leads", params={"page_size": 100}, headers=headers)
+    names = {item["customer_name"] for item in leads.json()["items"]}
+    assert {"Clinica Shanghai", "重复客户"} <= names
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert any(event["action"] == "import_job_completed" and event["trace_id"] == "import-success-test" for event in audit.json()["items"])
+
+
+def test_channel_import_rejects_oversized_or_invalid_files_before_worker(client: TestClient) -> None:
+    headers = auth_headers(client)
+    response = client.post(
+        "/api/import-jobs",
+        files={"file": ("leads.exe", b"not,a,csv", "application/octet-stream")},
+        headers={**headers, "x-trace-id": "import-rejected-test"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "INVALID_IMPORT_FILE"
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert any(event["action"] == "import_rejected" and event["trace_id"] == "import-rejected-test" for event in audit.json()["items"])
+
+
+def test_channel_import_failure_rows_are_downloadable_and_retry_is_idempotent(client: TestClient) -> None:
+    headers = auth_headers(client)
+    csv_body = "\n".join(
+        [
+            "customer_name,country,customer_type,product,source_category,source_label",
+            "无国家医院,,Hospital,Trolley Ultrasound,邮箱,官网邮箱",
+        ]
+    )
+    created = client.post(
+        "/api/import-jobs",
+        files={"file": ("failed_rows.csv", csv_body.encode("utf-8"), "text/csv")},
+        headers=headers,
+    ).json()
+
+    download = client.get(f"/api/import-jobs/{created['task_id']}/failed-rows", headers=headers)
+    assert download.status_code == 200
+    assert "无国家医院" in download.text
+    assert "MISSING_COUNTRY" in download.text
+
+    retry = client.post(f"/api/import-jobs/{created['task_id']}/retry", headers=headers)
+    assert retry.status_code == 200
+    assert retry.json()["task_id"] == created["task_id"]
+    assert retry.json()["status"] == "completed"
+    assert retry.json()["failed_rows"] == 1

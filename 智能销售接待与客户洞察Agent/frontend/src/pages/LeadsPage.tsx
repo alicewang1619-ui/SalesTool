@@ -162,7 +162,7 @@ export function LeadsPage() {
           <Select aria-label="国家" placeholder="全部国家" disabled />
           <Select aria-label="产品" placeholder="全部产品" disabled />
           <Button onClick={() => navigate("/admin/settings")}>管理来源</Button>
-          <Button type="primary" icon={<Upload size={16} />} onClick={() => navigate("/admin/leads?intent=import")}>
+          <Button type="primary" icon={<Upload size={16} />} onClick={() => navigate("/admin/leads/import")}>
             导入线索
           </Button>
         </Space>

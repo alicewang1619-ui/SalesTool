@@ -73,6 +73,22 @@ class PageResult(BaseModel):
     items: list[LeadOut]
 
 
+class ImportFailureOut(BaseModel):
+    row_number: int
+    customer_name: str
+    reason: str
+
+
+class ImportJobOut(BaseModel):
+    task_id: str
+    filename: str
+    status: str
+    total_rows: int
+    success_rows: int
+    failed_rows: int
+    failures: list[ImportFailureOut]
+
+
 class DashboardMetrics(BaseModel):
     today_inquiries: int
     valid_leads: int

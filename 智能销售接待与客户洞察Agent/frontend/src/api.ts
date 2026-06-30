@@ -81,6 +81,22 @@ export type SourceOption = {
   label: string;
 };
 
+export type ImportFailure = {
+  row_number: number;
+  customer_name: string;
+  reason: string;
+};
+
+export type ImportJob = {
+  task_id: string;
+  filename: string;
+  status: string;
+  total_rows: number;
+  success_rows: number;
+  failed_rows: number;
+  failures: ImportFailure[];
+};
+
 export type DashboardFilters = {
   page?: number;
   pageSize?: number;
@@ -162,6 +178,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function requestForm<T>(path: string, body: FormData): Promise<T> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_BASE}${path}`, { method: "POST", body, headers });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({ detail: "请求失败" }));
+    const rawDetail = detail.detail;
+    const message =
+      typeof rawDetail === "string" ? rawDetail : typeof rawDetail?.message === "string" ? rawDetail.message : "请求失败";
+    const error = new Error(message);
+    error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
+    throw error;
+  }
+  return response.json() as Promise<T>;
+}
+
 export function login(email: string, password: string): Promise<LoginResponse> {
   return request<LoginResponse>("/api/auth/login", {
     method: "POST",
@@ -204,6 +239,33 @@ export function updateLeadAssignment(
 
 export function fetchSourceDictionary(): Promise<SourceOption[]> {
   return request<SourceOption[]>("/api/source-dictionary");
+}
+
+export function createImportJob(file: File): Promise<ImportJob> {
+  const form = new FormData();
+  form.append("file", file);
+  return requestForm<ImportJob>("/api/import-jobs", form);
+}
+
+export function fetchImportJob(taskId: string): Promise<ImportJob> {
+  return request<ImportJob>(`/api/import-jobs/${taskId}`);
+}
+
+export function retryImportJob(taskId: string): Promise<ImportJob> {
+  return request<ImportJob>(`/api/import-jobs/${taskId}/retry`, { method: "POST" });
+}
+
+export async function downloadImportFailures(taskId: string): Promise<string> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_BASE}/api/import-jobs/${taskId}/failed-rows`, { headers });
+  if (!response.ok) {
+    throw new Error("失败行下载失败");
+  }
+  return response.text();
 }
 
 export function fetchDashboard(filters: DashboardFilters = {}): Promise<DashboardResult> {

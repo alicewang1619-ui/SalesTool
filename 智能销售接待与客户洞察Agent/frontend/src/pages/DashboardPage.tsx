@@ -207,7 +207,7 @@ export function DashboardPage() {
           <Button icon={<RefreshCw size={16} />} onClick={() => loadDashboard(filters)}>
             刷新
           </Button>
-          <Button type="primary" icon={<Upload size={16} />} onClick={() => navigate("/admin/leads?intent=import")}>
+          <Button type="primary" icon={<Upload size={16} />} onClick={() => navigate("/admin/leads/import")}>
             导入线索
           </Button>
         </Space>

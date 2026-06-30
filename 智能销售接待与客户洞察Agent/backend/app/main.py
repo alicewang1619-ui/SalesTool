@@ -20,6 +20,10 @@ from .schemas import (
     DashboardOut,
     DashboardTimelineItem,
     DashboardTodoOut,
+    LeadAssignmentUpdate,
+    LeadDetailOut,
+    LeadAssignmentOut,
+    LeadProfileSummary,
     LeadOut,
     LoginRequest,
     LoginResponse,
@@ -180,14 +184,97 @@ def list_leads(
     return PageResult(page=page, page_size=page_size, total=total, items=[LeadOut.model_validate(row, from_attributes=True) for row in rows])
 
 
-@app.get("/api/leads/{lead_id}", response_model=LeadOut)
+@app.get("/api/leads/{lead_id}", response_model=LeadDetailOut)
 def get_lead(lead_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Lead:
     lead = db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="线索不存在")
     if user.role == "sales" and lead.owner_id != user.id:
         raise HTTPException(status_code=403, detail="无权查看该线索")
-    return lead
+    return build_lead_detail(db, lead)
+
+
+def build_lead_detail(db: Session, lead: Lead) -> LeadDetailOut:
+    customer = db.scalar(select(Customer).where(Customer.name == lead.customer_name))
+    owner = db.get(User, lead.owner_id) if lead.owner_id else None
+    background = customer.background if customer and customer.background else None
+    source = f"{lead.source_category} / {lead.source_label}"
+    base = LeadOut.model_validate(lead, from_attributes=True).model_dump()
+    background_summary = (
+        background.manual_summary or background.auto_summary
+        if background
+        else f"{lead.customer_name} 尚未关联客户背景调查，需运营补充官网或邮箱公开信息。"
+    )
+    feedback_text = (
+        f"{owner.name if owner else '待分配'} 当前状态为 {lead.feedback_status}，线索来自 {source}。"
+    )
+    return LeadDetailOut(
+        **base,
+        raw_inquiry=f"{lead.customer_name} 咨询 {lead.product}，国家 {lead.country}，来源 {source}。",
+        conversation_history=[
+            f"客户表达对 {lead.product} 的采购兴趣。",
+            f"AI 已补全国家为 {lead.country}，客户类型为 {lead.customer_type}。",
+            "系统保留原始询盘、会话摘要和后续销售反馈，供人工判断。",
+        ],
+        profile_summary=LeadProfileSummary(
+            customer_type=lead.customer_type,
+            country=lead.country,
+            product=lead.product,
+            source=source,
+        ),
+        score_reasons=[
+            f"评分标签：{lead.score_label}",
+            f"客户身份为 {lead.customer_type}，产品兴趣明确。",
+            "国家字段完整，可进入销售分发规则。",
+        ],
+        background_summary=background_summary,
+        background_confidence=background.confidence if background else "待补充",
+        background_updated_at=background.updated_at if background else None,
+        customer_id=customer.id if customer else None,
+        assignment=LeadAssignmentOut(
+            owner_id=owner.id if owner else None,
+            owner_name=owner.name if owner else "待分配",
+            status=lead.feedback_status,
+        ),
+        feedback_history=[
+            feedback_text,
+            "销售反馈优先于 AI 评分，但 AI 判断理由会保留在详情中。",
+        ],
+        background_task_status="已完成" if background else "待补充",
+    )
+
+
+@app.put("/api/leads/{lead_id}/assignment", response_model=LeadDetailOut)
+def update_lead_assignment(
+    lead_id: int,
+    payload: LeadAssignmentUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> LeadDetailOut:
+    lead = db.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="线索不存在")
+    if payload.owner_id is not None:
+        owner = db.get(User, payload.owner_id)
+        if not owner or owner.role != "sales" or not owner.enabled:
+            raise HTTPException(status_code=400, detail="负责人必须是启用的销售账号")
+        lead.owner_id = owner.id
+    else:
+        lead.owner_id = None
+    lead.feedback_status = payload.feedback_status
+    add_audit(
+        db,
+        request.state.trace_id,
+        "lead_assignment_updated",
+        f"线索 {lead.customer_name} 分发状态更新为 {payload.feedback_status}",
+        actor_id=user.id,
+        target_type="lead",
+        target_id=lead.id,
+    )
+    db.commit()
+    db.refresh(lead)
+    return build_lead_detail(db, lead)
 
 
 @app.get("/api/dashboard", response_model=DashboardOut)
@@ -258,7 +345,7 @@ def dashboard(
         items=[
             DashboardTodoOut(
                 **LeadOut.model_validate(row, from_attributes=True).model_dump(),
-                detail_path=f"/admin/leads?recordId={row.id}",
+                detail_path=f"/admin/leads/{row.id}",
             )
             for row in rows
         ],

@@ -7,6 +7,7 @@ import { AppShell } from "./shell/AppShell";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadsPage } from "./pages/LeadsPage";
+import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./styles.css";
@@ -19,6 +20,7 @@ const router = createBrowserRouter([
     children: [
       { path: "dashboard", element: <DashboardPage /> },
       { path: "leads", element: <LeadsPage /> },
+      { path: "leads/:leadId", element: <LeadDetailPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
       { path: "settings", element: <SettingsPage /> }
     ]
@@ -41,4 +43,3 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </ConfigProvider>
   </React.StrictMode>
 );
-

@@ -42,6 +42,7 @@ export function AppShell() {
   if (sessionState === "expired") {
     return <Navigate to="/?reason=expired" replace />;
   }
+  const selectedKey = location.pathname.startsWith("/admin/leads") ? "/admin/leads" : location.pathname;
 
   return (
     <Layout className="app-shell" aria-busy={sessionState === "checking"}>
@@ -52,7 +53,7 @@ export function AppShell() {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[selectedKey]}
           items={items}
           onClick={(event) => {
             if (event.key !== "reports") navigate(event.key);

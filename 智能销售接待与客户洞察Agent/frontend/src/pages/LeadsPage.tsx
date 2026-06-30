@@ -222,7 +222,7 @@ export function LeadsPage() {
             { title: "反馈", dataIndex: "feedback_status" },
             {
               title: "动作",
-              render: (_, lead) => <Button onClick={() => navigate(`/admin/leads?recordId=${lead.id}`)}>查看详情</Button>
+              render: (_, lead) => <Button onClick={() => navigate(`/admin/leads/${lead.id}`)}>查看详情</Button>
             }
           ]}
         />

@@ -34,6 +34,38 @@ class LeadOut(BaseModel):
     feedback_status: str
 
 
+class LeadProfileSummary(BaseModel):
+    customer_type: str
+    country: str
+    product: str
+    source: str
+
+
+class LeadAssignmentOut(BaseModel):
+    owner_id: int | None
+    owner_name: str
+    status: str
+
+
+class LeadDetailOut(LeadOut):
+    raw_inquiry: str
+    conversation_history: list[str]
+    profile_summary: LeadProfileSummary
+    score_reasons: list[str]
+    background_summary: str
+    background_confidence: str
+    background_updated_at: datetime | None = None
+    customer_id: int | None = None
+    assignment: LeadAssignmentOut
+    feedback_history: list[str]
+    background_task_status: str
+
+
+class LeadAssignmentUpdate(BaseModel):
+    owner_id: int | None = None
+    feedback_status: str = Field(min_length=2, max_length=80)
+
+
 class PageResult(BaseModel):
     page: int
     page_size: int

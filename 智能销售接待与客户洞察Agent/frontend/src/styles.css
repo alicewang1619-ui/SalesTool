@@ -147,6 +147,10 @@ body {
   overflow: hidden;
 }
 
+.full-width {
+  width: 100%;
+}
+
 .login-app {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);

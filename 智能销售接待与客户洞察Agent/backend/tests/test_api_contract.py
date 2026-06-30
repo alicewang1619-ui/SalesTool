@@ -4,13 +4,21 @@ from sqlalchemy import delete
 
 from app.database import SessionLocal
 from app.main import app
-from app.models import LoginAttempt
+from app.models import Lead, LoginAttempt
 
 
 @pytest.fixture()
 def client() -> TestClient:
     with SessionLocal() as db:
         db.execute(delete(LoginAttempt))
+        globalmed = db.query(Lead).filter(Lead.customer_name == "GlobalMed Peru").first()
+        if globalmed:
+            globalmed.owner_id = 2
+            globalmed.feedback_status = "未反馈"
+        al_noor = db.query(Lead).filter(Lead.customer_name == "Al Noor Hospital").first()
+        if al_noor:
+            al_noor.owner_id = None
+            al_noor.feedback_status = "需跟进"
         db.commit()
     with TestClient(app) as test_client:
         yield test_client
@@ -106,6 +114,62 @@ def test_lead_detail_returns_same_record_and_respects_sales_scope(client: TestCl
     assert client.get(f"/api/leads/{forbidden['id']}", headers=sales_headers).status_code == 403
 
 
+def test_lead_detail_returns_full_context_for_manual_judgement(client: TestClient) -> None:
+    headers = auth_headers(client)
+    target = client.get("/api/leads", params={"page_size": 10}, headers=headers).json()["items"][0]
+
+    response = client.get(f"/api/leads/{target['id']}", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["raw_inquiry"]
+    assert body["conversation_history"]
+    assert body["profile_summary"]["customer_type"] == body["customer_type"]
+    assert body["score_reasons"]
+    assert body["background_summary"]
+    assert body["assignment"]["status"] in {"未反馈", "需跟进", "已联系", "已报价", "未分发"}
+    assert body["feedback_history"]
+
+
+def test_lead_assignment_update_persists_and_writes_audit(client: TestClient) -> None:
+    headers = auth_headers(client)
+    target = next(
+        item
+        for item in client.get("/api/leads", params={"page_size": 10}, headers=headers).json()["items"]
+        if item["customer_name"] == "Al Noor Hospital"
+    )
+
+    response = client.put(
+        f"/api/leads/{target['id']}/assignment",
+        json={"owner_id": 2, "feedback_status": "未反馈"},
+        headers={**headers, "x-trace-id": "lead-assignment-test"},
+    )
+    assert response.status_code == 200
+    updated = response.json()
+    assert updated["assignment"]["owner_id"] == 2
+    assert updated["assignment"]["owner_name"] == "Maria Chen"
+    assert updated["assignment"]["status"] == "未反馈"
+
+    refreshed = client.get(f"/api/leads/{target['id']}", headers=headers)
+    assert refreshed.status_code == 200
+    assert refreshed.json()["assignment"]["owner_id"] == 2
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert audit.status_code == 200
+    assert any(
+        event["action"] == "lead_assignment_updated"
+        and event["target_id"] == target["id"]
+        and event["trace_id"] == "lead-assignment-test"
+        for event in audit.json()["items"]
+    )
+    with SessionLocal() as db:
+        lead = db.get(Lead, target["id"])
+        assert lead is not None
+        lead.owner_id = None
+        lead.feedback_status = "需跟进"
+        db.commit()
+
+
 def test_sales_user_only_sees_owned_leads(client: TestClient) -> None:
     response = client.get("/api/leads", headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"))
     assert response.status_code == 200
@@ -132,7 +196,7 @@ def test_dashboard_returns_backend_aggregates_and_paginated_todos(client: TestCl
     assert body["metrics"]["today_inquiries"] >= body["total"]
     assert 0 <= body["metrics"]["website_kpi"] <= 100
     assert body["items"][0]["id"]
-    assert body["items"][0]["detail_path"].startswith("/admin/leads?")
+    assert body["items"][0]["detail_path"].startswith("/admin/leads/")
     assert str(body["items"][0]["id"]) in body["items"][0]["detail_path"]
 
 

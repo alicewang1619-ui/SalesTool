@@ -24,6 +24,29 @@ export type Lead = {
   feedback_status: string;
 };
 
+export type LeadDetail = Lead & {
+  raw_inquiry: string;
+  conversation_history: string[];
+  profile_summary: {
+    customer_type: string;
+    country: string;
+    product: string;
+    source: string;
+  };
+  score_reasons: string[];
+  background_summary: string;
+  background_confidence: string;
+  background_updated_at: string | null;
+  customer_id: number | null;
+  assignment: {
+    owner_id: number | null;
+    owner_name: string;
+    status: string;
+  };
+  feedback_history: string[];
+  background_task_status: string;
+};
+
 export type PageResult<T> = {
   page: number;
   page_size: number;
@@ -165,8 +188,18 @@ export function fetchLeads(filters: LeadFilters = {}): Promise<PageResult<Lead>>
   return request<PageResult<Lead>>(`/api/leads?${params.toString()}`);
 }
 
-export function fetchLead(leadId: number): Promise<Lead> {
-  return request<Lead>(`/api/leads/${leadId}`);
+export function fetchLead(leadId: number): Promise<LeadDetail> {
+  return request<LeadDetail>(`/api/leads/${leadId}`);
+}
+
+export function updateLeadAssignment(
+  leadId: number,
+  payload: { ownerId: number | null; feedbackStatus: string }
+): Promise<LeadDetail> {
+  return request<LeadDetail>(`/api/leads/${leadId}/assignment`, {
+    method: "PUT",
+    body: JSON.stringify({ owner_id: payload.ownerId, feedback_status: payload.feedbackStatus })
+  });
 }
 
 export function fetchSourceDictionary(): Promise<SourceOption[]> {

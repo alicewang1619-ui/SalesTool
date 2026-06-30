@@ -83,6 +83,39 @@ def test_sales_user_only_sees_owned_leads(client: TestClient) -> None:
     assert "Al Noor Hospital" not in names
 
 
+def test_dashboard_requires_login(client: TestClient) -> None:
+    response = client.get("/api/dashboard")
+    assert response.status_code == 401
+
+
+def test_dashboard_returns_backend_aggregates_and_paginated_todos(client: TestClient) -> None:
+    response = client.get("/api/dashboard", params={"page_size": 1}, headers=auth_headers(client))
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["page"] == 1
+    assert body["page_size"] == 1
+    assert body["total"] >= 2
+    assert len(body["items"]) == 1
+    assert {"today_inquiries", "valid_leads", "unfeedback", "website_kpi"} <= set(body["metrics"])
+    assert body["metrics"]["today_inquiries"] >= body["total"]
+    assert 0 <= body["metrics"]["website_kpi"] <= 100
+    assert body["items"][0]["id"]
+    assert body["items"][0]["detail_path"].startswith("/admin/leads?")
+    assert str(body["items"][0]["id"]) in body["items"][0]["detail_path"]
+
+
+def test_dashboard_respects_sales_data_scope(client: TestClient) -> None:
+    response = client.get(
+        "/api/dashboard",
+        headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"),
+    )
+    assert response.status_code == 200
+    names = [item["customer_name"] for item in response.json()["items"]]
+    assert "GlobalMed Peru" in names
+    assert "Al Noor Hospital" not in names
+
+
 def test_customer_background_can_be_manually_updated_by_admin(client: TestClient) -> None:
     headers = auth_headers(client)
     response = client.put(

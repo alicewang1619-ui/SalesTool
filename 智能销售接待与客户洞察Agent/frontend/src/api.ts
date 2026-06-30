@@ -31,6 +31,28 @@ export type PageResult<T> = {
   items: T[];
 };
 
+export type DashboardTodo = Lead & {
+  detail_path: string;
+};
+
+export type DashboardResult = {
+  page: number;
+  page_size: number;
+  total: number;
+  metrics: {
+    today_inquiries: number;
+    valid_leads: number;
+    unfeedback: number;
+    website_kpi: number;
+  };
+  ai_summary: string;
+  assignment_timeline: Array<{
+    label: string;
+    value: string;
+  }>;
+  items: DashboardTodo[];
+};
+
 export type Customer = {
   id: number;
   name: string;
@@ -116,6 +138,11 @@ export function fetchLeads(sourceCategory?: string): Promise<PageResult<Lead>> {
     params.set("source_category", sourceCategory);
   }
   return request<PageResult<Lead>>(`/api/leads?${params.toString()}`);
+}
+
+export function fetchDashboard(pageSize = 10): Promise<DashboardResult> {
+  const params = new URLSearchParams({ page: "1", page_size: String(pageSize) });
+  return request<DashboardResult>(`/api/dashboard?${params.toString()}`);
 }
 
 export function fetchCustomer(customerId: string): Promise<Customer> {

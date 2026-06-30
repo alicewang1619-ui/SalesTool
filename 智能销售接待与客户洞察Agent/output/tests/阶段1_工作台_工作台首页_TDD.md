@@ -14,3 +14,12 @@
 | PAGE-DASH-04 | P1 | 工作台接口失败 | 页面加载 | 展示失败原因和重试入口，结构化日志记录 trace id | 只显示空白会让运营无法定位问题 |
 | PAGE-DASH-05 | P2 | 1366px 与 390px 视口 | 渲染工作台 | 指标卡、Banner、表格无重叠和横向溢出 | 原型复刻不做响应式会破坏移动查看 |
 
+## 当前自动化落地（06-30-2026）
+- 已在 `backend/tests/test_api_contract.py` 增加工作台契约测试：未登录访问 `/api/dashboard` 返回 401；管理员获取后端聚合指标和分页待办；销售账号仅能看到自己负责的线索。
+- 已实现 `GET /api/dashboard`，前端工作台只消费该聚合接口，不再本地计算指标。
+- 当前验证结果：后端 `py -m pytest .\tests -q` 为 10 passed；前端 `npm.cmd run build` 通过。
+
+## 浏览器复核补充（06-30-2026）
+- 真实浏览器发现成功加载数据后仍可能残留旧错误条，已要求工作台页在 `fetchDashboard()` 成功后同步清空错误状态。
+- 响应式复核覆盖 1366px 与 390px：全局 Banner、四个指标卡、待办表格动作可见，页面级 `scrollWidth <= clientWidth`。
+- “查看详情”复核要求点击后 URL 必须携带真实记录 id，例如 `/admin/leads?recordId=2`。

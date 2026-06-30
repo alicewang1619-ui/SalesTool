@@ -77,10 +77,74 @@ body {
   font-weight: 700;
 }
 
+.page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
 .metric-row,
 .toolbar,
 .summary-grid {
   margin-bottom: 24px;
+}
+
+.metric-chip {
+  min-height: 36px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  color: #5b4be8;
+  font-weight: 700;
+  border-radius: 999px;
+  background: #f1f0ff;
+}
+
+.metric-chip.green {
+  color: #047857;
+  background: #e4f5ef;
+}
+
+.metric-chip.amber {
+  color: #a16207;
+  background: #f8eddb;
+}
+
+.dashboard-toolbar {
+  margin-bottom: 24px;
+}
+
+.dashboard-toolbar .ant-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dashboard-toolbar .ant-input,
+.dashboard-toolbar .ant-select {
+  width: 180px;
+}
+
+.timeline-list {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-item {
+  display: grid;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 4px solid #5b4be8;
+}
+
+.timeline-item span {
+  color: #6b7689;
+}
+
+.table-card {
+  overflow: hidden;
 }
 
 .login-app {
@@ -198,6 +262,17 @@ body {
     align-items: flex-start;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .page-heading,
+  .dashboard-toolbar .ant-card-body {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-toolbar .ant-input,
+  .dashboard-toolbar .ant-select {
+    width: 100%;
   }
 
   .page-content {

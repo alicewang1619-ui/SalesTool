@@ -11,8 +11,8 @@ const items = [
   { key: "/admin/dashboard", icon: <Home size={18} />, label: "工作台" },
   { key: "/admin/leads", icon: <Database size={18} />, label: "线索池" },
   { key: "/admin/customers/1", icon: <UsersRound size={18} />, label: "客户详情" },
-  { key: "/admin/settings", icon: <Settings size={18} />, label: "配置" },
-  { key: "reports", icon: <BarChart3 size={18} />, label: "报表" }
+  { key: "reports", icon: <BarChart3 size={18} />, label: "报表" },
+  { key: "/admin/settings", icon: <Settings size={18} />, label: "配置" }
 ];
 
 export function AppShell() {

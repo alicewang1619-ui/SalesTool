@@ -41,6 +41,32 @@ class PageResult(BaseModel):
     items: list[LeadOut]
 
 
+class DashboardMetrics(BaseModel):
+    today_inquiries: int
+    valid_leads: int
+    unfeedback: int
+    website_kpi: int
+
+
+class DashboardTodoOut(LeadOut):
+    detail_path: str
+
+
+class DashboardTimelineItem(BaseModel):
+    label: str
+    value: str
+
+
+class DashboardOut(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    metrics: DashboardMetrics
+    ai_summary: str
+    assignment_timeline: list[DashboardTimelineItem]
+    items: list[DashboardTodoOut]
+
+
 class CustomerBackgroundOut(BaseModel):
     auto_summary: str
     manual_summary: str | None

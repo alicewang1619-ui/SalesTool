@@ -16,6 +16,10 @@ from .schemas import (
     BannerOut,
     CustomerBackgroundUpdate,
     CustomerOut,
+    DashboardMetrics,
+    DashboardOut,
+    DashboardTimelineItem,
+    DashboardTodoOut,
     LeadOut,
     LoginRequest,
     LoginResponse,
@@ -174,6 +178,58 @@ def list_leads(
     total = db.scalar(count_query) or 0
     rows = db.scalars(query.order_by(Lead.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
     return PageResult(page=page, page_size=page_size, total=total, items=[LeadOut.model_validate(row, from_attributes=True) for row in rows])
+
+
+@app.get("/api/dashboard", response_model=DashboardOut)
+def dashboard(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> DashboardOut:
+    base_conditions = []
+    if user.role == "sales":
+        base_conditions.append(Lead.owner_id == user.id)
+
+    def scoped_count(*conditions) -> int:
+        query = select(func.count()).select_from(Lead)
+        for condition in [*base_conditions, *conditions]:
+            query = query.where(condition)
+        return db.scalar(query) or 0
+
+    query = select(Lead)
+    for condition in base_conditions:
+        query = query.where(condition)
+
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    total = scoped_count()
+    website_total = scoped_count(Lead.source_category.in_(["网站", "缃戠珯"]))
+    rows = db.scalars(query.order_by(Lead.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
+
+    return DashboardOut(
+        page=page,
+        page_size=page_size,
+        total=total,
+        metrics=DashboardMetrics(
+            today_inquiries=scoped_count(Lead.created_at >= today_start),
+            valid_leads=scoped_count(Lead.score_label.in_(["有效", "鏈夋晥"])),
+            unfeedback=scoped_count(Lead.feedback_status.in_(["未反馈", "鏈弽棣?"])),
+            website_kpi=round((website_total / total) * 100) if total else 0,
+        ),
+        ai_summary="工作台汇总当前线索、客户与反馈状态，所有数字由后端按登录用户权限聚合生成。",
+        assignment_timeline=[
+            DashboardTimelineItem(label="线索进入", value=f"{total} 条待处理记录"),
+            DashboardTimelineItem(label="有效判断", value="优先处理有效与高意向客户"),
+            DashboardTimelineItem(label="销售反馈", value="未反馈记录需要继续跟进"),
+        ],
+        items=[
+            DashboardTodoOut(
+                **LeadOut.model_validate(row, from_attributes=True).model_dump(),
+                detail_path=f"/admin/leads?recordId={row.id}",
+            )
+            for row in rows
+        ],
+    )
 
 
 @app.get("/api/customers/{customer_id}", response_model=CustomerOut)

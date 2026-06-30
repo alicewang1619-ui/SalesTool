@@ -1,0 +1,91 @@
+:root {
+  /* Surface */
+  --bg: #F7F8FC;
+  --surface: #FFFFFF;
+  --surface-warm: #FBFAFF;
+  --surface-raised: #FFFFFF;
+  --surface-overlay: #FFFFFF;
+  --surface-hover: #F1F0FF;
+
+  /* Foreground */
+  --fg: #111827;
+  --fg-2: #374151;
+  --muted: #667085;
+  --meta: #8A92A6;
+
+  /* Border */
+  --border: #D9DEEA;
+  --border-soft: #E8ECF5;
+
+  /* Accent */
+  --accent: #5B4BDB;
+  --accent-on: #FFFFFF;
+  --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+  --accent-active: color-mix(in oklab, var(--accent), black 14%);
+
+  /* Semantic */
+  --success: #168A5B;
+  --warn: #A96500;
+  --danger: #C2413B;
+
+  /* Typography */
+  --font-display: Inter, "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-body: Inter, "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
+  /* Type scale */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 32px;
+  --text-4xl: 44px;
+
+  /* Leading & tracking */
+  --leading-body: 1.6;
+  --leading-tight: 1.18;
+  --tracking-display: -0.02em;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Section rhythm */
+  --section-y-desktop: 64px;
+  --section-y-tablet: 48px;
+  --section-y-phone: 32px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  /* Elevation */
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 8px 24px color-mix(in oklab, var(--fg), transparent 90%);
+  --elev-float: 0 18px 56px color-mix(in oklab, var(--fg), transparent 86%);
+
+  /* Focus */
+  --focus-ring: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 72%);
+
+  /* Motion */
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Layout */
+  --container-max: 1280px;
+  --container-gutter-desktop: 32px;
+  --container-gutter-tablet: 24px;
+  --container-gutter-phone: 16px;
+}

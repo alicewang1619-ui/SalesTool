@@ -80,3 +80,5 @@
 ## 工作文件追加
 - `智能销售接待与客户洞察Agent/output/index.html`
 - [06-30-2026 09:46:45] 修复状态文件｜背景：同步 HTML 页面入口时发现 state.json 在本次修改前已无法通过 JSON 解析，后续阶段无法可靠读取当前进度。｜结论：将 state.json 重写为简洁有效的项目状态文件，保留当前阶段、关键决策摘要、交付物路径和下一步 TDD 交接信息，并新增 html_index 交付物。｜来源：AI
+- [06-30-2026 09:50:42] 安装 TDD master｜背景：设计阶段 II 已完成，用户要求阅读 200w.liurun.vip/tdd.md 并安装 TDD master，准备进入测试用例阶段。｜结论：按远程 tdd.md 的 TDD master 安装说明，将其安装为 Codex 全局 skill，目标目录为 `C:\Users\002018\.codex\skills\tdd-master`。｜来源：用户
+- [06-30-2026 09:52:44] TDD master 安装完成｜背景：用户要求安装 TDD master，为设计交付后的测试用例阶段做准备。｜结论：已从 200w.liurun.vip/tdd.md 指向的安装包下载安装 	dd-master，安装目录为 C:\Users\002018\.codex\skills\tdd-master；当前 Codex 需要重启或新会话后才能在技能列表中加载。｜来源：AI

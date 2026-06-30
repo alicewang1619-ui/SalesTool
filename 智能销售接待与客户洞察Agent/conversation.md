@@ -486,3 +486,11 @@ V1 收敛：第一版不是做完整客户增长中台，而是做询盘闭环 M
 - 用户指令：生成 HTML 页面给我。
 - 执行结果：已新增 `output/index.html`，集中链接设计系统、页面清单、技术方案和 `output/pages/` 下 25 个高保真 HTML 页面。
 - 查看方式：直接打开 `output/index.html`，或通过本地静态服务访问。
+
+## 06-30-2026 09:52 TDD master 安装
+
+- 用户指令：阅读 200w.liurun.vip/tdd.md，安装 TDD master。
+- 执行结果：已下载并安装到 C:\Users\002018\.codex\skills\tdd-master。
+- 校验结果：SKILL.md 存在且 
+ame: tdd-master，eferences/ 下包含 TDD 模板、分层测试设计规范、测试单元设计师、验收门禁与 GOAL 契约规范、提问收敛闸门等文件。
+- 使用提示：需要重启 Codex 或开启新会话后，技能列表才会加载 	dd-master。

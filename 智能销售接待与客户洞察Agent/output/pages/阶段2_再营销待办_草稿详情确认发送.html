@@ -151,7 +151,12 @@ tr:last-child td { border-bottom: 0; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .card, .topbar, table { animation: rise-in var(--motion-base) var(--ease-standard) both; }
 @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .main { padding: var(--space-4); } .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } .topbar { flex-direction: column; } }
-@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }</style>
+@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }    .global-banner { position: sticky; top: 0; z-index: 20; min-height: 88px; margin: -32px -32px 24px; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid rgba(255,255,255,.42); background: linear-gradient(105deg, rgba(17,24,39,.76), rgba(91,75,219,.72)), var(--banner-image, url('')); background-size: cover; background-position: center; color: #fff; box-shadow: 0 12px 32px rgba(17,24,39,.12); }
+    .global-banner strong { display: block; font-size: 20px; line-height: 1.2; letter-spacing: 0; }
+    .global-banner span { display: block; margin-top: 4px; max-width: 720px; color: rgba(255,255,255,.84); font-size: 13px; line-height: 1.5; }
+    .global-banner .banner-action { min-height: 36px; padding: 8px 12px; border: 1px solid rgba(255,255,255,.56); border-radius: 8px; background: rgba(255,255,255,.14); color: #fff; font-size: 13px; font-weight: 800; white-space: nowrap; }
+    @media (max-width: 900px) { .global-banner { position: relative; margin: -18px 0 18px; padding: 16px 18px; align-items: flex-start; flex-direction: column; } .global-banner .banner-action { white-space: normal; } }
+  </style>
 </head>
 <body>
   <div class="app">
@@ -163,27 +168,23 @@ tr:last-child td { border-bottom: 0; }
         <a class="" href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
         <a class="" href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
         <a class="active" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="" href="阶段1_系统配置_国家区域销售映射.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a class="" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
-    <main class="main"><div class="topbar"><div><div class="eyebrow">阶段2 · 再营销待办</div><h1>草稿详情确认发送</h1><p class="muted">编辑 AI 邮件草稿、确认发送、取消草稿和查看发送结果。</p></div><div class="filters"><button class="btn" onclick="toast('筛选已更新')"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" onclick="toast('已保存当前操作')"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
-    <div class="card metric status-line"><span class="muted">今日询盘</span><strong>42</strong><span class="badge accent">官网 18</span></div>
-    <div class="card metric status-line"><span class="muted">有效线索</span><strong>26</strong><span class="badge success">62%</span></div>
-    <div class="card metric status-line"><span class="muted">未反馈</span><strong>11</strong><span class="badge warn">48h 3 条</span></div>
-    <div class="card metric status-line"><span class="muted">官网 KPI</span><strong>71%</strong><span class="badge accent">可归因率</span></div>
-  </section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>客户摘要</h2><p>GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。</p><div class="timeline"><div>已报价未回复，建议 3 天后再营销</div><div>客户官网显示新增 Lima 分部</div><div>销售反馈：可转代理商跟进</div></div></div><div class="card"><h2>再营销草稿</h2><textarea class="input" rows="7">Hi Carlos, based on your interest in portable ultrasound for regional clinics, we prepared a short comparison for your team...</textarea><button class="btn primary" onclick="toast('草稿已确认，等待邮件发送')">人工确认发送</button></div></section><section class="card" style="margin-top:20px"><table>
-    <thead><tr><th>客户</th><th>国家</th><th>类型</th><th>产品</th><th>评分</th><th>反馈</th><th>动作</th></tr></thead>
+    <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
+  <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
+  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
+</section><div class="topbar"><div><div class="eyebrow">阶段2 · 再营销待办</div><h1>草稿详情确认发送</h1><p class="muted">查看建议下一步动作和客户备注，编辑 AI 邮件草稿、确认发送、取消草稿和查看发送结果。</p></div><div class="filters"><a class="btn" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-arrow-left"></i>返回列表</a><button class="btn primary" onclick="toast('草稿已确认，等待邮件发送')"><i class="ph ph-check"></i>确认发送</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
+    <div class="card metric status-line"><span class="muted">当前状态</span><strong>待确认</strong><span class="badge accent">人工复核</span></div>
+    <div class="card metric status-line"><span class="muted">联系方式</span><strong>可发送</strong><span class="badge success">邮箱有效</span></div>
+    <div class="card metric status-line"><span class="muted">退订状态</span><strong>未退订</strong><span class="badge success">允许触达</span></div>
+    <div class="card metric status-line"><span class="muted">草稿风险</span><strong>低</strong><span class="badge accent">无价格承诺</span></div>
+  </section><section class="grid grid-2" style="margin-top:20px"><div class="card status-line"><h2>建议下一步动作</h2><textarea class="input" rows="4">3 天内向 Carlos 发送 Portable Ultrasound 对比资料，并询问代理区域、年度采购量和预算窗口。</textarea><p class="muted">该动作展示在客户备注上方，修改后写入 NurtureTask 修改历史。</p></div><div class="card"><h2>客户备注</h2><p>GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。</p><div class="timeline"><div>客户官网显示新增 Lima 分部</div><div>销售反馈：可转代理商跟进</div></div></div></section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>触达理由</h2><div class="timeline"><div>已报价 7 天未回复，仍处在有效客户池</div><div>客户近期官网扩张，可能存在新增设备采购窗口</div><div>邮件内容不包含成交金额或最终报价承诺</div></div></div><div class="card"><h2>再营销草稿</h2><textarea class="input" rows="8">Hi Carlos, based on your interest in portable ultrasound for regional clinics, we prepared a short comparison for your team. Would it be useful if I send a one-page model comparison and confirm which application your team wants to prioritize?</textarea><button class="btn primary" onclick="toast('草稿已确认，等待邮件发送')">人工确认发送</button></div></section><section class="card" style="margin-top:20px"><h2>确认记录</h2><table>
+    <thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>结果</th></tr></thead>
     <tbody>
-      <tr><td>GlobalMed Peru</td><td>Peru</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>未反馈</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Sofia Ramirez</td><td>Mexico</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge accent">高意向</span></td><td>已联系</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Al Noor Hospital</td><td>UAE</td><td>Hospital</td><td>Trolley Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Clinica Andes</td><td>Chile</td><td>Clinic</td><td>Sonos Max</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>MedSupply Africa</td><td>Kenya</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge warn">资料库</span></td><td>已报价</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Ahmed Khan</td><td>Saudi Arabia</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>已联系</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Nordic Vet Care</td><td>Sweden</td><td>Clinic</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Latam Imaging SA</td><td>Colombia</td><td>代理商</td><td>Trolley Ultrasound</td><td><span class="badge accent">高意向</span></td><td>未反馈</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>CardioPoint</td><td>Brazil</td><td>Hospital</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>已报价</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Elena Ruiz</td><td>Spain</td><td>Doctor</td><td>Sonos I</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
+      <tr><td>今天 09:30</td><td>Alice</td><td>查看建议下一步动作</td><td><span class="badge accent">待确认</span></td></tr>
+      <tr><td>昨天 17:10</td><td>AI Agent</td><td>生成触达理由和草稿</td><td><span class="badge success">已生成</span></td></tr>
+      <tr><td>3 天前</td><td>Maria Chen</td><td>销售反馈</td><td><span class="badge warn">已报价未回复</span></td></tr>
     </tbody>
   </table></section></main>
   </div>

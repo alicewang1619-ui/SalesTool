@@ -1,9 +1,9 @@
 {
     "project_name":  "智能销售接待与客户洞察Agent",
     "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-29T23:53:49Z",
+    "last_updated_at_utc":  "2026-06-30T00:18:49Z",
     "current_stage":  "design-I",
-    "current_substep":  "socratic-round-7-data-integration",
+    "current_substep":  "socratic-round-8-tech-architecture",
     "completed_stages":  [
                              "0",
                              "1.1",
@@ -37,7 +37,7 @@
                        ],
     "next_action":  {
                         "type":  "user_decision",
-                        "description":  "等待用户确认 design master 第七轮：数据与集成是否按 P0 渠道合规接入/导入、内部标准化数据模型、定时任务和人工审批推进。"
+                        "description":  "等待用户确认 design master 第八轮：技术栈、架构和部署是否按 React + Python/FastAPI + Postgres + Redis/任务队列 + 单体模块化推进。"
                     },
     "open_questions":  [
                            {
@@ -66,8 +66,8 @@
                            },
                            {
                                "id":  "OQ-13",
-                               "title":  "设计阶段数据与集成待确认：P0 渠道接入、销售反馈通知入口、客户调研数据源、再营销发送工具和客户态势监督边界",
-                               "category":  "data",
+                               "title":  "设计阶段技术栈与架构待确认：前端、后端、数据库、任务队列、AI 编排、部署与国内可达",
+                               "category":  "architecture",
                                "priority":  "P0"
                            }
                        ],
@@ -125,6 +125,12 @@
                                    "decision":  "视觉风格确认为浅色医疗科技 SaaS，主色使用蓝紫色，不使用青蓝作为品牌主色。",
                                    "stage":  "design-I",
                                    "rationale":  "PRD 明确是管理后台和手机反馈卡片，需长期查看线索和报表；用户明确反馈“不要青蓝色，用蓝紫色，其他正确”。"
+                               },
+                               {
+                                   "id":  "D-10",
+                                   "decision":  "数据与集成确认为 P0 渠道合规接入/导入、统一 Inquiry 模型、SalesFeedback 反馈闭环、官网公开信息/人工补充/AI 摘要客户调研、人工确认后邮件再营销。",
+                                   "stage":  "design-I",
+                                   "rationale":  "PRD 明确 P0 渠道、核心实体、未授权社媒抓取边界和再营销人工确认原则；用户在推荐后回复“继续”。"
                                }
                            ],
     "category":  "saas",
@@ -407,6 +413,11 @@
                                 "stage":  "design-I",
                                 "timestamp":  "2026-06-29T23:53:49Z",
                                 "summary":  "用户反馈“不要青蓝色，用蓝紫色，其他正确”，确认视觉方向为浅色医疗科技 SaaS，主色使用蓝紫色，保留专业、可信、清爽、克制和不做深色科幻风。"
+                            },
+                            {
+                                "stage":  "design-I",
+                                "timestamp":  "2026-06-30T00:18:49Z",
+                                "summary":  "用户回复“继续”，确认 V1 数据集成方案：官网聊天 Webhook/API、官网后台和展会名片 CSV/Excel、邮箱 IMAP 或 Microsoft Graph/Gmail API，统一进入 Inquiry；销售反馈写入 SalesFeedback；客户调研不抓 Facebook/LinkedIn；再营销人工确认后通过现有邮箱发送。"
                             }
                         ]
 }

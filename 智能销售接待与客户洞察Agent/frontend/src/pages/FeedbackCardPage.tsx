@@ -2,7 +2,7 @@ import { Alert, Button, Card, Form, Input, Radio, Result, Space, Spin, Tag, Typo
 import { Check, RotateCcw, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { fetchFeedbackCard, submitFeedbackCard, type FeedbackCard } from "../api";
+import { fetchFeedbackCard, fetchFeedbackLinkExpiredContext, submitFeedbackCard, type FeedbackCard } from "../api";
 import { GlobalBanner } from "../shell/GlobalBanner";
 
 type FeedbackForm = {
@@ -18,12 +18,34 @@ export function FeedbackCardPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState<{ title: string; message: string; status: "403" | "404" | "500" } | null>(null);
+  const [error, setError] = useState<{
+    title: string;
+    message: string;
+    status: "403" | "404" | "500";
+    traceId?: string;
+    resendLabel?: string;
+    resendHint?: string;
+    supportPath?: string;
+  } | null>(null);
 
   async function loadCard() {
     setLoading(true);
     setError(null);
     try {
+      const context = await fetchFeedbackLinkExpiredContext(token);
+      if (context.reason_code !== "FEEDBACK_LINK_VALID") {
+        setError({
+          title: context.title,
+          message: context.message,
+          status: context.reason_code === "FEEDBACK_LINK_NOT_FOUND" ? "404" : "403",
+          traceId: context.trace_id,
+          resendLabel: context.request_resend_label,
+          resendHint: context.request_resend_hint,
+          supportPath: context.support_path
+        });
+        setCard(null);
+        return;
+      }
       const result = await fetchFeedbackCard(token);
       setCard(result);
       setSubmitted(result.submitted);
@@ -34,12 +56,25 @@ export function FeedbackCardPage() {
       });
     } catch (err) {
       const errorName = err instanceof Error ? err.name : "HTTP_500";
-      if (errorName === "FEEDBACK_LINK_EXPIRED") {
-        setError({ title: "反馈链接已过期", message: "请联系管理员重新发送 7 天有效的销售反馈链接。", status: "403" });
-      } else if (errorName === "FEEDBACK_LINK_OWNER_MISMATCH") {
-        setError({ title: "无权查看此客户", message: "该反馈链接不属于当前负责人，请联系运营重新分配。", status: "403" });
-      } else {
-        setError({ title: "反馈链接不可用", message: "未找到有效反馈链接，请检查微信或邮件中的完整地址。", status: "404" });
+      try {
+        const context = await fetchFeedbackLinkExpiredContext(token);
+        setError({
+          title: context.title,
+          message: context.message,
+          status: context.reason_code === "FEEDBACK_LINK_NOT_FOUND" ? "404" : "403",
+          traceId: context.trace_id,
+          resendLabel: context.request_resend_label,
+          resendHint: context.request_resend_hint,
+          supportPath: context.support_path
+        });
+      } catch {
+        if (errorName === "FEEDBACK_LINK_EXPIRED") {
+          setError({ title: "反馈链接已过期", message: "请联系管理员重新发送 7 天有效的销售反馈链接。", status: "403" });
+        } else if (errorName === "FEEDBACK_LINK_OWNER_MISMATCH") {
+          setError({ title: "无权查看此客户", message: "该反馈链接不属于当前负责人，请联系运营重新分配。", status: "403" });
+        } else {
+          setError({ title: "反馈链接不可用", message: "未找到有效反馈链接，请检查微信或邮件中的完整地址。", status: "404" });
+        }
       }
     } finally {
       setLoading(false);
@@ -77,8 +112,19 @@ export function FeedbackCardPage() {
           <Result
             status={error.status}
             title={error.title}
-            subTitle={error.message}
-            extra={<Button icon={<RotateCcw size={16} />} onClick={loadCard}>重试</Button>}
+            subTitle={
+              <Space direction="vertical" size={6}>
+                <span>{error.message}</span>
+                {error.resendHint ? <span>{error.resendHint}</span> : null}
+                {error.traceId ? <span>Trace ID：{error.traceId}</span> : null}
+              </Space>
+            }
+            extra={
+              <Space wrap>
+                <Button icon={<RotateCcw size={16} />} onClick={loadCard}>重试</Button>
+                {error.supportPath ? <Button type="primary" href={error.supportPath}>{error.resendLabel ?? "联系运营重新发送"}</Button> : null}
+              </Space>
+            }
           />
         ) : card ? (
           <>

@@ -934,6 +934,96 @@ def test_feedback_link_rejects_expired_or_non_owner_link(client: TestClient) -> 
     assert forbidden.json()["detail"]["code"] == "FEEDBACK_LINK_OWNER_MISMATCH"
 
 
+def test_feedback_link_expired_page_context_hides_customer_details(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+    with SessionLocal() as db:
+        feedback_link = db.query(SalesFeedbackLink).filter(SalesFeedbackLink.token == link["feedback_link_token"]).first()
+        assert feedback_link is not None
+        feedback_link.expires_at = feedback_link.created_at
+        db.commit()
+
+    card = client.get(f"/api/feedback-links/{link['feedback_link_token']}", headers={"x-trace-id": "expired-page-test"})
+    context = client.get(f"/api/feedback-links/{link['feedback_link_token']}/expired-context", headers={"x-trace-id": "expired-page-test"})
+
+    assert card.status_code == 410
+    assert context.status_code == 200
+    body = context.json()
+    assert body["reason_code"] == "FEEDBACK_LINK_EXPIRED"
+    assert body["title"] == "反馈链接已过期"
+    assert body["trace_id"] == "expired-page-test"
+    assert body["request_resend_label"] == "联系运营重新发送"
+    assert "GlobalMed Peru" not in str(body)
+    assert "Portable Ultrasound" not in str(body)
+
+
+def test_feedback_link_owner_mismatch_context_writes_security_audit(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+    with SessionLocal() as db:
+        feedback_link = db.query(SalesFeedbackLink).filter(SalesFeedbackLink.token == link["feedback_link_token"]).first()
+        assert feedback_link is not None
+        feedback_link.owner_id = 1
+        db.commit()
+
+    denied = client.get(f"/api/feedback-links/{link['feedback_link_token']}", headers={"x-trace-id": "owner-mismatch-test"})
+    context = client.get(f"/api/feedback-links/{link['feedback_link_token']}/expired-context", headers={"x-trace-id": "owner-mismatch-test"})
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "FEEDBACK_LINK_OWNER_MISMATCH"
+    assert context.status_code == 200
+    assert context.json()["reason_code"] == "FEEDBACK_LINK_OWNER_MISMATCH"
+
+    audit = client.get("/api/audit-logs", headers=auth_headers(client))
+    assert audit.status_code == 200
+    assert any(
+        event["action"] == "feedback_link_owner_mismatch"
+        and event["trace_id"] == "owner-mismatch-test"
+        and event["target_id"] == link["lead_id"]
+        for event in audit.json()["items"]
+    )
+
+
+def test_ops_resend_feedback_link_deactivates_old_link_and_audits(client: TestClient) -> None:
+    link = create_feedback_link_for_globalmed(client)
+    with SessionLocal() as db:
+        feedback_link = db.query(SalesFeedbackLink).filter(SalesFeedbackLink.token == link["feedback_link_token"]).first()
+        assert feedback_link is not None
+        feedback_link.expires_at = feedback_link.created_at
+        db.commit()
+
+    headers = {**auth_headers(client), "x-trace-id": "feedback-link-resend-test"}
+    resent = client.post(f"/api/feedback-links/{link['feedback_link_token']}/resend", headers=headers)
+
+    assert resent.status_code == 201
+    body = resent.json()
+    assert body["old_token"] == link["feedback_link_token"]
+    assert body["new_token"] != link["feedback_link_token"]
+    assert body["feedback_link_path"] == f"/feedback/{body['new_token']}"
+
+    old_card = client.get(f"/api/feedback-links/{link['feedback_link_token']}")
+    new_card = client.get(f"/api/feedback-links/{body['new_token']}")
+    assert old_card.status_code == 410
+    assert new_card.status_code == 200
+
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "feedback_link_resent"
+        and event["trace_id"] == "feedback-link-resend-test"
+        and event["target_id"] == link["lead_id"]
+        for event in audit
+    )
+
+
+def test_tampered_feedback_link_context_returns_safe_invalid_message(client: TestClient) -> None:
+    response = client.get("/api/feedback-links/not-a-real-token/expired-context", headers={"x-trace-id": "tampered-token-test"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reason_code"] == "FEEDBACK_LINK_NOT_FOUND"
+    assert body["title"] == "反馈链接不可用"
+    assert body["trace_id"] == "tampered-token-test"
+    assert "Traceback" not in str(body)
+
+
 def test_feedback_submit_rejects_expired_link_before_writing_feedback(client: TestClient) -> None:
     link = create_feedback_link_for_globalmed(client)
     with SessionLocal() as db:

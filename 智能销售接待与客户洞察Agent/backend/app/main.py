@@ -55,6 +55,8 @@ from .schemas import (
     DashboardTodoOut,
     EmptyStateOut,
     FeedbackCardOut,
+    FeedbackLinkExpiredContextOut,
+    FeedbackLinkResendOut,
     FeedbackOwnerOut,
     FeedbackSubmitOut,
     FeedbackSubmitRequest,
@@ -621,11 +623,67 @@ FEEDBACK_STATUS_OPTIONS = ["已联系", "已报价", "需跟进", "无效", "已
 FEEDBACK_JUDGEMENT_OPTIONS = ["有效客户，继续跟进", "确认真实需求", "放入资料库", "已转代理商"]
 
 
-def load_valid_feedback_context(db: Session, token: str) -> tuple[SalesFeedbackLink, Lead, User]:
+def feedback_link_context_response(reason_code: str, trace_id: str) -> FeedbackLinkExpiredContextOut:
+    if reason_code == "FEEDBACK_LINK_EXPIRED":
+        title = "反馈链接已过期"
+        message = "该销售反馈链接已超过有效期或已被重新发送的新链接替换，请联系运营重新发送 7 天有效的新链接。"
+        token_status = "expired"
+    elif reason_code == "FEEDBACK_LINK_OWNER_MISMATCH":
+        title = "反馈链接不可用"
+        message = "该反馈链接不属于当前负责人或线索负责人已变化，请联系运营重新分配并重新发送。"
+        token_status = "owner_mismatch"
+    elif reason_code == "FEEDBACK_LINK_VALID":
+        title = "反馈链接仍有效"
+        message = "该链接仍可打开，请返回原反馈卡片继续提交。"
+        token_status = "valid"
+    else:
+        title = "反馈链接不可用"
+        message = "未找到有效反馈链接，请检查微信或邮件中的完整地址，或联系运营重新发送。"
+        token_status = "invalid"
+    return FeedbackLinkExpiredContextOut(
+        title=title,
+        message=message,
+        reason_code=reason_code,
+        token_status=token_status,
+        trace_id=trace_id,
+        request_resend_label="联系运营重新发送",
+        request_resend_hint="为保护客户资料，过期、无效或非负责人链接不会展示客户详情。",
+        support_path="mailto:admin@ultrasound-growth.local?subject=重新发送销售反馈链接",
+    )
+
+
+def audit_feedback_link_denial(
+    db: Session,
+    trace_id: str,
+    action: str,
+    feedback_link: SalesFeedbackLink,
+    detail: str,
+) -> None:
+    add_audit(
+        db,
+        trace_id,
+        action,
+        detail,
+        actor_id=feedback_link.owner_id,
+        target_type="feedback_link",
+        target_id=feedback_link.lead_id,
+    )
+    db.commit()
+
+
+def load_valid_feedback_context(db: Session, token: str, trace_id: str | None = None) -> tuple[SalesFeedbackLink, Lead, User]:
     feedback_link = db.scalar(select(SalesFeedbackLink).where(SalesFeedbackLink.token == token))
     if not feedback_link:
         raise HTTPException(status_code=404, detail=error_detail("FEEDBACK_LINK_NOT_FOUND", "Feedback link not found."))
     if not feedback_link.active or feedback_link.expires_at <= datetime.utcnow():
+        if trace_id:
+            audit_feedback_link_denial(
+                db,
+                trace_id,
+                "feedback_link_expired_opened",
+                feedback_link,
+                f"Expired feedback link {feedback_link.token} opened",
+            )
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail=error_detail("FEEDBACK_LINK_EXPIRED", "Feedback link has expired. Request a new link."),
@@ -633,6 +691,14 @@ def load_valid_feedback_context(db: Session, token: str) -> tuple[SalesFeedbackL
     lead = db.get(Lead, feedback_link.lead_id)
     owner = db.get(User, feedback_link.owner_id)
     if not lead or not owner or lead.owner_id != feedback_link.owner_id:
+        if trace_id:
+            audit_feedback_link_denial(
+                db,
+                trace_id,
+                "feedback_link_owner_mismatch",
+                feedback_link,
+                f"Feedback link {feedback_link.token} owner mismatch",
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=error_detail("FEEDBACK_LINK_OWNER_MISMATCH", "Feedback link does not match current owner."),
@@ -667,9 +733,85 @@ def feedback_submit_out(feedback: SalesFeedback) -> FeedbackSubmitOut:
     )
 
 
+@app.get("/api/feedback-links/{token}/expired-context", response_model=FeedbackLinkExpiredContextOut)
+def feedback_link_expired_context(token: str, request: Request, db: Session = Depends(get_db)) -> FeedbackLinkExpiredContextOut:
+    trace_id = request.state.trace_id
+    feedback_link = db.scalar(select(SalesFeedbackLink).where(SalesFeedbackLink.token == token))
+    if not feedback_link:
+        return feedback_link_context_response("FEEDBACK_LINK_NOT_FOUND", trace_id)
+    lead = db.get(Lead, feedback_link.lead_id)
+    owner = db.get(User, feedback_link.owner_id)
+    if not feedback_link.active or feedback_link.expires_at <= datetime.utcnow():
+        return feedback_link_context_response("FEEDBACK_LINK_EXPIRED", trace_id)
+    if not lead or not owner or lead.owner_id != feedback_link.owner_id:
+        audit_feedback_link_denial(
+            db,
+            trace_id,
+            "feedback_link_owner_mismatch",
+            feedback_link,
+            f"Feedback link {feedback_link.token} owner mismatch context viewed",
+        )
+        return feedback_link_context_response("FEEDBACK_LINK_OWNER_MISMATCH", trace_id)
+    return feedback_link_context_response("FEEDBACK_LINK_VALID", trace_id)
+
+
+@app.post("/api/feedback-links/{token}/resend", response_model=FeedbackLinkResendOut, status_code=status.HTTP_201_CREATED)
+def resend_feedback_link(
+    token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> FeedbackLinkResendOut:
+    old_link = db.scalar(select(SalesFeedbackLink).where(SalesFeedbackLink.token == token))
+    if not old_link:
+        raise HTTPException(status_code=404, detail=error_detail("FEEDBACK_LINK_NOT_FOUND", "Feedback link not found."))
+    lead = db.get(Lead, old_link.lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail=error_detail("LEAD_NOT_FOUND", "Lead not found."))
+    owner_id = lead.owner_id or old_link.owner_id
+    owner = db.get(User, owner_id)
+    if not owner or not owner.enabled:
+        raise HTTPException(status_code=400, detail=error_detail("INVALID_FEEDBACK_OWNER", "Feedback owner is unavailable."))
+    active_links = db.scalars(
+        select(SalesFeedbackLink).where(SalesFeedbackLink.lead_id == old_link.lead_id, SalesFeedbackLink.active.is_(True))
+    ).all()
+    for item in active_links:
+        item.active = False
+    new_token = uuid4().hex
+    new_link = SalesFeedbackLink(
+        token=new_token,
+        lead_id=lead.id,
+        owner_id=owner.id,
+        expires_at=datetime.utcnow() + timedelta(days=7),
+        active=True,
+    )
+    db.add(new_link)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "feedback_link_resent",
+        f"Feedback link resent for lead {lead.id}",
+        actor_id=user.id,
+        target_type="feedback_link",
+        target_id=lead.id,
+    )
+    db.commit()
+    db.refresh(new_link)
+    return FeedbackLinkResendOut(
+        old_token=old_link.token,
+        new_token=new_link.token,
+        feedback_link_path=f"/feedback/{new_link.token}",
+        expires_at=new_link.expires_at,
+        lead_id=lead.id,
+        owner_id=owner.id,
+        owner_name=owner.name,
+        audit_action="feedback_link_resent",
+    )
+
+
 @app.get("/api/feedback-links/{token}", response_model=FeedbackCardOut)
-def get_feedback_card(token: str, db: Session = Depends(get_db)) -> FeedbackCardOut:
-    feedback_link, lead, owner = load_valid_feedback_context(db, token)
+def get_feedback_card(token: str, request: Request, db: Session = Depends(get_db)) -> FeedbackCardOut:
+    feedback_link, lead, owner = load_valid_feedback_context(db, token, request.state.trace_id)
     return feedback_card_out(db, feedback_link, lead, owner)
 
 
@@ -680,7 +822,7 @@ def submit_feedback_card(
     request: Request,
     db: Session = Depends(get_db),
 ) -> FeedbackSubmitOut:
-    feedback_link, lead, owner = load_valid_feedback_context(db, token)
+    feedback_link, lead, owner = load_valid_feedback_context(db, token, request.state.trace_id)
     if payload.feedback_status not in FEEDBACK_STATUS_OPTIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -136,6 +136,28 @@ class FeedbackSubmitOut(BaseModel):
     submitted_at: datetime
 
 
+class FeedbackLinkExpiredContextOut(BaseModel):
+    title: str
+    message: str
+    reason_code: str
+    token_status: str
+    trace_id: str
+    request_resend_label: str
+    request_resend_hint: str
+    support_path: str
+
+
+class FeedbackLinkResendOut(BaseModel):
+    old_token: str
+    new_token: str
+    feedback_link_path: str
+    expires_at: datetime
+    lead_id: int
+    owner_id: int
+    owner_name: str
+    audit_action: str
+
+
 class ImportFailureOut(BaseModel):
     row_number: int
     customer_name: str

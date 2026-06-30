@@ -339,6 +339,17 @@ export type FeedbackSubmitResult = {
   submitted_at: string;
 };
 
+export type FeedbackLinkExpiredContext = {
+  title: string;
+  message: string;
+  reason_code: string;
+  token_status: string;
+  trace_id: string;
+  request_resend_label: string;
+  request_resend_hint: string;
+  support_path: string;
+};
+
 export type DashboardFilters = {
   page?: number;
   pageSize?: number;
@@ -741,6 +752,10 @@ export function confirmPendingAssignment(
 
 export function fetchFeedbackCard(token: string): Promise<FeedbackCard> {
   return request<FeedbackCard>(`/api/feedback-links/${token}`);
+}
+
+export function fetchFeedbackLinkExpiredContext(token: string): Promise<FeedbackLinkExpiredContext> {
+  return request<FeedbackLinkExpiredContext>(`/api/feedback-links/${token}/expired-context`);
 }
 
 export function submitFeedbackCard(

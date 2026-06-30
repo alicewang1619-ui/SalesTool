@@ -1,445 +1,124 @@
-{
-    "project_name":  "智能销售接待与客户洞察Agent",
-    "project_started_at_utc":  "2026-06-29T04:06:53Z",
-    "last_updated_at_utc":  "2026-06-30T01:20:04Z",
-    "current_stage":  "design-complete",
-    "current_substep":  "stage-II-delivered",
-    "completed_stages":  [
-                             "0",
-                             "1.1",
-                             "1.2",
-                             "1.3",
-                             "1.4",
-                             "1.5",
-                             "1.6",
-                             "2",
-                             "3",
-                             "4.1",
-                             "4.2",
-                             "4.3",
-                             "4.4",
-                             "4.5",
-                             "4.6",
-                             "5.0",
-                             "5.1",
-                             "5.2",
-                             "5.3",
-                             "5.4",
-                             "5.4.5",
-                             "5.5",
-                             "5.6",
-                             "5.7",
-                             "6.1",
-                             "6.2",
-                             "design-I",
-                             "design-II"
-                         ],
-    "skipped_stages":  [
-
-                       ],
-    "next_action":  {
-                        "type":  "handoff_to_tdd",
-                        "description":  "design master 阶段 II 已完成；下一步可进入 TDD master，基于页面文档和高保真 HTML 生成测试用例。"
-                    },
-    "open_questions":  [
-
-                       ],
-    "key_decisions_made":  [
-                               {
-                                   "id":  "D-1",
-                                   "decision":  "产品不是单纯询盘管理，而是智能销售接待与客户洞察 Agent。",
-                                   "stage":  "0",
-                                   "rationale":  "用户明确要求在线沟通、产品讲解、引导式提问、客户背景调研、线索分发、销售反馈追踪和每日询盘报告。"
-                               },
-                               {
-                                   "id":  "D-2",
-                                   "decision":  "产品总模式确认为九个模块：统一收口、在线接待、引导提问、客户背调、客户态势监督、线索评分、销售分发、反馈追踪与客户分析报表、客户分层再营销。",
-                                   "stage":  "1.0",
-                                   "rationale":  "用户确认“对的，就是这些事情”。"
-                               },
-                               {
-                                   "id":  "D-3",
-                                   "decision":  "PRD/方案确认后进入 design master 设计阶段。",
-                                   "stage":  "design-I",
-                                   "rationale":  "用户在方案 PPT 美化后表示“方案可以，继续做吧”。"
-                               },
-                               {
-                                   "id":  "D-4",
-                                   "decision":  "第一版端形态确认为 PC 管理后台 + 手机销售反馈卡片。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 明确 MVP 以 Web 后台为主，销售反馈卡片必须适配手机浏览器；用户在推荐后回复“继续”。"
-                               },
-                               {
-                                   "id":  "D-5",
-                                   "decision":  "PC 后台信息架构确认为左侧导航 + 首页工作台 + 6 个主分区。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 的 MVP 闭环包含线索池、轻量销售反馈、报表、客户池、再营销与配置项；用户在推荐后回复“继续”。"
-                               },
-                               {
-                                   "id":  "D-6",
-                                   "decision":  "角色权限确认为管理员、营销/运营、销售三层；销售只使用手机反馈卡片。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 明确营销负责人看全局、管理员维护规则、销售反馈卡片必须手机可用；用户强调销售不能被复杂反馈拖累，并在推荐后回复“继续”。"
-                               },
-                               {
-                                   "id":  "D-7",
-                                   "decision":  "核心功能页面拆解确认为线索闭环优先的页面组。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 的 MVP 完成定义是跑通询盘进入、AI 问清、销售收到、销售反馈、管理者看报表；用户在推荐后回复“继续”。"
-                               },
-                               {
-                                   "id":  "D-8",
-                                   "decision":  "通用交互范式确认为表格分页筛选排序、详情页/右侧抽屉、表单自动草稿、Toast/弹窗确认、导出二次确认和极简手机反馈卡片。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 明确主列表、筛选、导出、草稿确认、无权限和 10-30 秒销售反馈卡片是关键交互；用户在推荐后回复“继续吧 / 继续执行”。"
-                               },
-                               {
-                                   "id":  "D-9",
-                                   "decision":  "视觉风格确认为浅色医疗科技 SaaS，主色使用蓝紫色，不使用青蓝作为品牌主色。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 明确是管理后台和手机反馈卡片，需长期查看线索和报表；用户明确反馈“不要青蓝色，用蓝紫色，其他正确”。"
-                               },
-                               {
-                                   "id":  "D-10",
-                                   "decision":  "数据与集成确认为 P0 渠道合规接入/导入、统一 Inquiry 模型、SalesFeedback 反馈闭环、官网公开信息/人工补充/AI 摘要客户调研、人工确认后邮件再营销。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 明确 P0 渠道、核心实体、未授权社媒抓取边界和再营销人工确认原则；用户在推荐后回复“继续”。"
-                               },
-                               {
-                                   "id":  "D-11",
-                                   "decision":  "技术栈与架构确认为 React + Ant Design Pro、Python FastAPI、Postgres、Redis + Celery/RQ、Docker Compose 的模块化单体。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 推荐 React/Vue、Python/Node、Postgres 和任务调度；用户在推荐后回复“继续”。"
-                               },
-                               {
-                                   "id":  "D-12",
-                                   "decision":  "安全与运维确认为自建账号 RBAC、敏感数据权限控制与导出脱敏、销售反馈链接 7 天有效、每日自动备份保留 30 天、关键操作审计、软删和再营销退订/不再联系标记。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 明确 PII 权限控制、反馈链接有效期、再营销人工确认、退订禁发、配置变更记录操作人和时间；用户在推荐后回复“可以，继续”。"
-                               },
-                               {
-                                   "id":  "D-13",
-                                   "decision":  "网站 KPI 口径确认为系统对官网渠道做 KPI 归因，不把网站本身作为独立 KPI 系统。",
-                                   "stage":  "design-I",
-                                   "rationale":  "PRD 已要求 P0 官网渠道进入统一线索池和非金额型报表；用户在总蓝图确认前表示不确定网站是否可以做 KPI，因此补充官网渠道询盘量、有效率、响应时效、分发时效和销售反馈率等归因指标。"
-                               },
-                               {
-                                   "id":  "D-14",
-                                   "decision":  "设计阶段总蓝图已确认并完成阶段 II 全套交付。",
-                                   "stage":  "design-II",
-                                   "rationale":  "用户在官网渠道 KPI 口径补齐后回复“继续做”，确认进入阶段 II；已产出 DESIGN、tokens、设计系统展示页、页面清单、25 份页面文档、25 个高保真 HTML 和技术方案。"
-                               }
-                           ],
-    "category":  "saas",
-    "prd_type":  "new_product",
-    "agents_used":  {
-                        "lead_pm_calls":  0,
-                        "reviewer_calls":  0,
-                        "author_calls":  0,
-                        "total_tokens_estimated":  0
-                    },
-    "deliverables":  {
-                         "scene_anchor":  "scene-anchor.md",
-                         "proposal_v0":  "proposal-v0.md",
-                         "proposal_v1":  "proposal-v1.md",
-                         "debate_log":  "debate-log.md",
-                         "assumptions":  "assumptions.md",
-                         "conversation":  "conversation.md",
-                         "evidence":  [
-                                          "evidence/competitors.md",
-                                          "evidence/benchmark.md"
-                                      ],
-                         "drafts":  [
-
-                                    ],
-                         "final_prd":  "output/PRD详细版.md",
-                         "prd_summary":  "output/PRD-summary.md",
-                         "prd_dev":  "output/PRD-dev.md",
-                         "ppt_outline":  "output/ppt.md",
-                         "ppt_html":  [
-                                          "output/ppt/p01.html",
-                                          "output/ppt/p02.html",
-                                          "output/ppt/p03.html",
-                                          "output/ppt/p04.html",
-                                          "output/ppt/p05.html",
-                                          "output/ppt/p06.html",
-                                          "output/ppt/p07.html",
-                                          "output/ppt/p08.html",
-                                          "output/ppt/p09.html",
-                                          "output/ppt/p10.html",
-                                          "output/ppt/p11.html"
-                                      ],
-                         "ppt_assets":  [
-                                            "output/ppt/assets/hero-ultrasound-growth.png",
-                                            "output/ppt/assets/inquiry-funnel.png",
-                                            "output/ppt/assets/agent-architecture.png"
-                                        ],
-                         "pptx":  "output/ppt/ultrasound-sales-agent-report.pptx",
-                         "design_blueprint":  "output/设计决策蓝图.md",
-                         "design_system":  "output/DESIGN.md",
-                         "design_tokens":  "output/tokens.css",
-                         "design_showcase":  "output/design-system-showcase.html",
-                         "page_list":  "output/页面清单.md",
-                         "page_docs_dir":  "output/pages/",
-                         "page_docs_count":  25,
-                         "page_html_count":  25,
-                         "tech_solution":  "output/技术方案.md"
-                     },
-    "user_inputs_log":  [
-                            {
-                                "stage":  "0",
-                                "timestamp":  "2026-06-29T04:06:53Z",
-                                "summary":  "用户做数字化营销，询盘来源分散，线上沟通人工效率低，询盘整理、分发和反馈收集靠人工。希望有 Agent 处理这些工作。"
-                            },
-                            {
-                                "stage":  "0",
-                                "timestamp":  "2026-06-29T04:06:53Z",
-                                "summary":  "用户补充：不仅是询盘，还要做客户调研、分析、背景查询。"
-                            },
-                            {
-                                "stage":  "0",
-                                "timestamp":  "2026-06-29T04:06:53Z",
-                                "summary":  "用户补充：在线时 Agent 要像初级销售或售前一样沟通、讲产品并引导提问，例如客户询问 ultrasound 时继续追问应用场景。"
-                            },
-                            {
-                                "stage":  "0",
-                                "timestamp":  "2026-06-29T04:06:53Z",
-                                "summary":  "用户补充：销售线索分发给销售后，要追踪销售反馈，并每天形成询盘报告发给用户。"
-                            },
-                            {
-                                "stage":  "1.0",
-                                "timestamp":  "2026-06-29T04:09:45Z",
-                                "summary":  "用户询问当前需求是否完整，以及竞品或相关产品通常怎么做。"
-                            },
-                            {
-                                "stage":  "1.0",
-                                "timestamp":  "2026-06-29T04:16:20Z",
-                                "summary":  "用户补充：客户信息收集后，应按不同进度和客户类别进行再次营销沟通，例如邮件群发。"
-                            },
-                            {
-                                "stage":  "1.0",
-                                "timestamp":  "2026-06-29T04:17:42Z",
-                                "summary":  "用户补充：后续可以对客户网站、LinkedIn、Facebook 等平台进行动态监测，并在出现机会信号时给客户发信息。"
-                            },
-                            {
-                                "stage":  "1.0",
-                                "timestamp":  "2026-06-29T04:18:52Z",
-                                "summary":  "用户澄清：该能力严格来说应是客户情况监督，用于发现商机以及进行客户背景调查，而不是单纯平台动态监测。"
-                            },
-                            {
-                                "stage":  "1.0",
-                                "timestamp":  "2026-06-29T04:20:09Z",
-                                "summary":  "用户要求整理当前总模式需要做几件事情。当前收敛为九个模块：统一收口、在线接待、引导提问、客户背调、客户态势监督、线索评分、销售分发、反馈追踪与日报、客户分层再营销。"
-                            },
-                            {
-                                "stage":  "1.0",
-                                "timestamp":  "2026-06-29T04:21:18Z",
-                                "summary":  "用户补充：除每天日报外，背后还需要一整套客户分析和报表系统，可生成月报、季报、年报。"
-                            },
-                            {
-                                "stage":  "1.0",
-                                "timestamp":  "2026-06-29T04:23:25Z",
-                                "summary":  "用户确认九个模块就是当前总模式，可以继续沟通细节。"
-                            },
-                            {
-                                "stage":  "1.1",
-                                "timestamp":  "2026-06-29T04:24:55Z",
-                                "summary":  "用户确认产品为 Ultrasound，产品线包括 Trolley Ultrasound、Portable Ultrasound、Handheld Ultrasound。询盘渠道包括官网在线聊天、WhatsApp、邮箱、Facebook、LinkedIn、Google 询盘、官网后台、展会名片、Facebook Message 聊天记录以及 LinkedIn 收件箱。"
-                            },
-                            {
-                                "stage":  "1.1",
-                                "timestamp":  "2026-06-29T04:26:08Z",
-                                "summary":  "用户澄清：虽然系统是 B2B 销售增长系统，但主要客户不仅是 B2B 企业，也包括代理商和较多终端用户，尤其是医生类型。"
-                            },
-                            {
-                                "stage":  "1.1",
-                                "timestamp":  "2026-06-29T04:29:46Z",
-                                "summary":  "用户定义高质量线索标准：客户必须能明确说出身份信息，包括所在机构类型（Company、Hospital、Doctor 等）和具体应用领域（Radiology、Cardiology 等）；还必须给出具体业务需求，不能只是泛泛咨询或询价。"
-                            },
-                            {
-                                "stage":  "1.2",
-                                "timestamp":  "2026-06-29T04:34:45Z",
-                                "summary":  "用户补充两类客户画像字段。代理商需关注重点国家、历史合作业务/代理品牌、是否做过超声及涉及品牌、年业务规模。医生需关注所属科室和临床应用、之前使用过的机器、预算、想购买的产品和应用场景。"
-                            },
-                            {
-                                "stage":  "1.2",
-                                "timestamp":  "2026-06-29T04:36:25Z",
-                                "summary":  "用户确认销售分发原则：按国家区域划分，先确认所属区域（如拉美、北美、中东），再确认具体国家，根据国家分配给对应销售人员。"
-                            },
-                            {
-                                "stage":  "1.3",
-                                "timestamp":  "2026-06-29T04:39:24Z",
-                                "summary":  "用户确认销售反馈状态包括已联系、已报价、无效、需跟进、已成交。销售还需做简单客户分析：有效客户继续跟进、放入资料库后续再跟进、确认真实需求、已转给代理商跟进。当前主要用微信和邮件沟通，没有 CRM，担心让销售填表会太麻烦。"
-                            },
-                            {
-                                "stage":  "1.3",
-                                "timestamp":  "2026-06-29T04:40:44Z",
-                                "summary":  "用户确认不希望做复杂 CRM，销售反馈必须最简单方便；销售工作繁忙，无法花太长时间写反馈，并且销售的一线判断比系统更懂实际客户。"
-                            },
-                            {
-                                "stage":  "1.3",
-                                "timestamp":  "2026-06-29T04:42:17Z",
-                                "summary":  "用户确认报表指标：每天看总询盘数、有效询盘数、不同国家区域询盘分量；分析每个销售反馈、不同渠道线索质量（如 Facebook vs 官网有效客户数量）、不同区域销售反馈差异；分析跟进后转化，包括区域销售转化和来源渠道转化率；分析产品询盘分布和产品转化率，例如 Sonos Max、Sonos I。"
-                            },
-                            {
-                                "stage":  "1.4",
-                                "timestamp":  "2026-06-29T04:44:49Z",
-                                "summary":  "用户收敛报表指标：关注询盘总量、有效数量、国家分布、渠道质量、代理商/医生占比、产品分类、销售反馈、未及时反馈、撤单、再营销数据、客户池变化；不需要成交金额、报价等金额类指标。"
-                            },
-                            {
-                                "stage":  "1.4",
-                                "timestamp":  "2026-06-29T04:45:30Z",
-                                "summary":  "用户说继续，默认接受客户池第一版分层：高意向客户、有效客户持续跟进、已报价未回复、暂无明确需求放入资料库、已转代理商跟进、无效客户、撤单/流失客户、已成交客户。"
-                            },
-                            {
-                                "stage":  "1.5",
-                                "timestamp":  "2026-06-29T06:05:07Z",
-                                "summary":  "用户确认再营销发送原则：人工确认后发送。AI 可生成内容和建议，但不能未经确认自动发送。"
-                            },
-                            {
-                                "stage":  "1.6",
-                                "timestamp":  "2026-06-29T06:09:05Z",
-                                "summary":  "用户说继续，默认接受客户态势监督信号第一版轻量覆盖官网、社媒公开动态、邮件行为和销售反馈；已生成 scene-anchor.md 与 assumptions.md。"
-                            },
-                            {
-                                "stage":  "2.0",
-                                "timestamp":  "2026-06-29T06:10:38Z",
-                                "summary":  "用户确认场景锚点准确，进入价值论证阶段。"
-                            },
-                            {
-                                "stage":  "2.0",
-                                "timestamp":  "2026-06-29T06:14:02Z",
-                                "summary":  "用户确认每月约 300 多条询盘，人工处理单个客户平均约 10 分钟；沟通、查背景、分发给销售通常约 5-10 分钟。"
-                            },
-                            {
-                                "stage":  "2.1",
-                                "timestamp":  "2026-06-29T06:17:17Z",
-                                "summary":  "用户确认由于速度、效率和反馈环节断裂，损失 20%-30% 客户；销售无反馈比例占 50% 以上。价值论证已写入 scene-anchor.md。"
-                            },
-                            {
-                                "stage":  "3.0",
-                                "timestamp":  "2026-06-29T06:24:03Z",
-                                "summary":  "完成标准档竞品与行业 benchmark 调研，生成 evidence/competitors.md 和 evidence/benchmark.md。"
-                            },
-                            {
-                                "stage":  "4.1",
-                                "timestamp":  "2026-06-29T06:27:12Z",
-                                "summary":  "基于场景锚点、价值论证和竞品调研，生成方案 V0。"
-                            },
-                            {
-                                "stage":  "4.5",
-                                "timestamp":  "2026-06-29T06:30:36Z",
-                                "summary":  "完成工程、设计、商业、战略四方评审，收敛生成方案 V1。"
-                            },
-                            {
-                                "stage":  "4.6",
-                                "timestamp":  "2026-06-29T06:33:31Z",
-                                "summary":  "用户接受方案 V1，进入 MVP 边界确认。"
-                            },
-                            {
-                                "stage":  "4.6",
-                                "timestamp":  "2026-06-29T06:39:01Z",
-                                "summary":  "用户要求 Facebook/LinkedIn 也放进第一版必须做。已更新 proposal-v1.md：Facebook 线索/Message、LinkedIn 线索/收件箱进入第一版统一线索池，但第一版只承诺合规线索接入/导入和会话归档，深度态势监测与未授权抓取后置。"
-                            },
-                            {
-                                "stage":  "4.6",
-                                "timestamp":  "2026-06-29T06:45:00Z",
-                                "summary":  "用户在了解 Facebook/LinkedIn 官方授权/API 限制后，决定先不接 Facebook 和 LinkedIn，按原来的 V1 做。已回退 proposal-v1.md：第一版 P0 渠道为官网聊天、官网后台、邮箱、展会名片导入；Facebook/LinkedIn 后置。"
-                            },
-                            {
-                                "stage":  "6.2",
-                                "timestamp":  "2026-06-29T06:58:56Z",
-                                "summary":  "PRD master 终交付完成：生成 PRD详细版、PRD-summary、PRD-dev、ppt.md 与 10 页 HTML 方案 PPT。"
-                            },
-                            {
-                                "stage":  "6.2",
-                                "timestamp":  "2026-06-29T07:14:32Z",
-                                "summary":  "用户要求把 HTML 汇报 PPT 变成可下载 PPT；已生成 output/ppt/ultrasound-sales-agent-report.pptx，并在 10 页 HTML 中加入下载入口。"
-                            },
-                            {
-                                "stage":  "6.2",
-                                "timestamp":  "2026-06-29T07:24:22Z",
-                                "summary":  "用户反馈 PPT 图片不清晰且变形；已用固定 1920x1080 视口重新渲染 10 张高清 JPEG，并重新打包 output/ppt/ultrasound-sales-agent-report.pptx。"
-                            },
-                            {
-                                "stage":  "6.2",
-                                "timestamp":  "2026-06-29T07:35:19Z",
-                                "summary":  "用户要求补充每一步用什么技术实现以及技术内容放在哪里；已更新 PRD详细版、PRD-dev、ppt.md、HTML PPT，并重新生成 11 页高清 PPTX。"
-                            },
-                            {
-                                "stage":  "6.2",
-                                "timestamp":  "2026-06-29T07:59:30Z",
-                                "summary":  "用户反馈 PPT 不能编辑；已覆盖生成可编辑 PPTX，使用 PowerPoint 原生文本框、形状和表格，不再使用整页图片。"
-                            },
-                            {
-                                "stage":  "6.2",
-                                "timestamp":  "2026-06-29T08:15:18Z",
-                                "summary":  "用户反馈可编辑 PPTX 中文显示为问号；已新增 UTF-8 HTML 到 OpenXML 的生成脚本，重新覆盖下载版 PPTX，并验证中文文本正常、无整页图片。"
-                            },
-                            {
-                                "stage":  "6.2",
-                                "timestamp":  "2026-06-29T08:48:04Z",
-                                "summary":  "用户要求 PPT 美化并加入合适图片和背景；已生成 3 张无文字、无 Logo 的 16:9 视觉资产，接入 HTML 预览页和可下载 PPTX，并验证图片背景、中文文本和可编辑结构正常。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-29T09:01:02Z",
-                                "summary":  "用户确认方案可以并要求继续；已进入 design master 阶段 I，第一轮需确认端形态和工作台骨架。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-29T09:15:19Z",
-                                "summary":  "用户回复“继续”，确认第一版按 PC 管理后台 + 手机销售反馈卡片推进。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-29T09:25:39Z",
-                                "summary":  "用户回复“继续”，确认 PC 后台采用左侧导航、首页工作台和 6 个主分区：工作台、线索池、客户池、报表中心、再营销待办、系统配置。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-29T10:05:15Z",
-                                "summary":  "用户回复“继续”，确认角色按管理员、营销/运营、销售三层设计；销售只通过手机反馈卡片处理分配给自己的线索。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-29T10:24:12Z",
-                                "summary":  "用户回复“继续”，确认第一版按线索闭环优先拆页面，覆盖工作台、线索池、线索详情、渠道导入、手机销售反馈卡片、客户池、报表中心、再营销待办和系统配置。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-29T15:50:22Z",
-                                "summary":  "用户回复“继续吧 / 继续执行”，确认通用交互方案：后台列表表格分页筛选排序，详情页/右侧抽屉，长表单自动草稿，Toast/弹窗确认，导出二次确认，手机销售反馈卡片保持 10-30 秒可完成。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-29T23:53:49Z",
-                                "summary":  "用户反馈“不要青蓝色，用蓝紫色，其他正确”，确认视觉方向为浅色医疗科技 SaaS，主色使用蓝紫色，保留专业、可信、清爽、克制和不做深色科幻风。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-30T00:18:49Z",
-                                "summary":  "用户回复“继续”，确认 V1 数据集成方案：官网聊天 Webhook/API、官网后台和展会名片 CSV/Excel、邮箱 IMAP 或 Microsoft Graph/Gmail API，统一进入 Inquiry；销售反馈写入 SalesFeedback；客户调研不抓 Facebook/LinkedIn；再营销人工确认后通过现有邮箱发送。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-30T00:21:50Z",
-                                "summary":  "用户回复“继续”，确认 V1 技术架构：React + Ant Design Pro、Python FastAPI、Postgres、Redis + Celery/RQ、AI 编排先放后端服务内，Docker Compose 模块化单体部署。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-30T00:48:45Z",
-                                "summary":  "用户回复“可以，继续”，确认安全运维方案：PC 后台自建账号 + RBAC，客户敏感信息权限控制与导出脱敏，销售反馈链接 7 天有效，数据库每日备份保留 30 天，关键操作审计，线索/客户软删，再营销邮件带退订/不再联系标记。"
-                            },
-                            {
-                                "stage":  "design-I",
-                                "timestamp":  "2026-06-30T00:56:29Z",
-                                "summary":  "用户表示先继续，但不确定网站是否可以做 KPI。已补充口径：网站不单独做 KPI 系统，系统对官网渠道做归因统计，包括官网询盘量、有效率、AI 补全率、响应/分发时效、销售反馈率、未反馈数、客户池和再营销待办进入量；仍不统计成交金额和报价金额。"
-                            },
-                            {
-                                "stage":  "design-II",
-                                "timestamp":  "2026-06-30T01:20:04Z",
-                                "summary":  "用户回复“继续做”，确认进入 design master 阶段 II。已完成 DESIGN.md、tokens.css、设计系统展示页、页面清单、25 份页面文档、25 个高保真 HTML 和技术方案；下一步可进入 TDD master。"
-                            }
-                        ]
+﻿{
+  "project_name": "智能销售接待与客户洞察Agent",
+  "project_started_at_utc": "2026-06-29T04:06:53Z",
+  "last_updated_at_utc": "2026-06-30T01:47:37Z",
+  "current_stage": "design-complete",
+  "current_substep": "html-preview-index-delivered",
+  "completed_stages": [
+    "prd-master",
+    "ppt-delivery",
+    "design-I",
+    "design-II",
+    "html-preview-index"
+  ],
+  "skipped_stages": [],
+  "next_action": {
+    "type": "handoff_to_tdd",
+    "description": "HTML 页面总入口已补充；下一步可进入 TDD master，基于页面文档和高保真 HTML 生成测试用例。"
+  },
+  "open_questions": [],
+  "category": "saas",
+  "prd_type": "new_product",
+  "key_decisions_made": [
+    {
+      "id": "D-1",
+      "stage": "prd",
+      "decision": "产品定位为智能销售接待与客户洞察 Agent，不是单纯询盘管理工具。",
+      "rationale": "用户需要统一收口、在线接待、引导提问、客户调研、销售分发、反馈追踪、报表和再营销闭环。"
+    },
+    {
+      "id": "D-2",
+      "stage": "prd",
+      "decision": "V1 暂不接 Facebook / LinkedIn 官方 API 或个人后台，不做未授权抓取。",
+      "rationale": "用户在了解授权/API 限制后确认先按原 V1 做。"
+    },
+    {
+      "id": "D-3",
+      "stage": "design-I",
+      "decision": "第一版端形态为 PC 管理后台 + 手机销售反馈卡片。",
+      "rationale": "运营和管理者需要处理列表、报表、配置；销售只需要 10-30 秒完成轻量反馈。"
+    },
+    {
+      "id": "D-4",
+      "stage": "design-I",
+      "decision": "后台信息架构采用左侧导航、首页工作台和 6 个主分区。",
+      "rationale": "覆盖工作台、线索池、客户池、报表中心、再营销待办、系统配置。"
+    },
+    {
+      "id": "D-5",
+      "stage": "design-I",
+      "decision": "角色权限分为管理员、营销/运营、销售三层。",
+      "rationale": "销售不进入复杂后台，只通过手机反馈卡片提交状态、判断和备注。"
+    },
+    {
+      "id": "D-6",
+      "stage": "design-I",
+      "decision": "视觉风格为浅色医疗科技 SaaS，主色使用蓝紫色，不使用青蓝色。",
+      "rationale": "用户明确要求不要青蓝色，用蓝紫色，其他方向正确。"
+    },
+    {
+      "id": "D-7",
+      "stage": "design-I",
+      "decision": "V1 数据集成聚焦官网聊天、官网后台、邮箱、展会名片导入和销售反馈闭环。",
+      "rationale": "保证第一版合规可落地，并把 Facebook / LinkedIn 后置。"
+    },
+    {
+      "id": "D-8",
+      "stage": "design-I",
+      "decision": "技术架构采用 React + Ant Design Pro、Python FastAPI、Postgres、Redis + Celery/RQ、Docker Compose 的模块化单体。",
+      "rationale": "优先快速落地 MVP，同时保留任务队列、AI 编排、报表聚合和未来拆服务边界。"
+    },
+    {
+      "id": "D-9",
+      "stage": "design-I",
+      "decision": "官网不单独作为 KPI 系统，而是在销售增长系统内做官网渠道 KPI 归因。",
+      "rationale": "用户不确定网站是否可以做 KPI，因此将 KPI 口径放在系统的渠道归因维度。"
+    },
+    {
+      "id": "D-10",
+      "stage": "design-II",
+      "decision": "设计阶段 II 已完成全套设计系统、页面文档、高保真 HTML 和技术方案。",
+      "rationale": "用户确认继续后进入 design master 阶段 II 并完成交付。"
+    },
+    {
+      "id": "D-11",
+      "stage": "design-II",
+      "decision": "新增 output/index.html 作为全部 HTML 页面统一预览入口。",
+      "rationale": "用户要求生成 HTML 页面给我，需要一个可直接打开、集中浏览全部页面的入口。"
+    }
+  ],
+  "deliverables": {
+    "scene_anchor": "scene-anchor.md",
+    "proposal_v1": "proposal-v1.md",
+    "conversation": "conversation.md",
+    "final_prd": "output/PRD详细版.md",
+    "prd_summary": "output/PRD-summary.md",
+    "prd_dev": "output/PRD-dev.md",
+    "ppt_outline": "output/ppt.md",
+    "pptx": "output/ppt/ultrasound-sales-agent-report.pptx",
+    "design_blueprint": "output/设计决策蓝图.md",
+    "design_system": "output/DESIGN.md",
+    "design_tokens": "output/tokens.css",
+    "design_showcase": "output/design-system-showcase.html",
+    "page_list": "output/页面清单.md",
+    "page_docs_dir": "output/pages/",
+    "page_docs_count": 25,
+    "page_html_count": 25,
+    "html_index": "output/index.html",
+    "tech_solution": "output/技术方案.md"
+  },
+  "validation": {
+    "page_docs_count": 25,
+    "page_html_count": 25,
+    "html_index_links": 33,
+    "html_index_page_cards": 25,
+    "last_checked_at_utc": "2026-06-30T01:47:37Z"
+  },
+  "user_inputs_log": [
+    {
+      "stage": "design-II-html-index",
+      "timestamp": "2026-06-30T01:47:37Z",
+      "summary": "用户要求生成 HTML 页面给我；已补充 output/index.html 作为全部 HTML 页面总入口。"
+    }
+  ]
 }

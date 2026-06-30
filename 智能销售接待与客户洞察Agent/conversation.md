@@ -480,3 +480,9 @@ V1 收敛：第一版不是做完整客户增长中台，而是做询盘闭环 M
 - 技术方案：生成 `output/技术方案.md`，技术版本号已通过 npm/PyPI 实测核心包版本。
 - 校验：25 个页面文档均具备 11 节模板；25 个 HTML 均包含 tokens；展示页 11 个 Section 齐全；死链扫描通过；未发现空锚点、默认 Tailwind 紫色、Lorem Ipsum 或 TODO。
 - 下一步：可进入 TDD master 生成测试用例。
+
+## 06-30-2026 09:46 HTML 页面总入口
+
+- 用户指令：生成 HTML 页面给我。
+- 执行结果：已新增 `output/index.html`，集中链接设计系统、页面清单、技术方案和 `output/pages/` 下 25 个高保真 HTML 页面。
+- 查看方式：直接打开 `output/index.html`，或通过本地静态服务访问。

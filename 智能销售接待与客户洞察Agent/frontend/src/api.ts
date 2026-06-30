@@ -92,6 +92,7 @@ export type ImportJob = {
   filename: string;
   status: string;
   total_rows: number;
+  processed_rows: number;
   success_rows: number;
   failed_rows: number;
   failures: ImportFailure[];

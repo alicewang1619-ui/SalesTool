@@ -84,6 +84,7 @@ class ImportJobOut(BaseModel):
     filename: str
     status: str
     total_rows: int
+    processed_rows: int
     success_rows: int
     failed_rows: int
     failures: list[ImportFailureOut]

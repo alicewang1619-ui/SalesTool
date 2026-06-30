@@ -22,3 +22,10 @@
 - `PAGE-IMPORT-03` 已覆盖非法格式文件拒绝，API 返回 `INVALID_IMPORT_FILE`，且写入 `import_rejected` 审计日志，不进入处理流程。
 - `PAGE-IMPORT-04` 已覆盖失败行下载与重试任务：`GET /api/import-jobs/{task_id}/failed-rows` 返回 CSV，`POST /api/import-jobs/{task_id}/retry` 幂等返回同一任务。
 - `PAGE-IMPORT-05` 已通过停用来源字典行级校验覆盖，停用来源不会被导入为有效线索。
+
+## 验收返修 TDD 补充（06-30-2026）
+
+- 新增 Excel 用例：构造最小 `.xlsx` 工作簿上传到 `/api/import-jobs`，断言创建响应为 `queued`、`processed_rows=0`，随后查询任务为 `completed`、`processed_rows=total_rows`，成功行进入线索池。
+- CSV 用例收紧为异步语义：创建任务响应必须先返回 `queued`，查询任务再返回完成态和完整统计。
+- 非法文件用例补充超大文件拒绝，覆盖 >5MB 文件不进入处理流程。
+- 重试用例补充 `import_job_retried` 审计断言，确保重试动作可追溯且幂等。

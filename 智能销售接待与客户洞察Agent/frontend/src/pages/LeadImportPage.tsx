@@ -97,8 +97,14 @@ export function LeadImportPage() {
           <Card><Statistic title="总行数" value={job?.total_rows ?? 0} /></Card>
         </Col>
         <Col xs={24} md={6}>
+          <Card><Statistic title="已处理" value={job?.processed_rows ?? 0} /></Card>
+        </Col>
+        <Col xs={24} md={6}>
           <Card><Statistic title="成功入库" value={job?.success_rows ?? 0} /></Card>
         </Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
         <Col xs={24} md={6}>
           <Card><Statistic title="失败行" value={job?.failed_rows ?? 0} /></Card>
         </Col>

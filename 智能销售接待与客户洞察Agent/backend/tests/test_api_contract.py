@@ -1,10 +1,36 @@
 from fastapi.testclient import TestClient
+import io
 import pytest
 from sqlalchemy import delete
+import zipfile
 
 from app.database import Base, SessionLocal, engine
 from app.main import app, ensure_sqlite_compatibility
 from app.models import AuditLog, ImportJob, Lead, LoginAttempt, SourceDictionary
+
+
+def make_xlsx(rows: list[list[str]]) -> bytes:
+    def cell_ref(row_index: int, column_index: int) -> str:
+        return f"{chr(ord('A') + column_index)}{row_index}"
+
+    sheet_rows = []
+    for row_index, row in enumerate(rows, start=1):
+        cells = []
+        for column_index, value in enumerate(row):
+            cells.append(
+                f'<c r="{cell_ref(row_index, column_index)}" t="inlineStr"><is><t>{value}</t></is></c>'
+            )
+        sheet_rows.append(f'<row r="{row_index}">{"".join(cells)}</row>')
+    sheet_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<sheetData>{"".join(sheet_rows)}</sheetData></worksheet>'
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as workbook:
+        workbook.writestr("[Content_Types].xml", '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>')
+        workbook.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+    return output.getvalue()
 
 
 @pytest.fixture()
@@ -14,7 +40,9 @@ def client() -> TestClient:
     with SessionLocal() as db:
         db.execute(delete(LoginAttempt))
         db.execute(delete(ImportJob))
-        db.query(Lead).filter(Lead.customer_name.in_(["Clinica Shanghai", "重复客户"])).delete(synchronize_session=False)
+        db.query(Lead).filter(
+            Lead.customer_name.in_(["Clinica Shanghai", "重复客户", "Excel Clinic", "Clinica Browser Check"])
+        ).delete(synchronize_session=False)
         disabled = db.query(SourceDictionary).filter(SourceDictionary.category == "停用来源", SourceDictionary.label == "旧展会").first()
         if not disabled:
             db.add(SourceDictionary(category="停用来源", label="旧展会", enabled=False))
@@ -311,13 +339,15 @@ def test_channel_import_uploads_csv_to_task_and_persists_success_rows(client: Te
     created = response.json()
     assert created["task_id"]
     assert created["filename"] == "leads.csv"
-    assert created["status"] in {"queued", "processing", "completed"}
+    assert created["status"] == "queued"
+    assert created["processed_rows"] == 0
 
     job = client.get(f"/api/import-jobs/{created['task_id']}", headers=headers)
     assert job.status_code == 200
     body = job.json()
     assert body["status"] == "completed"
     assert body["total_rows"] == 5
+    assert body["processed_rows"] == 5
     assert body["success_rows"] == 2
     assert body["failed_rows"] == 3
     assert any(item["reason"] == "DUPLICATE_CUSTOMER" and item["customer_name"] == "重复客户" for item in body["failures"])
@@ -330,6 +360,37 @@ def test_channel_import_uploads_csv_to_task_and_persists_success_rows(client: Te
 
     audit = client.get("/api/audit-logs", headers=headers)
     assert any(event["action"] == "import_job_completed" and event["trace_id"] == "import-success-test" for event in audit.json()["items"])
+
+
+def test_channel_import_accepts_xlsx_and_exposes_progress(client: TestClient) -> None:
+    headers = auth_headers(client)
+    workbook = make_xlsx(
+        [
+            ["customer_name", "country", "customer_type", "product", "source_category", "source_label"],
+            ["Excel Clinic", "China", "Clinic", "Portable Ultrasound", "网站", "官网聊天"],
+        ]
+    )
+
+    response = client.post(
+        "/api/import-jobs",
+        files={"file": ("excel-leads.xlsx", workbook, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=headers,
+    )
+
+    assert response.status_code == 201
+    created = response.json()
+    assert created["status"] == "queued"
+    assert created["processed_rows"] == 0
+
+    job = client.get(f"/api/import-jobs/{created['task_id']}", headers=headers)
+    assert job.status_code == 200
+    body = job.json()
+    assert body["status"] == "completed"
+    assert body["total_rows"] == 1
+    assert body["processed_rows"] == 1
+    assert body["success_rows"] == 1
+    leads = client.get("/api/leads", params={"page_size": 100}, headers=headers).json()["items"]
+    assert any(item["customer_name"] == "Excel Clinic" for item in leads)
 
 
 def test_channel_import_rejects_oversized_or_invalid_files_before_worker(client: TestClient) -> None:
@@ -345,6 +406,14 @@ def test_channel_import_rejects_oversized_or_invalid_files_before_worker(client:
 
     audit = client.get("/api/audit-logs", headers=headers)
     assert any(event["action"] == "import_rejected" and event["trace_id"] == "import-rejected-test" for event in audit.json()["items"])
+
+    oversized = client.post(
+        "/api/import-jobs",
+        files={"file": ("large.csv", b"a" * (5 * 1024 * 1024 + 1), "text/csv")},
+        headers=headers,
+    )
+    assert oversized.status_code == 400
+    assert oversized.json()["detail"]["code"] == "INVALID_IMPORT_FILE"
 
 
 def test_channel_import_failure_rows_are_downloadable_and_retry_is_idempotent(client: TestClient) -> None:
@@ -371,3 +440,6 @@ def test_channel_import_failure_rows_are_downloadable_and_retry_is_idempotent(cl
     assert retry.json()["task_id"] == created["task_id"]
     assert retry.json()["status"] == "completed"
     assert retry.json()["failed_rows"] == 1
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert any(event["action"] == "import_job_retried" and event["target_type"] == "import_job" for event in audit.json()["items"])

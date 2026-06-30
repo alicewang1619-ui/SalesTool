@@ -3,14 +3,16 @@ import io
 import json
 from datetime import datetime, timedelta
 from uuid import uuid4
+import zipfile
+import xml.etree.ElementTree as ET
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .database import Base, engine, get_db
+from .database import Base, SessionLocal, engine, get_db
 from .dependencies import current_user, require_admin_or_ops
 from .models import AuditLog, Banner, Customer, CustomerBackground, ImportJob, Lead, LoginAttempt, SourceDictionary, User
 from .schemas import (
@@ -119,6 +121,11 @@ def ensure_sqlite_compatibility() -> None:
                     ),
                 },
             )
+    if "import_jobs" in table_names:
+        import_job_columns = {column["name"] for column in inspector.get_columns("import_jobs")}
+        if "processed_rows" not in import_job_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE import_jobs ADD COLUMN processed_rows INTEGER NOT NULL DEFAULT 0"))
 
 
 @app.on_event("startup")
@@ -171,15 +178,41 @@ def import_job_out(job: ImportJob) -> ImportJobOut:
         filename=job.filename,
         status=job.status,
         total_rows=job.total_rows,
+        processed_rows=job.processed_rows,
         success_rows=job.success_rows,
         failed_rows=job.failed_rows,
         failures=[ImportFailureOut(**item) for item in failures],
     )
 
 
+def parse_xlsx_rows(content: bytes) -> list[dict[str, str]]:
+    with zipfile.ZipFile(io.BytesIO(content)) as workbook:
+        sheet_xml = workbook.read("xl/worksheets/sheet1.xml")
+    namespace = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    root = ET.fromstring(sheet_xml)
+    rows: list[list[str]] = []
+    for row in root.findall(".//m:sheetData/m:row", namespace):
+        values: list[str] = []
+        for cell in row.findall("m:c", namespace):
+            inline = cell.find("m:is/m:t", namespace)
+            value = cell.find("m:v", namespace)
+            values.append((inline.text if inline is not None else value.text if value is not None else "") or "")
+        rows.append(values)
+    if not rows:
+        return []
+    headers = [value.strip() for value in rows[0]]
+    return [{headers[index]: value for index, value in enumerate(row) if index < len(headers)} for row in rows[1:]]
+
+
+def parse_import_rows(job: ImportJob) -> list[dict[str, str]]:
+    if job.filename.lower().endswith(".xlsx"):
+        return parse_xlsx_rows(job.original_content.encode("latin1"))
+    return list(csv.DictReader(io.StringIO(job.original_content)))
+
+
 def process_import_job(db: Session, job: ImportJob) -> None:
     job.status = "processing"
-    reader = csv.DictReader(io.StringIO(job.original_content))
+    rows = parse_import_rows(job)
     required_fields = ["customer_name", "country", "customer_type", "product", "source_category", "source_label"]
     failures: list[dict[str, object]] = []
     success_rows = 0
@@ -189,7 +222,12 @@ def process_import_job(db: Session, job: ImportJob) -> None:
         for item in db.scalars(select(SourceDictionary).where(SourceDictionary.enabled.is_(True))).all()
     }
 
-    for row_number, row in enumerate(reader, start=1):
+    job.total_rows = len(rows)
+    job.processed_rows = 0
+    db.flush()
+
+    for row_number, row in enumerate(rows, start=1):
+        job.processed_rows = row_number
         clean = {field: (row.get(field) or "").strip() for field in required_fields}
         customer_name = clean["customer_name"]
         reason = ""
@@ -223,11 +261,29 @@ def process_import_job(db: Session, job: ImportJob) -> None:
         )
         success_rows += 1
 
-    job.total_rows = success_rows + len(failures)
+    job.processed_rows = len(rows)
     job.success_rows = success_rows
     job.failed_rows = len(failures)
     job.failures_json = json.dumps(failures, ensure_ascii=False)
     job.status = "completed"
+
+
+def process_import_job_task(task_id: str, trace_id: str, actor_id: int) -> None:
+    with SessionLocal() as db:
+        job = db.scalar(select(ImportJob).where(ImportJob.task_id == task_id))
+        if not job:
+            return
+        process_import_job(db, job)
+        add_audit(
+            db,
+            trace_id,
+            "import_job_completed",
+            f"导入任务 {job.task_id} 完成，成功 {job.success_rows} 行，失败 {job.failed_rows} 行",
+            actor_id=actor_id,
+            target_type="import_job",
+            target_id=job.id,
+        )
+        db.commit()
 
 
 @app.post("/api/auth/login", response_model=LoginResponse)
@@ -291,6 +347,7 @@ def source_dictionary(db: Session = Depends(get_db), user: User = Depends(curren
 
 @app.post("/api/import-jobs", response_model=ImportJobOut, status_code=status.HTTP_201_CREATED)
 async def create_import_job(
+    background_tasks: BackgroundTasks,
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -305,31 +362,15 @@ async def create_import_job(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_detail("INVALID_IMPORT_FILE", "仅支持 5MB 内的 CSV/Excel 导入文件"),
         )
-    if filename.lower().endswith(".xlsx"):
-        add_audit(db, request.state.trace_id, "import_rejected", f"暂不支持解析 Excel：{filename}", actor_id=user.id, target_type="import_job")
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail("INVALID_IMPORT_FILE", "当前本地导入 worker 仅支持 CSV，Excel 需转换后上传"),
-        )
 
-    text_content = content.decode("utf-8-sig")
+    text_content = content.decode("latin1") if filename.lower().endswith(".xlsx") else content.decode("utf-8-sig")
     job = ImportJob(task_id=uuid4().hex, filename=filename, status="queued", original_content=text_content, created_by=user.id)
     db.add(job)
     db.flush()
-    process_import_job(db, job)
-    add_audit(
-        db,
-        request.state.trace_id,
-        "import_job_completed",
-        f"导入任务 {job.task_id} 完成，成功 {job.success_rows} 行，失败 {job.failed_rows} 行",
-        actor_id=user.id,
-        target_type="import_job",
-        target_id=job.id,
-    )
+    result = import_job_out(job)
     db.commit()
-    db.refresh(job)
-    return import_job_out(job)
+    background_tasks.add_task(process_import_job_task, job.task_id, request.state.trace_id, user.id)
+    return result
 
 
 @app.get("/api/import-jobs/{task_id}", response_model=ImportJobOut)
@@ -363,7 +404,8 @@ def retry_import_job(
     job = db.scalar(select(ImportJob).where(ImportJob.task_id == task_id))
     if not job:
         raise HTTPException(status_code=404, detail="导入任务不存在")
-    process_import_job(db, job)
+    if job.status != "completed":
+        process_import_job(db, job)
     add_audit(db, request.state.trace_id, "import_job_retried", f"导入任务 {task_id} 已重试", actor_id=user.id, target_type="import_job", target_id=job.id)
     db.commit()
     db.refresh(job)

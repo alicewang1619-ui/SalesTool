@@ -66,6 +66,7 @@ class ImportJob(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="queued")
     total_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    processed_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     success_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failures_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")

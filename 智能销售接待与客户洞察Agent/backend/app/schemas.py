@@ -302,6 +302,55 @@ class ReportPeriodOut(BaseModel):
     downstream: ReportPeriodDownstreamOut
 
 
+class ReportMetricDetailGroupItemOut(BaseModel):
+    key: str
+    label: str
+    value: int
+    unit: str = ""
+    hint: str = ""
+
+
+class ReportMetricDetailLeadItemOut(BaseModel):
+    lead_id: int
+    customer_id: int | None = None
+    customer_name: str
+    country: str
+    source_category: str
+    source_label: str
+    product: str
+    feedback_status: str
+    score_label: str
+    owner_id: int | None = None
+    lead_detail_path: str
+    customer_detail_path: str | None = None
+
+
+class ReportMetricDetailExportOut(BaseModel):
+    fields: list[str]
+    desensitization: str
+    excludes: list[str]
+
+
+class ReportMetricDetailEmptyStateOut(BaseModel):
+    title: str
+    action_label: str
+    action_path: str
+
+
+class ReportMetricDetailOut(BaseModel):
+    period: str
+    query_window: ReportQueryWindowOut
+    filters: ReportPeriodFiltersOut
+    limits: ReportLimitsOut
+    metric_cards: list[ReportMetricCardOut]
+    detail_groups: dict[str, list[ReportMetricDetailGroupItemOut]]
+    items: list[ReportMetricDetailLeadItemOut]
+    total: int
+    downstream: ReportPeriodDownstreamOut
+    export_summary: ReportMetricDetailExportOut
+    empty_state: ReportMetricDetailEmptyStateOut | None = None
+
+
 class CustomerBackgroundSourceOut(BaseModel):
     type: str
     title: str

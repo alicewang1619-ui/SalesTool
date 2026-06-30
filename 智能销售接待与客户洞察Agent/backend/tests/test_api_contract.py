@@ -1129,3 +1129,109 @@ def test_sales_user_cannot_access_report_period(client: TestClient) -> None:
 
     assert response.status_code == 403
     assert response.json()["detail"]["code"] == "FORBIDDEN"
+
+
+def test_report_metrics_detail_returns_kpi_feedback_product_and_unfeedback_details(client: TestClient) -> None:
+    response = client.get("/api/reports/metrics", params={"period": "year"}, headers=auth_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["period"] == "year"
+    assert_no_money_fields(body)
+    labels = {card["label"] for card in body["metric_cards"]}
+    assert {"今日询盘", "有效线索", "未反馈", "官网 KPI"}.issubset(labels)
+    detail_groups = body["detail_groups"]
+    assert detail_groups["website_kpi"]
+    assert detail_groups["unfeedback"]
+    assert detail_groups["sales_feedback"]
+    assert detail_groups["products"]
+    assert any(row["label"] == "官网归因率" for row in detail_groups["website_kpi"])
+    assert any(row["label"] for row in detail_groups["products"])
+
+
+def test_report_metrics_detail_filters_are_backend_paginated(client: TestClient) -> None:
+    headers = auth_headers(client)
+    all_response = client.get("/api/reports/metrics", params={"period": "year", "page_size": 10}, headers=headers)
+    filtered = client.get(
+        "/api/reports/metrics",
+        params={
+            "period": "year",
+            "country": "Peru",
+            "source_category": "缃戠珯",
+            "product": "Portable Ultrasound",
+            "page": 1,
+            "page_size": 1,
+        },
+        headers=headers,
+    )
+
+    assert all_response.status_code == 200
+    assert filtered.status_code == 200
+    all_body = all_response.json()
+    filtered_body = filtered.json()
+    assert filtered_body["filters"]["country"] == "Peru"
+    assert filtered_body["filters"]["source_category"] == "缃戠珯"
+    assert filtered_body["filters"]["product"] == "Portable Ultrasound"
+    assert filtered_body["limits"] == {"page": 1, "page_size": 1}
+    assert filtered_body["total"] < all_body["total"]
+    assert len(filtered_body["items"]) <= 1
+    assert all(item["country"] == "Peru" for item in filtered_body["items"])
+    assert all(item["source_category"] == "缃戠珯" for item in filtered_body["items"])
+
+
+def test_report_metrics_detail_rows_use_real_lead_and_customer_paths(client: TestClient) -> None:
+    response = client.get(
+        "/api/reports/metrics",
+        params={"period": "year", "country": "Peru", "page_size": 10},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 200
+    rows = response.json()["items"]
+    globalmed = next(row for row in rows if row["customer_name"] == "GlobalMed Peru")
+    assert globalmed["lead_detail_path"] == f"/admin/leads/{globalmed['lead_id']}"
+    assert globalmed["customer_detail_path"].startswith("/admin/customers/")
+    lead_detail = client.get(globalmed["lead_detail_path"].replace("/admin", "/api"), headers=auth_headers(client))
+    assert lead_detail.status_code == 200
+    assert lead_detail.json()["customer_name"] == "GlobalMed Peru"
+
+
+def test_report_metrics_detail_export_context_matches_filters_and_masks_money(client: TestClient) -> None:
+    response = client.get(
+        "/api/reports/metrics",
+        params={"period": "month", "country": "Peru", "source_category": "缃戠珯"},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["downstream"]["export_requires_confirmation"] is True
+    assert "period=month" in body["downstream"]["export_path"]
+    assert "country=Peru" in body["downstream"]["export_path"]
+    assert "source_category=" in body["downstream"]["export_path"]
+    assert "成交金额" not in " ".join(body["export_summary"]["fields"])
+    assert "报价金额" not in " ".join(body["export_summary"]["fields"])
+    assert body["export_summary"]["desensitization"] == "导出客户联系信息时按角色权限脱敏"
+
+
+def test_report_metrics_detail_empty_state_returns_period_entry(client: TestClient) -> None:
+    response = client.get(
+        "/api/reports/metrics",
+        params={"period": "year", "country": "__no_such_country__"},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 0
+    assert body["items"] == []
+    assert body["empty_state"]["title"] == "当前筛选没有指标明细"
+    assert body["empty_state"]["action_path"] == "/admin/reports/period?period=year"
+
+
+def test_sales_user_cannot_access_report_metrics_detail(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+    response = client.get("/api/reports/metrics", headers=sales_headers)
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "FORBIDDEN"

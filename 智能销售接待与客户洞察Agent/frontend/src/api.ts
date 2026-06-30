@@ -177,6 +177,70 @@ export type ReportPeriodViewResult = {
   };
 };
 
+export type ReportMetricDetailItem = {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  hint: string;
+};
+
+export type ReportMetricsDetailResult = {
+  period: ReportPeriod;
+  query_window: {
+    start_at: string;
+    end_at: string;
+  };
+  filters: {
+    country: string | null;
+    source_category: string | null;
+    product: string | null;
+    feedback_status: string | null;
+  };
+  limits: {
+    page: number;
+    page_size: number;
+  };
+  metric_cards: Array<{
+    key: string;
+    label: string;
+    value: number;
+    unit: string;
+    hint: string;
+  }>;
+  detail_groups: Record<string, ReportMetricDetailItem[]>;
+  items: Array<{
+    lead_id: number;
+    customer_id: number | null;
+    customer_name: string;
+    country: string;
+    source_category: string;
+    source_label: string;
+    product: string;
+    feedback_status: string;
+    score_label: string;
+    owner_id: number | null;
+    lead_detail_path: string;
+    customer_detail_path: string | null;
+  }>;
+  total: number;
+  downstream: {
+    metrics_path: string;
+    export_path: string;
+    export_requires_confirmation: boolean;
+  };
+  export_summary: {
+    fields: string[];
+    desensitization: string;
+    excludes: string[];
+  };
+  empty_state?: {
+    title: string;
+    action_label: string;
+    action_path: string;
+  } | null;
+};
+
 export type SourceOption = {
   category: string;
   label: string;
@@ -576,6 +640,29 @@ export function fetchReportPeriod(
   if (filters.feedbackStatus) params.set("feedback_status", filters.feedbackStatus);
   if (filters.timeoutMs) params.set("timeout_ms", String(filters.timeoutMs));
   return request<ReportPeriodViewResult>(`/api/reports/period?${params.toString()}`);
+}
+
+export function fetchReportMetricsDetail(
+  filters: {
+    period?: ReportPeriod;
+    country?: string;
+    sourceCategory?: string;
+    product?: string;
+    feedbackStatus?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}
+): Promise<ReportMetricsDetailResult> {
+  const params = new URLSearchParams({
+    period: filters.period ?? "day",
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 10)
+  });
+  if (filters.country) params.set("country", filters.country);
+  if (filters.sourceCategory) params.set("source_category", filters.sourceCategory);
+  if (filters.product) params.set("product", filters.product);
+  if (filters.feedbackStatus) params.set("feedback_status", filters.feedbackStatus);
+  return request<ReportMetricsDetailResult>(`/api/reports/metrics?${params.toString()}`);
 }
 
 export function fetchCustomer(customerId: string): Promise<Customer> {

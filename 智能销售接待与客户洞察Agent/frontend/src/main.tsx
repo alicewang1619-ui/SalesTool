@@ -15,6 +15,7 @@ import { FeedbackCardPage } from "./pages/FeedbackCardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PendingAssignmentsPage } from "./pages/PendingAssignmentsPage";
 import { ReportsHomePage } from "./pages/ReportsHomePage";
+import { ReportsMetricsPage } from "./pages/ReportsMetricsPage";
 import { ReportsPeriodPage } from "./pages/ReportsPeriodPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./styles.css";
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
       { path: "reports", element: <ReportsHomePage /> },
       { path: "reports/period", element: <ReportsPeriodPage /> },
+      { path: "reports/metrics", element: <ReportsMetricsPage /> },
       { path: "settings", element: <SettingsPage /> }
     ]
   }

@@ -73,6 +73,11 @@ from .schemas import (
     ReportGenerationOut,
     ReportHomeOut,
     ReportLimitsOut,
+    ReportMetricDetailEmptyStateOut,
+    ReportMetricDetailExportOut,
+    ReportMetricDetailGroupItemOut,
+    ReportMetricDetailLeadItemOut,
+    ReportMetricDetailOut,
     ReportMetricCardOut,
     ReportPeriodBreakdownsOut,
     ReportPeriodDownstreamOut,
@@ -1072,6 +1077,24 @@ def report_downstream_paths(period: str, filters: ReportPeriodFiltersOut) -> Rep
     )
 
 
+def breakdown_to_metric_items(
+    rows: list[ReportBreakdownItemOut],
+    *,
+    key_prefix: str,
+    unit: str = "条",
+) -> list[ReportMetricDetailGroupItemOut]:
+    return [
+        ReportMetricDetailGroupItemOut(
+            key=f"{key_prefix}_{index}",
+            label=row.label,
+            value=row.inquiry_count,
+            unit=unit,
+            hint=f"有效 {row.valid_count}，有效率 {row.valid_rate}%",
+        )
+        for index, row in enumerate(rows, start=1)
+    ]
+
+
 @app.get("/api/reports/period", response_model=ReportPeriodOut)
 def report_period(
     request: Request,
@@ -1160,6 +1183,130 @@ def report_period(
         ],
         total=total,
         downstream=report_downstream_paths(resolved_period, filters),
+    )
+
+
+@app.get("/api/reports/metrics", response_model=ReportMetricDetailOut)
+def report_metrics_detail(
+    request: Request,
+    period: str = Query("day", pattern="^(day|month|quarter|year)$"),
+    country: str | None = None,
+    source_category: str | None = None,
+    product: str | None = None,
+    feedback_status: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ReportMetricDetailOut:
+    resolved_period, start_at, end_at = report_period_window(period)
+    filters = ReportPeriodFiltersOut(
+        country=country,
+        source_category=source_category,
+        product=product,
+        feedback_status=feedback_status,
+    )
+    conditions = report_period_conditions(start_at, end_at, country, source_category, product, feedback_status)
+    total = report_count(db, conditions)
+    valid_total = report_count(db, conditions, Lead.score_label.in_(VALID_SCORE_LABELS))
+    unfeedback_total = report_count(db, conditions, Lead.feedback_status.in_(UNFEEDBACK_LABELS))
+    website_total = report_count(db, conditions, Lead.source_category.in_(WEBSITE_SOURCE_LABELS))
+    assigned_total = report_count(db, conditions, Lead.owner_id.is_not(None))
+    feedback_total = report_count(db, conditions, Lead.feedback_status.notin_(UNFEEDBACK_LABELS))
+    customer_total = db.scalar(select(func.count(Customer.id))) or 0
+
+    rows = db.execute(
+        select(Lead)
+        .where(*conditions)
+        .order_by(Lead.created_at.desc(), Lead.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).scalars().all()
+    customer_names = {row.customer_name for row in rows}
+    customer_ids = {
+        name: customer_id
+        for name, customer_id in db.execute(
+            select(Customer.name, Customer.id).where(Customer.name.in_(customer_names))
+        ).all()
+    } if customer_names else {}
+
+    unfeedback_conditions = [*conditions, Lead.feedback_status.in_(UNFEEDBACK_LABELS)]
+    channel_rows = report_breakdown(db, conditions, Lead.source_category)
+    product_rows = report_breakdown(db, conditions, Lead.product)
+    feedback_rows = report_breakdown(db, conditions, Lead.feedback_status)
+    unfeedback_rows = report_breakdown(db, unfeedback_conditions, Lead.country)
+
+    add_audit(
+        db,
+        request.state.trace_id,
+        "report_metrics_viewed",
+        f"Report metrics detail viewed: {resolved_period}",
+        actor_id=user.id,
+        target_type="report",
+    )
+    db.commit()
+
+    empty_state = None
+    if total == 0:
+        empty_state = ReportMetricDetailEmptyStateOut(
+            title="当前筛选没有指标明细",
+            action_label="返回周期报表",
+            action_path=f"/admin/reports/period?period={resolved_period}",
+        )
+
+    return ReportMetricDetailOut(
+        period=resolved_period,
+        query_window=ReportQueryWindowOut(start_at=start_at, end_at=end_at),
+        filters=filters,
+        limits=ReportLimitsOut(page=page, page_size=page_size),
+        metric_cards=[
+            ReportMetricCardOut(key="today_inquiries", label="今日询盘", value=report_count(db, [Lead.created_at >= report_period_window("day")[1]]), hint="当日进入系统的询盘"),
+            ReportMetricCardOut(key="valid_leads", label="有效线索", value=valid_total, hint="当前筛选内有效与高意向线索"),
+            ReportMetricCardOut(key="unfeedback", label="未反馈", value=unfeedback_total, hint="仍未收到销售反馈"),
+            ReportMetricCardOut(key="website_kpi", label="官网 KPI", value=pct(website_total, total), unit="%", hint="官网来源占比"),
+        ],
+        detail_groups={
+            "website_kpi": [
+                ReportMetricDetailGroupItemOut(key="attribution_rate", label="官网归因率", value=pct(website_total, total), unit="%", hint="官网来源/总询盘"),
+                ReportMetricDetailGroupItemOut(key="ai_completion_rate", label="AI 补全率", value=pct(valid_total, total), unit="%", hint="以有效线索作为已补全口径"),
+                ReportMetricDetailGroupItemOut(key="assignment_rate", label="分配完成率", value=pct(assigned_total, total), unit="%", hint="已分配负责人/总询盘"),
+                ReportMetricDetailGroupItemOut(key="sales_feedback_rate", label="销售反馈率", value=pct(feedback_total, total), unit="%", hint="已有销售反馈/总询盘"),
+                ReportMetricDetailGroupItemOut(key="entered_customer_pool", label="进入客户池", value=customer_total, unit="个客户", hint="当前沉淀客户数"),
+            ],
+            "unfeedback": breakdown_to_metric_items(unfeedback_rows, key_prefix="unfeedback"),
+            "sales_feedback": breakdown_to_metric_items(feedback_rows, key_prefix="feedback"),
+            "products": breakdown_to_metric_items(product_rows, key_prefix="product"),
+            "channels": breakdown_to_metric_items(channel_rows, key_prefix="channel"),
+        },
+        items=[
+            ReportMetricDetailLeadItemOut(
+                lead_id=row.id,
+                customer_id=customer_ids.get(row.customer_name),
+                customer_name=row.customer_name,
+                country=row.country,
+                source_category=row.source_category,
+                source_label=row.source_label,
+                product=row.product,
+                feedback_status=row.feedback_status,
+                score_label=row.score_label,
+                owner_id=row.owner_id,
+                lead_detail_path=f"/admin/leads/{row.id}",
+                customer_detail_path=(
+                    f"/admin/customers/{customer_ids[row.customer_name]}"
+                    if row.customer_name in customer_ids
+                    else None
+                ),
+            )
+            for row in rows
+        ],
+        total=total,
+        downstream=report_downstream_paths(resolved_period, filters),
+        export_summary=ReportMetricDetailExportOut(
+            fields=["客户名称", "国家", "来源", "产品", "评分", "反馈", "负责人"],
+            desensitization="导出客户联系信息时按角色权限脱敏",
+            excludes=["money_metrics"],
+        ),
+        empty_state=empty_state,
     )
 
 

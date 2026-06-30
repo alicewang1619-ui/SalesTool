@@ -1,2 +1,8 @@
 __pycache__/
 *.py[cod]
+.pytest_cache/
+*.db
+*.log
+node_modules/
+dist/
+*.tsbuildinfo

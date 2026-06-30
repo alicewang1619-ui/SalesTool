@@ -76,6 +76,8 @@ class PageResult(BaseModel):
 class PendingAssignmentOut(LeadOut):
     owner_id: int | None
     owner_name: str
+    suggested_owner_id: int | None = None
+    suggested_owner_name: str | None = None
     pending_reasons: list[str]
     detail_path: str
     configure_mapping_path: str | None = None
@@ -537,6 +539,39 @@ class BannerUpdateRequest(BaseModel):
 class PermissionUpdateRequest(BaseModel):
     role: str = Field(pattern="^(sales|ops|admin)$")
     permissions: list[str] = Field(min_length=1)
+
+
+class CountrySalesMappingOut(BaseModel):
+    id: int
+    country: str
+    region: str
+    sales_user_id: int
+    sales_user_name: str
+    sales_user_email: str
+    sales_user_enabled: bool
+    active: bool
+    updated_at: datetime
+    pending_count: int
+    risk_level: str
+    risk_reasons: list[str]
+
+
+class CountrySalesMappingPage(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    summary: dict[str, int]
+    sales_users: list[SalesUserOut]
+    items: list[CountrySalesMappingOut]
+    pending_items: list[PendingAssignmentOut]
+    empty_state: EmptyStateOut | None = None
+
+
+class CountrySalesMappingUpdateRequest(BaseModel):
+    country: str = Field(min_length=2, max_length=80)
+    region: str = Field(min_length=2, max_length=80)
+    sales_user_id: int
+    active: bool = True
 
 
 class AuditLogOut(BaseModel):

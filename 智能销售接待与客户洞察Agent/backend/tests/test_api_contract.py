@@ -1,4 +1,4 @@
-from fastapi.testclient import TestClient
+﻿from fastapi.testclient import TestClient
 import io
 import pytest
 from sqlalchemy import delete
@@ -9,6 +9,7 @@ from app.database import Base, SessionLocal, engine
 from app.main import app, ensure_sqlite_compatibility
 from app.models import (
     AuditLog,
+    CountrySalesMapping,
     Customer,
     CustomerBackground,
     ImportJob,
@@ -17,6 +18,7 @@ from app.models import (
     SalesFeedback,
     SalesFeedbackLink,
     SourceDictionary,
+    User,
 )
 
 
@@ -53,6 +55,10 @@ def client() -> TestClient:
         db.execute(delete(ImportJob))
         db.execute(delete(SalesFeedback))
         db.execute(delete(SalesFeedbackLink))
+        for prefix in ["Chile-", "Riskland-", "Blocked-Riskland-", "Utopia-"]:
+            db.query(CountrySalesMapping).filter(CountrySalesMapping.country.like(f"{prefix}%")).delete(synchronize_session=False)
+        db.query(Lead).filter(Lead.customer_name.like("Pending Utopia-%")).delete(synchronize_session=False)
+        db.query(User).filter(User.email.like("disabled-%@ultrasound-growth.local")).delete(synchronize_session=False)
         test_customer_names = [
             "Dr. Sofia Ramirez",
             "MedSupply Africa",
@@ -719,7 +725,7 @@ def test_pending_assignments_list_unassigned_and_mapping_failures_with_paginatio
     } <= set(first)
     chile = next(item for item in body["items"] if item["customer_name"] == "Clinica Andes Pending")
     assert "COUNTRY_MAPPING_MISSING" in chile["pending_reasons"]
-    assert chile["configure_mapping_path"] == "/admin/settings?section=country-sales&pending_country=Chile"
+    assert chile["configure_mapping_path"] == "/admin/settings/country-sales?pending_country=Chile"
 
 
 def test_pending_assignment_confirm_writes_owner_feedback_link_and_audit(client: TestClient) -> None:
@@ -1461,3 +1467,141 @@ def test_sales_user_cannot_access_settings_management(client: TestClient) -> Non
     assert overview.status_code == 403
     assert created.status_code == 403
     assert banner.status_code == 403
+
+
+def test_country_sales_mapping_overview_lists_rules_sales_and_pending(client: TestClient) -> None:
+    response = client.get("/api/settings/country-sales", headers=auth_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["page"] == 1
+    assert body["page_size"] >= 10
+    assert body["summary"]["active_mappings"] >= 1
+    assert body["summary"]["pending_without_mapping"] >= 1
+    assert any(user["email"] == "maria@ultrasound-growth.local" for user in body["sales_users"])
+    peru = next(item for item in body["items"] if item["country"] == "Peru")
+    assert peru["region"] == "Latam"
+    assert peru["sales_user_name"] == "Maria Chen"
+    assert peru["active"] is True
+    assert peru["risk_level"] == "normal"
+    assert "updated_at" in peru
+    pending_names = {item["customer_name"] for item in body["pending_items"]}
+    assert "Al Noor Hospital" in pending_names
+
+
+def test_country_sales_mapping_save_is_unique_and_audited(client: TestClient) -> None:
+    country = f"Chile-{uuid4().hex[:8]}"
+    headers = {**auth_headers(client), "x-trace-id": "country-sales-save-test"}
+
+    first = client.put(
+        "/api/settings/country-sales",
+        json={"country": country, "region": "Latam", "sales_user_id": 2, "active": True},
+        headers=headers,
+    )
+    second = client.put(
+        "/api/settings/country-sales",
+        json={"country": country, "region": "South Latam", "sales_user_id": 2, "active": True},
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["country"] == country
+    assert second.json()["region"] == "South Latam"
+    filtered = client.get("/api/settings/country-sales", params={"country": country}, headers=headers)
+    assert filtered.status_code == 200
+    filtered_body = filtered.json()
+    assert filtered_body["total"] == 1
+    assert filtered_body["items"][0]["region"] == "South Latam"
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "settings_country_sales_mapping_saved" and event["trace_id"] == "country-sales-save-test"
+        for event in audit
+    )
+
+
+def test_country_sales_mapping_feeds_pending_assignment_suggestion(client: TestClient) -> None:
+    country = f"Utopia-{uuid4().hex[:8]}"
+    headers = auth_headers(client)
+    with SessionLocal() as db:
+        db.add(
+            Lead(
+                customer_name=f"Pending {country}",
+                country=country,
+                customer_type="Clinic",
+                product="Handheld Ultrasound",
+                source_category="website",
+                source_label="website chat",
+                score_label="pending",
+                feedback_status="unassigned",
+                raw_inquiry="Customer asks for handheld ultrasound and has no owner yet.",
+                owner_id=None,
+            )
+        )
+        db.commit()
+
+    before = client.get("/api/assignments/pending", params={"page_size": 50}, headers=headers)
+    before_item = next(item for item in before.json()["items"] if item["country"] == country)
+    assert "COUNTRY_MAPPING_MISSING" in before_item["pending_reasons"]
+    assert before_item["configure_mapping_path"] == f"/admin/settings/country-sales?pending_country={country}"
+
+    saved = client.put(
+        "/api/settings/country-sales",
+        json={"country": country, "region": "Test Region", "sales_user_id": 2, "active": True},
+        headers=headers,
+    )
+    assert saved.status_code == 200
+    after = client.get("/api/assignments/pending", params={"page_size": 50}, headers=headers)
+    after_item = next(item for item in after.json()["items"] if item["country"] == country)
+    assert "COUNTRY_MAPPING_MISSING" not in after_item["pending_reasons"]
+    assert after_item["suggested_owner_id"] == 2
+    assert after_item["suggested_owner_name"] == "Maria Chen"
+
+def test_country_sales_mapping_disabled_sales_owner_is_risky_and_rejected(client: TestClient) -> None:
+    country = f"Riskland-{uuid4().hex[:8]}"
+    headers = auth_headers(client)
+    with SessionLocal() as db:
+        disabled = User(
+            name="Disabled Sales",
+            email=f"disabled-{uuid4().hex[:8]}@ultrasound-growth.local",
+            password_hash="disabled",
+            role="sales",
+            data_scope="Riskland",
+            enabled=False,
+        )
+        db.add(disabled)
+        db.flush()
+        db.add(CountrySalesMapping(country=country, sales_user_id=disabled.id, active=True))
+        db.commit()
+        disabled_id = disabled.id
+
+    overview = client.get("/api/settings/country-sales", params={"country": country}, headers=headers)
+
+    assert overview.status_code == 200
+    item = overview.json()["items"][0]
+    assert item["country"] == country
+    assert item["sales_user_enabled"] is False
+    assert item["risk_level"] == "danger"
+    assert "SALES_USER_DISABLED" in item["risk_reasons"]
+
+    rejected = client.put(
+        "/api/settings/country-sales",
+        json={"country": f"Blocked-{country}", "region": "Risk Region", "sales_user_id": disabled_id, "active": True},
+        headers=headers,
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"]["code"] == "INVALID_SALES_OWNER"
+
+
+def test_sales_user_cannot_access_country_sales_mapping_settings(client: TestClient) -> None:
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+
+    overview = client.get("/api/settings/country-sales", headers=sales_headers)
+    saved = client.put(
+        "/api/settings/country-sales",
+        json={"country": "Blocked Country", "region": "Blocked Region", "sales_user_id": 2, "active": True},
+        headers=sales_headers,
+    )
+
+    assert overview.status_code == 403
+    assert saved.status_code == 403

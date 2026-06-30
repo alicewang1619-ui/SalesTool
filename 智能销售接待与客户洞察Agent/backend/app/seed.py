@@ -27,7 +27,7 @@ def seed_data(db: Session) -> None:
     db.add_all([admin, sales])
     db.flush()
 
-    db.add(CountrySalesMapping(country="Peru", sales_user_id=sales.id, active=True))
+    db.add(CountrySalesMapping(country="Peru", region="Latam", sales_user_id=sales.id, active=True))
 
     db.add(
         Banner(

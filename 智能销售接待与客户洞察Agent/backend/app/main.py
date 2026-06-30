@@ -96,6 +96,9 @@ from .schemas import (
     ReportWebsiteKpiOut,
     SalesUserOut,
     BannerUpdateRequest,
+    CountrySalesMappingOut,
+    CountrySalesMappingPage,
+    CountrySalesMappingUpdateRequest,
     PermissionUpdateRequest,
     SalesUserCreateRequest,
     SettingsEntryOut,
@@ -191,6 +194,13 @@ def ensure_sqlite_compatibility() -> None:
         if "processed_rows" not in import_job_columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE import_jobs ADD COLUMN processed_rows INTEGER NOT NULL DEFAULT 0"))
+    if "country_sales_mappings" in table_names:
+        mapping_columns = {column["name"] for column in inspector.get_columns("country_sales_mappings")}
+        if "region" not in mapping_columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE country_sales_mappings ADD COLUMN region VARCHAR(80) NOT NULL DEFAULT 'Unassigned Region'")
+                )
 
 
 def ensure_default_country_mappings(db: Session) -> None:
@@ -199,8 +209,12 @@ def ensure_default_country_mappings(db: Session) -> None:
         return
     peru_mapping = db.scalar(select(CountrySalesMapping).where(CountrySalesMapping.country == "Peru"))
     if not peru_mapping:
-        db.add(CountrySalesMapping(country="Peru", sales_user_id=maria.id, active=True))
-        db.commit()
+        db.add(CountrySalesMapping(country="Peru", region="Latam", sales_user_id=maria.id, active=True))
+    else:
+        peru_mapping.region = "Latam"
+        peru_mapping.sales_user_id = maria.id
+        peru_mapping.active = True
+    db.commit()
 
 
 @app.on_event("startup")
@@ -499,16 +513,25 @@ def pending_reasons_for_lead(lead: Lead, mapped_countries: set[str]) -> list[str
     return reasons
 
 
-def pending_assignment_out(db: Session, lead: Lead, reasons: list[str]) -> PendingAssignmentOut:
+def pending_assignment_out(
+    db: Session,
+    lead: Lead,
+    reasons: list[str],
+    mapping_lookup: dict[str, tuple[CountrySalesMapping, User]] | None = None,
+) -> PendingAssignmentOut:
     base = LeadOut.model_validate(lead, from_attributes=True).model_dump()
     owner = db.get(User, lead.owner_id) if lead.owner_id else None
+    suggested_mapping = mapping_lookup.get(lead.country) if mapping_lookup else None
+    suggested_owner = suggested_mapping[1] if suggested_mapping else None
     configure_mapping_path = None
     if "COUNTRY_MAPPING_MISSING" in reasons:
-        configure_mapping_path = f"/admin/settings?section=country-sales&pending_country={lead.country}"
+        configure_mapping_path = f"/admin/settings/country-sales?pending_country={lead.country}"
     return PendingAssignmentOut(
         **base,
         owner_id=owner.id if owner else None,
         owner_name=owner.name if owner else "Unassigned",
+        suggested_owner_id=suggested_owner.id if suggested_owner else None,
+        suggested_owner_name=suggested_owner.name if suggested_owner else None,
         pending_reasons=reasons,
         detail_path=f"/admin/leads/{lead.id}",
         configure_mapping_path=configure_mapping_path,
@@ -626,15 +649,19 @@ def pending_assignments(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ops),
 ) -> PendingAssignmentPage:
-    mapped_countries = set(
-        db.scalars(select(CountrySalesMapping.country).where(CountrySalesMapping.active.is_(True))).all()
-    )
+    mapping_rows = db.execute(
+        select(CountrySalesMapping, User)
+        .join(User, User.id == CountrySalesMapping.sales_user_id)
+        .where(CountrySalesMapping.active.is_(True), User.enabled.is_(True), User.role == "sales")
+    ).all()
+    mapped_countries = {mapping.country for mapping, _ in mapping_rows}
+    mapping_lookup = {mapping.country: (mapping, owner) for mapping, owner in mapping_rows}
     leads = db.scalars(select(Lead).order_by(Lead.created_at.desc(), Lead.id.desc())).all()
     pending_items: list[PendingAssignmentOut] = []
     for lead in leads:
         reasons = pending_reasons_for_lead(lead, mapped_countries)
         if reasons:
-            pending_items.append(pending_assignment_out(db, lead, reasons))
+            pending_items.append(pending_assignment_out(db, lead, reasons, mapping_lookup))
 
     start = (page - 1) * page_size
     return PendingAssignmentPage(
@@ -1768,6 +1795,58 @@ DEFAULT_PERMISSION_MATRIX = {
 }
 
 
+def country_mapping_pending_counts(db: Session) -> dict[str, int]:
+    rows = db.execute(
+        select(Lead.country, func.count())
+        .where(Lead.owner_id.is_(None), Lead.country != "")
+        .group_by(Lead.country)
+    ).all()
+    return {country: count for country, count in rows}
+
+
+def active_country_mapping_lookup(db: Session) -> dict[str, tuple[CountrySalesMapping, User]]:
+    rows = db.execute(
+        select(CountrySalesMapping, User)
+        .join(User, User.id == CountrySalesMapping.sales_user_id)
+        .where(CountrySalesMapping.active.is_(True), User.enabled.is_(True), User.role == "sales")
+    ).all()
+    return {mapping.country: (mapping, owner) for mapping, owner in rows}
+
+
+def country_sales_mapping_out(
+    mapping: CountrySalesMapping,
+    owner: User | None,
+    pending_count: int,
+) -> CountrySalesMappingOut:
+    risk_reasons: list[str] = []
+    if not mapping.active:
+        risk_reasons.append("MAPPING_INACTIVE")
+    if owner is None:
+        risk_reasons.append("SALES_USER_MISSING")
+    elif owner.role != "sales":
+        risk_reasons.append("OWNER_NOT_SALES")
+    elif not owner.enabled:
+        risk_reasons.append("SALES_USER_DISABLED")
+    if pending_count:
+        risk_reasons.append("PENDING_LEADS_WAITING")
+    danger_reasons = {"SALES_USER_MISSING", "OWNER_NOT_SALES", "SALES_USER_DISABLED"}
+    risk_level = "danger" if danger_reasons.intersection(risk_reasons) else "warning" if risk_reasons else "normal"
+    return CountrySalesMappingOut(
+        id=mapping.id,
+        country=mapping.country,
+        region=mapping.region,
+        sales_user_id=mapping.sales_user_id,
+        sales_user_name=owner.name if owner else "Unknown",
+        sales_user_email=owner.email if owner else "",
+        sales_user_enabled=bool(owner.enabled) if owner else False,
+        active=mapping.active,
+        updated_at=mapping.updated_at,
+        pending_count=pending_count,
+        risk_level=risk_level,
+        risk_reasons=risk_reasons,
+    )
+
+
 def settings_entries() -> list[SettingsEntryOut]:
     return [
         SettingsEntryOut(key="sales_accounts", title="销售账号", description="维护销售与管理员账号", path="/admin/settings?section=sales-users", status="ready"),
@@ -1822,6 +1901,109 @@ def settings_overview(db: Session = Depends(get_db), user: User = Depends(requir
         risks=["6 个国家缺少销售负责人", "邮箱同步需要重试"],
         recent_changes=[AuditLogOut.model_validate(item, from_attributes=True).model_dump() for item in changes],
     )
+
+
+@app.get("/api/settings/country-sales", response_model=CountrySalesMappingPage)
+def country_sales_mappings(
+    country: str | None = None,
+    region: str | None = None,
+    status_filter: str | None = Query(default=None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> CountrySalesMappingPage:
+    pending_counts = country_mapping_pending_counts(db)
+    sales_users = db.scalars(select(User).where(User.role == "sales").order_by(User.enabled.desc(), User.name)).all()
+    mapping_rows = db.execute(
+        select(CountrySalesMapping, User)
+        .join(User, User.id == CountrySalesMapping.sales_user_id, isouter=True)
+        .order_by(CountrySalesMapping.region, CountrySalesMapping.country)
+    ).all()
+    all_items = [
+        country_sales_mapping_out(mapping, owner, pending_counts.get(mapping.country, 0))
+        for mapping, owner in mapping_rows
+    ]
+    filtered_items = all_items
+    if country:
+        country_filter = country.strip().lower()
+        filtered_items = [item for item in filtered_items if country_filter in item.country.lower()]
+    if region:
+        region_filter = region.strip().lower()
+        filtered_items = [item for item in filtered_items if region_filter in item.region.lower()]
+    if status_filter == "active":
+        filtered_items = [item for item in filtered_items if item.active]
+    elif status_filter == "inactive":
+        filtered_items = [item for item in filtered_items if not item.active]
+    elif status_filter == "risk":
+        filtered_items = [item for item in filtered_items if item.risk_level != "normal"]
+
+    active_lookup = active_country_mapping_lookup(db)
+    mapped_countries = set(active_lookup)
+    leads = db.scalars(select(Lead).order_by(Lead.created_at.desc(), Lead.id.desc())).all()
+    pending_items: list[PendingAssignmentOut] = []
+    for lead in leads:
+        reasons = pending_reasons_for_lead(lead, mapped_countries)
+        if reasons:
+            pending_items.append(pending_assignment_out(db, lead, reasons, active_lookup))
+
+    pending_without_mapping = sum(count for country_name, count in pending_counts.items() if country_name not in mapped_countries)
+    start = (page - 1) * page_size
+    return CountrySalesMappingPage(
+        page=page,
+        page_size=page_size,
+        total=len(filtered_items),
+        summary={
+            "active_mappings": len([item for item in all_items if item.active]),
+            "inactive_mappings": len([item for item in all_items if not item.active]),
+            "risk_mappings": len([item for item in all_items if item.risk_level != "normal"]),
+            "pending_without_mapping": pending_without_mapping,
+            "enabled_sales_users": len([item for item in sales_users if item.enabled]),
+        },
+        sales_users=[SalesUserOut.model_validate(item, from_attributes=True) for item in sales_users],
+        items=filtered_items[start : start + page_size],
+        pending_items=pending_items[:10],
+        empty_state=EmptyStateOut(title="暂无国家销售映射", action_label="新增映射", action_path="/admin/settings/country-sales") if not filtered_items else None,
+    )
+
+
+@app.put("/api/settings/country-sales", response_model=CountrySalesMappingOut)
+def save_country_sales_mapping(
+    payload: CountrySalesMappingUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> CountrySalesMappingOut:
+    country = payload.country.strip()
+    region = payload.region.strip()
+    owner = db.get(User, payload.sales_user_id)
+    if not owner or owner.role != "sales" or not owner.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail("INVALID_SALES_OWNER", "Sales owner must be an enabled sales user."),
+        )
+    mapping = db.scalar(select(CountrySalesMapping).where(CountrySalesMapping.country == country))
+    if not mapping:
+        mapping = CountrySalesMapping(country=country, region=region, sales_user_id=owner.id, active=payload.active)
+        db.add(mapping)
+    else:
+        mapping.region = region
+        mapping.sales_user_id = owner.id
+        mapping.active = payload.active
+    db.flush()
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_country_sales_mapping_saved",
+        f"Country sales mapping saved: {country} -> {region} / {owner.name}.",
+        actor_id=user.id,
+        target_type="country_sales_mapping",
+        target_id=mapping.id,
+    )
+    db.commit()
+    db.refresh(mapping)
+    pending_count = country_mapping_pending_counts(db).get(mapping.country, 0)
+    return country_sales_mapping_out(mapping, owner, pending_count)
 
 
 @app.post("/api/settings/sales-users", response_model=SalesUserOut, status_code=status.HTTP_201_CREATED)

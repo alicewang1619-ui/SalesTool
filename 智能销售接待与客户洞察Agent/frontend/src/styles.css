@@ -383,6 +383,21 @@ body {
   gap: 8px;
 }
 
+.country-mapping-page {
+  display: grid;
+  gap: 18px;
+}
+
+.mapping-form-card {
+  position: sticky;
+  top: 104px;
+}
+
+.mapping-filter-bar {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;
@@ -434,5 +449,9 @@ body {
 
   .page-content {
     padding: 20px;
+  }
+
+  .mapping-form-card {
+    position: static;
   }
 }

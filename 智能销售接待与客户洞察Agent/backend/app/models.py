@@ -72,6 +72,7 @@ class CountrySalesMapping(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     country: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    region: Mapped[str] = mapped_column(String(80), nullable=False, default="Unassigned Region")
     sales_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

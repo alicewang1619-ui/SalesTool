@@ -299,6 +299,8 @@ export type ImportJob = {
 export type PendingAssignment = Lead & {
   owner_id: number | null;
   owner_name: string;
+  suggested_owner_id?: number | null;
+  suggested_owner_name?: string | null;
   pending_reasons: string[];
   detail_path: string;
   configure_mapping_path?: string | null;
@@ -480,6 +482,36 @@ export type SettingsOverview = {
     detail: string;
     created_at: string;
   }>;
+};
+
+export type CountrySalesMapping = {
+  id: number;
+  country: string;
+  region: string;
+  sales_user_id: number;
+  sales_user_name: string;
+  sales_user_email: string;
+  sales_user_enabled: boolean;
+  active: boolean;
+  updated_at: string;
+  pending_count: number;
+  risk_level: "normal" | "warning" | "danger";
+  risk_reasons: string[];
+};
+
+export type CountrySalesMappingPageResult = {
+  page: number;
+  page_size: number;
+  total: number;
+  summary: Record<string, number>;
+  sales_users: SalesUser[];
+  items: CountrySalesMapping[];
+  pending_items: PendingAssignment[];
+  empty_state: {
+    title: string;
+    action_label: string;
+    action_path: string;
+  } | null;
 };
 
 const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET ?? "").trim();
@@ -807,6 +839,40 @@ export function fetchSettingsSummary(): Promise<Record<string, number>> {
 
 export function fetchSettingsOverview(): Promise<SettingsOverview> {
   return request<SettingsOverview>("/api/settings/overview");
+}
+
+export function fetchCountrySalesMappings(filters: {
+  country?: string;
+  region?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<CountrySalesMappingPageResult> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20)
+  });
+  if (filters.country) params.set("country", filters.country);
+  if (filters.region) params.set("region", filters.region);
+  if (filters.status) params.set("status", filters.status);
+  return request<CountrySalesMappingPageResult>(`/api/settings/country-sales?${params.toString()}`);
+}
+
+export function saveCountrySalesMapping(payload: {
+  country: string;
+  region: string;
+  salesUserId: number;
+  active: boolean;
+}): Promise<CountrySalesMapping> {
+  return request<CountrySalesMapping>("/api/settings/country-sales", {
+    method: "PUT",
+    body: JSON.stringify({
+      country: payload.country,
+      region: payload.region,
+      sales_user_id: payload.salesUserId,
+      active: payload.active
+    })
+  });
 }
 
 export function fetchSalesUsers(): Promise<SalesUser[]> {

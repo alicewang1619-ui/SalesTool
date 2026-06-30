@@ -58,6 +58,15 @@ export function PendingAssignmentsPage() {
         setItems(result.items);
         setTotal(result.total);
         setSalesUsers(users);
+        setAssigneeByLead((current) => {
+          const next = { ...current };
+          result.items.forEach((item) => {
+            if (!next[item.id] && item.suggested_owner_id) {
+              next[item.id] = item.suggested_owner_id;
+            }
+          });
+          return next;
+        });
       })
       .catch((failure: Error) => setError(failure.message))
       .finally(() => setLoading(false));
@@ -155,7 +164,7 @@ export function PendingAssignmentsPage() {
           <Button icon={<RefreshCw size={16} />} onClick={loadPage}>
             刷新
           </Button>
-          <Button icon={<Route size={16} />} onClick={() => navigate("/admin/settings?section=country-sales")}>
+          <Button icon={<Route size={16} />} onClick={() => navigate("/admin/settings/country-sales")}>
             国家销售映射
           </Button>
         </Space>

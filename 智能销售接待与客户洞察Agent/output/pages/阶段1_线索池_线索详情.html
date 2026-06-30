@@ -185,7 +185,7 @@ tr:last-child td { border-bottom: 0; }
     <div class="card"><h2>客户画像与评分理由</h2><div class="timeline"><div>客户类型：代理商</div><div>产品兴趣：Portable Ultrasound</div><div>国家字段完整，可进入销售分发规则。</div></div></div>
   </div><div class="grid">
     <div class="card"><h2>客户背景调查摘要</h2><p>GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。</p><span class="badge success">可信度：高</span></div>
-    <div class="card"><h2>分发与反馈</h2><label class="muted">销售负责人</label><select><option>Maria Chen</option><option>待分配</option></select><label class="muted">反馈状态</label><select><option>未反馈</option><option>需跟进</option><option>已联系</option><option>已报价</option></select><a class="btn primary" style="margin-top:12px" href="阶段1_线索池_线索详情.html">保存分发</a></div>
+    <div class="card"><h2>分发与反馈</h2><form onsubmit="event.preventDefault();toast('分发与反馈状态已保存');"><label class="muted">销售负责人</label><select><option>Maria Chen</option><option>待分配</option></select><label class="muted">反馈状态</label><select><option>未反馈</option><option>需跟进</option><option>已联系</option><option>已报价</option></select><button class="btn primary" type="submit" style="margin-top:12px">保存分发</button></form></div>
     <div class="card"><h2>反馈历史</h2><div class="timeline"><div>Maria Chen 当前状态为未反馈，线索来自网站 / 官网聊天。</div><div>销售反馈优先于 AI 评分，但 AI 判断理由会保留在详情中。</div></div></div>
   </div></section></main>
   </div>

@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy.orm import Session
 
 from .models import Banner, Customer, CustomerBackground, Lead, SourceDictionary, User
@@ -57,6 +59,15 @@ def seed_data(db: Session) -> None:
                 source_label="官网聊天",
                 score_label="有效",
                 feedback_status="未反馈",
+                raw_inquiry="客户原文：We distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics.",
+                conversation_history=json.dumps(
+                    [
+                        "客户询问 portable ultrasound 代理组合与区域诊所应用。",
+                        "AI 追问国家、客户身份和应用场景后确认其为 Peru 代理商。",
+                        "客户表示希望三天内收到产品对比资料。"
+                    ],
+                    ensure_ascii=False,
+                ),
                 owner_id=sales.id,
             ),
             Lead(
@@ -68,6 +79,15 @@ def seed_data(db: Session) -> None:
                 source_label="官网邮箱",
                 score_label="有效",
                 feedback_status="需跟进",
+                raw_inquiry="客户原文：Our hospital is reviewing trolley ultrasound systems for emergency and radiology departments.",
+                conversation_history=json.dumps(
+                    [
+                        "邮箱询盘说明医院正在评估 trolley ultrasound。",
+                        "AI 从邮箱签名和国家字段识别 UAE Hospital。",
+                        "系统标记为需跟进，等待运营分配销售负责人。"
+                    ],
+                    ensure_ascii=False,
+                ),
                 owner_id=None,
             ),
         ]
@@ -92,4 +112,3 @@ def seed_data(db: Session) -> None:
         )
     )
     db.commit()
-

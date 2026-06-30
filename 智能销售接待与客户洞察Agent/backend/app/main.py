@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from uuid import uuid4
 
@@ -57,12 +58,63 @@ def ensure_sqlite_compatibility() -> None:
     if engine.dialect.name != "sqlite":
         return
     inspector = inspect(engine)
-    if "audit_logs" not in inspector.get_table_names():
-        return
-    column_names = {column["name"] for column in inspector.get_columns("audit_logs")}
-    if "trace_id" not in column_names:
+    table_names = inspector.get_table_names()
+    if "audit_logs" in table_names:
+        column_names = {column["name"] for column in inspector.get_columns("audit_logs")}
+        if "trace_id" not in column_names:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE audit_logs ADD COLUMN trace_id VARCHAR(64) NOT NULL DEFAULT ''"))
+    if "leads" in table_names:
+        lead_columns = {column["name"] for column in inspector.get_columns("leads")}
         with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE audit_logs ADD COLUMN trace_id VARCHAR(64) NOT NULL DEFAULT ''"))
+            if "raw_inquiry" not in lead_columns:
+                connection.execute(text("ALTER TABLE leads ADD COLUMN raw_inquiry TEXT NOT NULL DEFAULT ''"))
+            if "conversation_history" not in lead_columns:
+                connection.execute(text("ALTER TABLE leads ADD COLUMN conversation_history TEXT NOT NULL DEFAULT '[]'"))
+            connection.execute(
+                text(
+                    """
+                    UPDATE leads
+                    SET raw_inquiry = :raw_inquiry,
+                        conversation_history = :conversation_history
+                    WHERE customer_name = :customer_name
+                    """
+                ),
+                {
+                    "customer_name": "GlobalMed Peru",
+                    "raw_inquiry": "客户原文：We distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics.",
+                    "conversation_history": json.dumps(
+                        [
+                            "客户询问 portable ultrasound 代理组合与区域诊所应用。",
+                            "AI 追问国家、客户身份和应用场景后确认其为 Peru 代理商。",
+                            "客户表示希望三天内收到产品对比资料。"
+                        ],
+                        ensure_ascii=False,
+                    ),
+                },
+            )
+            connection.execute(
+                text(
+                    """
+                    UPDATE leads
+                    SET raw_inquiry = :raw_inquiry,
+                        conversation_history = :conversation_history
+                    WHERE customer_name = :customer_name
+                    """
+                ),
+                {
+                    "customer_name": "Al Noor Hospital",
+                    "raw_inquiry": "客户原文：Our hospital is reviewing trolley ultrasound systems for emergency and radiology departments.",
+                    "conversation_history": json.dumps(
+                        [
+                            "邮箱询盘说明医院正在评估 trolley ultrasound。",
+                            "AI 从邮箱签名和国家字段识别 UAE Hospital。",
+                            "系统标记为需跟进，等待运营分配销售负责人。"
+                        ],
+                        ensure_ascii=False,
+                    ),
+                },
+            )
 
 
 @app.on_event("startup")
@@ -208,14 +260,16 @@ def build_lead_detail(db: Session, lead: Lead) -> LeadDetailOut:
     feedback_text = (
         f"{owner.name if owner else '待分配'} 当前状态为 {lead.feedback_status}，线索来自 {source}。"
     )
+    try:
+        conversation_history = json.loads(lead.conversation_history or "[]")
+    except json.JSONDecodeError:
+        conversation_history = []
+    if not isinstance(conversation_history, list):
+        conversation_history = []
     return LeadDetailOut(
         **base,
-        raw_inquiry=f"{lead.customer_name} 咨询 {lead.product}，国家 {lead.country}，来源 {source}。",
-        conversation_history=[
-            f"客户表达对 {lead.product} 的采购兴趣。",
-            f"AI 已补全国家为 {lead.country}，客户类型为 {lead.customer_type}。",
-            "系统保留原始询盘、会话摘要和后续销售反馈，供人工判断。",
-        ],
+        raw_inquiry=lead.raw_inquiry,
+        conversation_history=[str(item) for item in conversation_history],
         profile_summary=LeadProfileSummary(
             customer_type=lead.customer_type,
             country=lead.country,

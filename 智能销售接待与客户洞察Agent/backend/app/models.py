@@ -52,6 +52,8 @@ class Lead(Base):
     source_label: Mapped[str] = mapped_column(String(120), nullable=False)
     score_label: Mapped[str] = mapped_column(String(40), nullable=False)
     feedback_status: Mapped[str] = mapped_column(String(80), nullable=False)
+    raw_inquiry: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    conversation_history: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

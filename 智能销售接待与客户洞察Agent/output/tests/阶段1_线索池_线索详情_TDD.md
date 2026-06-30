@@ -21,3 +21,9 @@
 - `PAGE-LEAD-DETAIL-03` 继续由 `test_lead_detail_returns_same_record_and_respects_sales_scope` 覆盖：销售账号可访问本人线索，访问他人线索返回 403。
 - 前端门禁通过 `npm.cmd run build` 覆盖类型检查与生产构建；真实详情页为 `frontend/src/pages/LeadDetailPage.tsx`，路由为 `/admin/leads/:leadId`。
 - 当前后端门禁：`py -m pytest .\tests -q` 为 16 passed；仍保留 FastAPI `on_event` 与 `datetime.utcnow` deprecation warning 作为后续技术债。
+
+### 验收风险返修覆盖（06-30-2026）
+
+- `PAGE-LEAD-DETAIL-01` 的自动化断言已加严：`raw_inquiry` 必须等于数据库持久化的客户原文，`conversation_history` 必须等于数据库持久化的会话历史数组，禁止再用列表字段拼接冒充原始询盘。
+- SQLite 兼容迁移在测试 fixture 启动前执行，确保历史本地库也具备 `raw_inquiry` 与 `conversation_history` 字段。
+- 静态 HTML 原型的“保存分发”已改为 `<button type="submit">`，不再是跳回本页的假链接。

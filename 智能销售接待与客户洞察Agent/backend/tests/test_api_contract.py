@@ -2,13 +2,15 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import delete
 
-from app.database import SessionLocal
-from app.main import app
+from app.database import Base, SessionLocal, engine
+from app.main import app, ensure_sqlite_compatibility
 from app.models import Lead, LoginAttempt
 
 
 @pytest.fixture()
 def client() -> TestClient:
+    Base.metadata.create_all(bind=engine)
+    ensure_sqlite_compatibility()
     with SessionLocal() as db:
         db.execute(delete(LoginAttempt))
         globalmed = db.query(Lead).filter(Lead.customer_name == "GlobalMed Peru").first()
@@ -116,14 +118,22 @@ def test_lead_detail_returns_same_record_and_respects_sales_scope(client: TestCl
 
 def test_lead_detail_returns_full_context_for_manual_judgement(client: TestClient) -> None:
     headers = auth_headers(client)
-    target = client.get("/api/leads", params={"page_size": 10}, headers=headers).json()["items"][0]
+    target = next(
+        item
+        for item in client.get("/api/leads", params={"page_size": 10}, headers=headers).json()["items"]
+        if item["customer_name"] == "GlobalMed Peru"
+    )
 
     response = client.get(f"/api/leads/{target['id']}", headers=headers)
     assert response.status_code == 200
     body = response.json()
 
-    assert body["raw_inquiry"]
-    assert body["conversation_history"]
+    assert body["raw_inquiry"] == "客户原文：We distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics."
+    assert body["conversation_history"] == [
+        "客户询问 portable ultrasound 代理组合与区域诊所应用。",
+        "AI 追问国家、客户身份和应用场景后确认其为 Peru 代理商。",
+        "客户表示希望三天内收到产品对比资料。"
+    ]
     assert body["profile_summary"]["customer_type"] == body["customer_type"]
     assert body["score_reasons"]
     assert body["background_summary"]

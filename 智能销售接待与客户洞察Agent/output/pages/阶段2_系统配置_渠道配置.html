@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>渠道配置</title>
+  <title>渠道与来源配置</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <style>
@@ -151,7 +151,8 @@ tr:last-child td { border-bottom: 0; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .card, .topbar, table { animation: rise-in var(--motion-base) var(--ease-standard) both; }
 @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .main { padding: var(--space-4); } .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } .topbar { flex-direction: column; } }
-@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }</style>
+@media (prefers-reduced-motion: reduce) { .card, .topbar, table { animation: none; } .btn, .card { transition: none; } }
+</style>
 </head>
 <body>
   <div class="app">
@@ -166,24 +167,53 @@ tr:last-child td { border-bottom: 0; }
         <a class="active" href="阶段1_系统配置_国家区域销售映射.html"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
-    <main class="main"><div class="topbar"><div><div class="eyebrow">阶段2 · 系统配置</div><h1>渠道配置</h1><p class="muted">维护官网聊天 Webhook、官网后台导入、邮箱同步和展会名片导入配置。</p></div><div class="filters"><button class="btn" onclick="toast('筛选已更新')"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" onclick="toast('已保存当前操作')"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-3"><div class="card"><h3>渠道</h3><input class="input" value="官网聊天 Webhook"><p class="muted">保存后记录操作人和时间。</p></div><div class="card"><h3>国家/区域</h3><input class="input" value="Mexico / Latam"><p class="muted">保存后记录操作人和时间。</p></div><div class="card"><h3>销售负责人</h3><input class="input" value="Maria Chen"><p class="muted">保存后记录操作人和时间。</p></div></section><section class="card" style="margin-top:20px"><h2>配置记录</h2><table>
-    <thead><tr><th>客户</th><th>国家</th><th>类型</th><th>产品</th><th>评分</th><th>反馈</th><th>动作</th></tr></thead>
+    <main class="main"><div class="topbar"><div><div class="eyebrow">阶段2 · 系统配置</div><h1>渠道与来源配置</h1><p class="muted">维护官网聊天 Webhook、官网后台导入、邮箱同步、展会名片导入配置，并管理客户来源字典。</p></div><div class="filters"><button class="btn" data-new-source><i class="ph ph-plus"></i>新增来源</button><button class="btn primary" onclick="toast('来源配置已保存')"><i class="ph ph-check"></i>保存配置</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
+    <div class="card metric status-line"><span class="muted">一级来源</span><strong>5</strong><span class="badge success">启用中</span></div>
+    <div class="card metric status-line"><span class="muted">具体来源</span><strong>7</strong><span class="badge accent">可映射</span></div>
+    <div class="card metric status-line"><span class="muted">待处理</span><strong>2</strong><span class="badge warn">导入字段</span></div>
+    <div class="card metric status-line"><span class="muted">历史保护</span><strong>ON</strong><span class="badge success">保留快照</span></div>
+  </section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>新增/编辑来源</h2><div class="grid grid-2"><label><span class="muted">显示名称</span><input class="input" data-source-name value="社媒"></label><label><span class="muted">系统键</span><input class="input" data-source-key value="social"></label><label><span class="muted">来源层级</span><select data-source-level><option>一级来源</option><option>具体来源</option></select></label><label><span class="muted">归属一级来源</span><select data-source-parent><option>无</option><option>网站</option><option>邮箱</option><option>社媒</option><option>线下展会</option><option>其他</option></select></label></div><div class="filters" style="margin-top:16px"><button class="btn primary" onclick="toast('已保存来源字典，线索池筛选将同步更新')">保存来源</button><button class="btn" onclick="toast('已生成一条停用确认记录')">停用来源</button></div><p class="muted" style="margin-top:12px">已被历史线索引用的来源不可硬删除，只能停用；历史线索继续展示保存时的来源快照。</p></div><div class="card"><h2>接入参数</h2><div class="grid grid-2"><label><span class="muted">官网聊天 Webhook</span><input class="input" value="https://api.example.com/inquiry/webhook"></label><label><span class="muted">邮箱同步</span><input class="input" value="sales@company.com"></label><label><span class="muted">展会导入模板</span><input class="input" value="Expo Lead CSV v2"></label><label><span class="muted">默认未知来源</span><select><option>其他 / 人工补充</option><option>网站 / 官网后台</option></select></label></div></div></section><section class="card" style="margin-top:20px"><h2>一级来源字典</h2><table>
+    <thead><tr><th>显示名称</th><th>系统键</th><th>具体来源</th><th>状态</th><th>排序</th><th>更新时间</th><th>动作</th></tr></thead>
     <tbody>
-      <tr><td>GlobalMed Peru</td><td>Peru</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>未反馈</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Sofia Ramirez</td><td>Mexico</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge accent">高意向</span></td><td>已联系</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Al Noor Hospital</td><td>UAE</td><td>Hospital</td><td>Trolley Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Clinica Andes</td><td>Chile</td><td>Clinic</td><td>Sonos Max</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>MedSupply Africa</td><td>Kenya</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge warn">资料库</span></td><td>已报价</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Ahmed Khan</td><td>Saudi Arabia</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>已联系</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Nordic Vet Care</td><td>Sweden</td><td>Clinic</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Latam Imaging SA</td><td>Colombia</td><td>代理商</td><td>Trolley Ultrasound</td><td><span class="badge accent">高意向</span></td><td>未反馈</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>CardioPoint</td><td>Brazil</td><td>Hospital</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>已报价</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Elena Ruiz</td><td>Spain</td><td>Doctor</td><td>Sonos I</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
+      <tr><td>网站</td><td>website</td><td>官网聊天、官网后台</td><td><span class="badge success">启用</span></td><td>1</td><td>06-30 10:54</td><td><button class="btn" data-source-edit data-name="网站" data-key="website">编辑</button></td></tr>
+      <tr><td>邮箱</td><td>email</td><td>官网邮箱、邮件同步</td><td><span class="badge success">启用</span></td><td>2</td><td>06-30 10:54</td><td><button class="btn" data-source-edit data-name="邮箱" data-key="email">编辑</button></td></tr>
+      <tr><td>社媒</td><td>social</td><td>Facebook、领英</td><td><span class="badge success">启用</span></td><td>3</td><td>06-30 10:54</td><td><button class="btn" data-source-edit data-name="社媒" data-key="social">编辑</button></td></tr>
+      <tr><td>线下展会</td><td>expo</td><td>展会导入</td><td><span class="badge success">启用</span></td><td>4</td><td>06-30 10:54</td><td><button class="btn" data-source-edit data-name="线下展会" data-key="expo">编辑</button></td></tr>
+      <tr><td>其他</td><td>other</td><td>人工补充、未知来源</td><td><span class="badge success">启用</span></td><td>5</td><td>06-30 10:54</td><td><button class="btn" data-source-edit data-name="其他" data-key="other">编辑</button></td></tr>
     </tbody>
-  </table></section></main>
+  </table></section><section class="card" style="margin-top:20px"><h2>具体来源映射</h2><table>
+    <thead><tr><th>具体来源</th><th>归属一级来源</th><th>接入方式</th><th>用于筛选</th><th>动作</th></tr></thead>
+    <tbody>
+      <tr><td>官网聊天</td><td>网站</td><td>Webhook/API</td><td><span class="badge success">是</span></td><td><button class="btn">编辑</button></td></tr>
+      <tr><td>官网后台</td><td>网站</td><td>CSV/Excel 导入</td><td><span class="badge success">是</span></td><td><button class="btn">编辑</button></td></tr>
+      <tr><td>Facebook</td><td>社媒</td><td>手工导入/授权归档</td><td><span class="badge success">是</span></td><td><button class="btn">编辑</button></td></tr>
+      <tr><td>领英</td><td>社媒</td><td>手工导入/授权归档</td><td><span class="badge success">是</span></td><td><button class="btn">编辑</button></td></tr>
+      <tr><td>展会导入</td><td>线下展会</td><td>CSV/Excel 导入</td><td><span class="badge success">是</span></td><td><button class="btn">编辑</button></td></tr>
+    </tbody>
+  </table></section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>影响范围</h2><div class="timeline"><div>线索池筛选读取启用来源</div><div>渠道导入按具体来源映射归类</div><div>报表按 source_group_id 聚合</div><div>历史线索展示 source_snapshot</div></div></div><div class="card"><h2>最近变更</h2><div class="timeline"><div>Alice 启用“其他 / 人工补充”</div><div>Alice 将 Facebook 归入“社媒”</div><div>系统初始化 5 个一级来源</div></div></div></section></main>
   </div>
   <script>
     function toast(text){var n=document.querySelector('[data-toast]'); if(n){n.textContent=text || '操作已保存';}}
+    (function(){
+      var nameInput = document.querySelector('[data-source-name]');
+      var keyInput = document.querySelector('[data-source-key]');
+      var newButton = document.querySelector('[data-new-source]');
+      var editButtons = Array.prototype.slice.call(document.querySelectorAll('[data-source-edit]'));
+      if (newButton) {
+        newButton.addEventListener('click', function(){
+          if (nameInput) nameInput.value = '';
+          if (keyInput) keyInput.value = '';
+          toast('请输入新的来源名称和系统键');
+        });
+      }
+      editButtons.forEach(function(button){
+        button.addEventListener('click', function(){
+          if (nameInput) nameInput.value = button.dataset.name || '';
+          if (keyInput) keyInput.value = button.dataset.key || '';
+          toast('已载入“' + (button.dataset.name || '来源') + '”配置');
+        });
+      });
+    })();
   </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!DOCTYPE html>`r`n<!-- GOAL: visual blueprint only; production behavior runs in React routes and FastAPI APIs. -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -163,26 +163,24 @@ tr:last-child td { border-bottom: 0; }
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark"><i class="ph ph-activity"></i></div><div>Ultrasound<br>Growth</div></div>
       <nav class="nav">
-        <a class="" href="阶段1_工作台_工作台首页.html"><i class="ph ph-caret-right"></i>工作台</a>
-        <a class="" href="阶段1_线索池_线索池列表.html"><i class="ph ph-caret-right"></i>线索池</a>
-        <a class="" href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
-        <a class="active" href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
-        <a class="" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a class="" href="/admin/dashboard"><i class="ph ph-caret-right"></i>工作台</a>
+        <a class="" href="/admin/leads"><i class="ph ph-caret-right"></i>线索池</a>
+        <a class="" href="/admin/customers"><i class="ph ph-caret-right"></i>客户池</a>
+        <a class="active" href="/admin/reports"><i class="ph ph-caret-right"></i>报表</a>
+        <a class="" href="/admin/nurture"><i class="ph ph-caret-right"></i>再营销</a>
+        <a class="" href="/admin/settings"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
     <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
   <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
-  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
-</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 报表中心</div><h1>导出确认弹窗</h1><p class="muted">确认导出周期、字段、脱敏策略和不包含成交金额/报价金额。</p></div><div class="filters"><button class="btn" onclick="toast('筛选已更新')"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" onclick="toast('已保存当前操作')"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
+  <a class="banner-action" href="/admin/settings">管理 Banner</a>
+</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 报表中心</div><h1>导出确认弹窗</h1><p class="muted">确认导出周期、字段、脱敏策略和不包含成交金额/报价金额。</p></div><div class="filters"><button class="btn" data-prototype-action="visual-only"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
     <div class="card metric status-line"><span class="muted">今日询盘</span><strong>42</strong><span class="badge accent">官网 18</span></div>
     <div class="card metric status-line"><span class="muted">有效线索</span><strong>26</strong><span class="badge success">62%</span></div>
     <div class="card metric status-line"><span class="muted">未反馈</span><strong>11</strong><span class="badge warn">48h 3 条</span></div>
     <div class="card metric status-line"><span class="muted">官网 KPI</span><strong>71%</strong><span class="badge accent">可归因率</span></div>
-  </section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>渠道质量</h2><table><tbody><tr><td>官网</td><td>18 条</td><td>有效率 72%</td></tr><tr><td>邮箱</td><td>11 条</td><td>有效率 55%</td></tr><tr><td>展会名片</td><td>8 条</td><td>有效率 63%</td></tr><tr><td>官网后台</td><td>5 条</td><td>有效率 60%</td></tr></tbody></table></div><div class="card"><h2>官网 KPI</h2><div class="timeline"><div>首次响应 P50：38 秒</div><div>AI 补全率：64%</div><div>分发时效 P50：6 分钟</div><div>销售反馈率：58%</div><div>进入客户池：12 条</div></div></div></section><section class="toolbar"><a class="btn" href="阶段1_报表中心_周期报表视图.html">查看周期报表</a><a class="btn" href="阶段1_报表中心_指标明细.html">查看指标明细</a><a class="btn primary" href="阶段1_报表中心_导出确认弹窗.html">导出</a></section></main>
+  </section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>渠道质量</h2><table><tbody><tr><td>官网</td><td>18 条</td><td>有效率 72%</td></tr><tr><td>邮箱</td><td>11 条</td><td>有效率 55%</td></tr><tr><td>展会名片</td><td>8 条</td><td>有效率 63%</td></tr><tr><td>官网后台</td><td>5 条</td><td>有效率 60%</td></tr></tbody></table></div><div class="card"><h2>官网 KPI</h2><div class="timeline"><div>首次响应 P50：38 秒</div><div>AI 补全率：64%</div><div>分发时效 P50：6 分钟</div><div>销售反馈率：58%</div><div>进入客户池：12 条</div></div></div></section><section class="toolbar"><a class="btn" href="/admin/reports/period">查看周期报表</a><a class="btn" href="/admin/reports/metrics">查看指标明细</a><a class="btn primary" href="/admin/reports/export">导出</a></section></main>
   </div>
-  <script>
-    function toast(text){var n=document.querySelector('[data-toast]'); if(n){n.textContent=text || '操作已保存';}}
-  </script>
+
 </body>
 </html>

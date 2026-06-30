@@ -393,6 +393,20 @@ body {
   gap: 18px;
 }
 
+.nurture-prompt-panel,
+.nurture-upload-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e6ebf4;
+}
+
+.nurture-upload-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .mapping-form-card {
   position: sticky;
   top: 104px;
@@ -492,5 +506,10 @@ body {
 
   .knowledge-form-card {
     position: static;
+  }
+
+  .nurture-upload-panel {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

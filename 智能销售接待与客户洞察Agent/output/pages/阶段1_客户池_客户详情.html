@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!DOCTYPE html>`r`n<!-- GOAL: visual blueprint only; production behavior runs in React routes and FastAPI APIs. -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -163,40 +163,38 @@ tr:last-child td { border-bottom: 0; }
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark"><i class="ph ph-activity"></i></div><div>Ultrasound<br>Growth</div></div>
       <nav class="nav">
-        <a class="" href="阶段1_工作台_工作台首页.html"><i class="ph ph-caret-right"></i>工作台</a>
-        <a class="" href="阶段1_线索池_线索池列表.html"><i class="ph ph-caret-right"></i>线索池</a>
-        <a class="active" href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
-        <a class="" href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
-        <a class="" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a class="" href="/admin/dashboard"><i class="ph ph-caret-right"></i>工作台</a>
+        <a class="" href="/admin/leads"><i class="ph ph-caret-right"></i>线索池</a>
+        <a class="active" href="/admin/customers"><i class="ph ph-caret-right"></i>客户池</a>
+        <a class="" href="/admin/reports"><i class="ph ph-caret-right"></i>报表</a>
+        <a class="" href="/admin/nurture"><i class="ph ph-caret-right"></i>再营销</a>
+        <a class="" href="/admin/settings"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
     <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
   <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
-  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
-</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 客户池</div><h1>客户详情</h1><p class="muted">聚合客户历史线索、反馈、状态变化、再营销记录和态势信号。</p></div><div class="filters"><button class="btn" onclick="toast('筛选已更新')"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" onclick="toast('已保存当前操作')"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
+  <a class="banner-action" href="/admin/settings">管理 Banner</a>
+</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 客户池</div><h1>客户详情</h1><p class="muted">聚合客户历史线索、反馈、状态变化、再营销记录和态势信号。</p></div><div class="filters"><button class="btn" data-prototype-action="visual-only"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="grid grid-4">
     <div class="card metric status-line"><span class="muted">今日询盘</span><strong>42</strong><span class="badge accent">官网 18</span></div>
     <div class="card metric status-line"><span class="muted">有效线索</span><strong>26</strong><span class="badge success">62%</span></div>
     <div class="card metric status-line"><span class="muted">未反馈</span><strong>11</strong><span class="badge warn">48h 3 条</span></div>
     <div class="card metric status-line"><span class="muted">官网 KPI</span><strong>71%</strong><span class="badge accent">可归因率</span></div>
-  </section><section class="grid grid-2" style="margin-top:20px"><div class="card"><div class="toolbar" style="margin:0 0 12px"><div><h2>客户背景调查</h2><p class="muted">系统导入客户后，自动结合客户官网公开信息、邮箱域名、历史邮件互动和人工补充生成，可由授权人员修改。</p></div><span class="badge success">可信度 82%</span></div><textarea class="input" rows="8">GlobalMed Peru 是位于秘鲁 Lima 的医疗设备代理商，官网公开信息显示其覆盖 IVD、影像和基础诊断设备渠道。邮箱域名与公司网站一致，历史邮件中多次提到为区域诊所寻找便携式超声设备。当前 Portable Ultrasound 需求与其渠道能力匹配，建议按代理商客户持续跟进，并补充其现有超声品牌代理情况。</textarea><div class="filters" style="margin-top:12px"><button class="btn primary" onclick="toast('客户背景调查已保存，系统记录人工修改来源')"><i class="ph ph-floppy-disk"></i>保存人工修改</button><button class="btn" onclick="toast('已重新触发客户背景调查任务')"><i class="ph ph-arrows-clockwise"></i>重新生成</button></div></div><div class="card"><h2>调查来源与证据</h2><table><thead><tr><th>来源</th><th>内容</th><th>状态</th></tr></thead><tbody><tr><td>客户官网</td><td>公开产品线、公司地址、渠道覆盖说明</td><td><span class="badge success">已引用</span></td></tr><tr><td>邮箱域名</td><td>globalmed.pe 与联系人邮箱域名一致</td><td><span class="badge success">已验证</span></td></tr><tr><td>历史邮件</td><td>提到区域诊所便携式超声采购需求</td><td><span class="badge accent">已摘要</span></td></tr><tr><td>人工补充</td><td>销售备注：可转代理商跟进</td><td><span class="badge warn">需复核</span></td></tr></tbody></table><p class="muted" style="margin-top:12px">最近生成：2026-06-30 10:40；最近人工修改：Maria Chen，2026-06-30 11:12。</p></div></section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>客户摘要</h2><p>GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。</p><div class="timeline"><div>已报价未回复，建议 3 天后再营销</div><div>客户官网显示新增 Lima 分部</div><div>销售反馈：可转代理商跟进</div></div></div><div class="card"><h2>再营销草稿</h2><textarea class="input" rows="7">Hi Carlos, based on your interest in portable ultrasound for regional clinics, we prepared a short comparison for your team...</textarea><button class="btn primary" onclick="toast('草稿已确认，等待邮件发送')">人工确认发送</button></div></section><section class="card" style="margin-top:20px"><table>
+  </section><section class="grid grid-2" style="margin-top:20px"><div class="card"><div class="toolbar" style="margin:0 0 12px"><div><h2>客户背景调查</h2><p class="muted">系统导入客户后，自动结合客户官网公开信息、邮箱域名、历史邮件互动和人工补充生成，可由授权人员修改。</p></div><span class="badge success">可信度 82%</span></div><textarea class="input" rows="8">GlobalMed Peru 是位于秘鲁 Lima 的医疗设备代理商，官网公开信息显示其覆盖 IVD、影像和基础诊断设备渠道。邮箱域名与公司网站一致，历史邮件中多次提到为区域诊所寻找便携式超声设备。当前 Portable Ultrasound 需求与其渠道能力匹配，建议按代理商客户持续跟进，并补充其现有超声品牌代理情况。</textarea><div class="filters" style="margin-top:12px"><button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-floppy-disk"></i>保存人工修改</button><button class="btn" data-prototype-action="visual-only"><i class="ph ph-arrows-clockwise"></i>重新生成</button></div></div><div class="card"><h2>调查来源与证据</h2><table><thead><tr><th>来源</th><th>内容</th><th>状态</th></tr></thead><tbody><tr><td>客户官网</td><td>公开产品线、公司地址、渠道覆盖说明</td><td><span class="badge success">已引用</span></td></tr><tr><td>邮箱域名</td><td>globalmed.pe 与联系人邮箱域名一致</td><td><span class="badge success">已验证</span></td></tr><tr><td>历史邮件</td><td>提到区域诊所便携式超声采购需求</td><td><span class="badge accent">已摘要</span></td></tr><tr><td>人工补充</td><td>销售备注：可转代理商跟进</td><td><span class="badge warn">需复核</span></td></tr></tbody></table><p class="muted" style="margin-top:12px">最近生成：2026-06-30 10:40；最近人工修改：Maria Chen，2026-06-30 11:12。</p></div></section><section class="grid grid-2" style="margin-top:20px"><div class="card"><h2>客户摘要</h2><p>GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。</p><div class="timeline"><div>已报价未回复，建议 3 天后再营销</div><div>客户官网显示新增 Lima 分部</div><div>销售反馈：可转代理商跟进</div></div></div><div class="card"><h2>再营销草稿</h2><textarea class="input" rows="7">Hi Carlos, based on your interest in portable ultrasound for regional clinics, we prepared a short comparison for your team...</textarea><button class="btn primary" data-prototype-action="visual-only">人工确认发送</button></div></section><section class="card" style="margin-top:20px"><table>
     <thead><tr><th>客户</th><th>国家</th><th>类型</th><th>产品</th><th>评分</th><th>反馈</th><th>动作</th></tr></thead>
     <tbody>
-      <tr><td>GlobalMed Peru</td><td>Peru</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>未反馈</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Sofia Ramirez</td><td>Mexico</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge accent">高意向</span></td><td>已联系</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Al Noor Hospital</td><td>UAE</td><td>Hospital</td><td>Trolley Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Clinica Andes</td><td>Chile</td><td>Clinic</td><td>Sonos Max</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>MedSupply Africa</td><td>Kenya</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge warn">资料库</span></td><td>已报价</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Ahmed Khan</td><td>Saudi Arabia</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>已联系</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Nordic Vet Care</td><td>Sweden</td><td>Clinic</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Latam Imaging SA</td><td>Colombia</td><td>代理商</td><td>Trolley Ultrasound</td><td><span class="badge accent">高意向</span></td><td>未反馈</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>CardioPoint</td><td>Brazil</td><td>Hospital</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>已报价</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
-      <tr><td>Dr. Elena Ruiz</td><td>Spain</td><td>Doctor</td><td>Sonos I</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="阶段1_线索池_线索详情.html">查看详情</a></td></tr>
+      <tr><td>GlobalMed Peru</td><td>Peru</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>未反馈</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>Dr. Sofia Ramirez</td><td>Mexico</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge accent">高意向</span></td><td>已联系</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>Al Noor Hospital</td><td>UAE</td><td>Hospital</td><td>Trolley Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>Clinica Andes</td><td>Chile</td><td>Clinic</td><td>Sonos Max</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>MedSupply Africa</td><td>Kenya</td><td>代理商</td><td>Portable Ultrasound</td><td><span class="badge warn">资料库</span></td><td>已报价</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>Dr. Ahmed Khan</td><td>Saudi Arabia</td><td>Doctor</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>已联系</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>Nordic Vet Care</td><td>Sweden</td><td>Clinic</td><td>Handheld Ultrasound</td><td><span class="badge success">有效</span></td><td>需跟进</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>Latam Imaging SA</td><td>Colombia</td><td>代理商</td><td>Trolley Ultrasound</td><td><span class="badge accent">高意向</span></td><td>未反馈</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>CardioPoint</td><td>Brazil</td><td>Hospital</td><td>Portable Ultrasound</td><td><span class="badge success">有效</span></td><td>已报价</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
+      <tr><td>Dr. Elena Ruiz</td><td>Spain</td><td>Doctor</td><td>Sonos I</td><td><span class="badge warn">待补充</span></td><td>未分发</td><td><a class="btn" href="/admin/leads/1">查看详情</a></td></tr>
     </tbody>
   </table></section></main>
   </div>
-  <script>
-    function toast(text){var n=document.querySelector('[data-toast]'); if(n){n.textContent=text || '操作已保存';}}
-  </script>
+
 </body>
 </html>

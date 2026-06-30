@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!DOCTYPE html>`r`n<!-- GOAL: visual blueprint only; production behavior runs in React routes and FastAPI APIs. -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -163,18 +163,18 @@ tr:last-child td { border-bottom: 0; }
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark"><i class="ph ph-activity"></i></div><div>Ultrasound<br>Growth</div></div>
       <nav class="nav">
-        <a class="" href="阶段1_工作台_工作台首页.html"><i class="ph ph-caret-right"></i>工作台</a>
-        <a class="active" href="阶段1_线索池_线索池列表.html"><i class="ph ph-caret-right"></i>线索池</a>
-        <a class="" href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
-        <a class="" href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
-        <a class="" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a class="" href="/admin/dashboard"><i class="ph ph-caret-right"></i>工作台</a>
+        <a class="active" href="/admin/leads"><i class="ph ph-caret-right"></i>线索池</a>
+        <a class="" href="/admin/customers"><i class="ph ph-caret-right"></i>客户池</a>
+        <a class="" href="/admin/reports"><i class="ph ph-caret-right"></i>报表</a>
+        <a class="" href="/admin/nurture"><i class="ph ph-caret-right"></i>再营销</a>
+        <a class="" href="/admin/settings"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
     <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
   <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
-  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
-</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 线索池</div><h1>GlobalMed Peru</h1><p class="muted">Peru · 代理商 · Portable Ultrasound · 网站 / 官网聊天</p></div><div class="filters"><a class="btn" href="阶段1_线索池_线索池列表.html"><i class="ph ph-arrow-left"></i>返回线索池</a><a class="btn" href="阶段1_客户池_客户详情.html">查看客户详情</a></div></div><section class="grid grid-4">
+  <a class="banner-action" href="/admin/settings">管理 Banner</a>
+</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 线索池</div><h1>GlobalMed Peru</h1><p class="muted">Peru · 代理商 · Portable Ultrasound · 网站 / 官网聊天</p></div><div class="filters"><a class="btn" href="/admin/leads"><i class="ph ph-arrow-left"></i>返回线索池</a><a class="btn" href="/admin/customers/1">查看客户详情</a></div></div><section class="grid grid-4">
     <div class="card metric status-line"><span class="muted">评分</span><strong>有效</strong><span class="badge success">身份与需求明确</span></div>
     <div class="card metric status-line"><span class="muted">负责人</span><strong>Maria</strong><span class="badge accent">Latam</span></div>
     <div class="card metric status-line"><span class="muted">反馈状态</span><strong>未反馈</strong><span class="badge warn">18 小时</span></div>
@@ -185,12 +185,10 @@ tr:last-child td { border-bottom: 0; }
     <div class="card"><h2>客户画像与评分理由</h2><div class="timeline"><div>客户类型：代理商</div><div>产品兴趣：Portable Ultrasound</div><div>国家字段完整，可进入销售分发规则。</div></div></div>
   </div><div class="grid">
     <div class="card"><h2>客户背景调查摘要</h2><p>GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。</p><span class="badge success">可信度：高</span></div>
-    <div class="card"><h2>分发与反馈</h2><form onsubmit="event.preventDefault();toast('分发与反馈状态已保存');"><label class="muted">销售负责人</label><select><option>Maria Chen</option><option>待分配</option></select><label class="muted">反馈状态</label><select><option>未反馈</option><option>需跟进</option><option>已联系</option><option>已报价</option></select><button class="btn primary" type="submit" style="margin-top:12px">保存分发</button></form></div>
+    <div class="card"><h2>分发与反馈</h2><form data-prototype-form="visual-only"><label class="muted">销售负责人</label><select><option>Maria Chen</option><option>待分配</option></select><label class="muted">反馈状态</label><select><option>未反馈</option><option>需跟进</option><option>已联系</option><option>已报价</option></select><button class="btn primary" type="submit" style="margin-top:12px">保存分发</button></form></div>
     <div class="card"><h2>反馈历史</h2><div class="timeline"><div>Maria Chen 当前状态为未反馈，线索来自网站 / 官网聊天。</div><div>销售反馈优先于 AI 评分，但 AI 判断理由会保留在详情中。</div></div></div>
   </div></section></main>
   </div>
-  <script>
-    function toast(text){var n=document.querySelector('[data-toast]'); if(n){n.textContent=text || '操作已保存';}}
-  </script>
+
 </body>
 </html>

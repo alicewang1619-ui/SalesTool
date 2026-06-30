@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!DOCTYPE html>`r`n<!-- GOAL: visual blueprint only; production behavior runs in React routes and FastAPI APIs. -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -163,21 +163,19 @@ tr:last-child td { border-bottom: 0; }
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark"><i class="ph ph-activity"></i></div><div>Ultrasound<br>Growth</div></div>
       <nav class="nav">
-        <a class="active" href="阶段1_工作台_工作台首页.html"><i class="ph ph-caret-right"></i>工作台</a>
-        <a class="" href="阶段1_线索池_线索池列表.html"><i class="ph ph-caret-right"></i>线索池</a>
-        <a class="" href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
-        <a class="" href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
-        <a class="" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a class="active" href="/admin/dashboard"><i class="ph ph-caret-right"></i>工作台</a>
+        <a class="" href="/admin/leads"><i class="ph ph-caret-right"></i>线索池</a>
+        <a class="" href="/admin/customers"><i class="ph ph-caret-right"></i>客户池</a>
+        <a class="" href="/admin/reports"><i class="ph ph-caret-right"></i>报表</a>
+        <a class="" href="/admin/nurture"><i class="ph ph-caret-right"></i>再营销</a>
+        <a class="" href="/admin/settings"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
     <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
   <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
-  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
+  <a class="banner-action" href="/admin/settings">管理 Banner</a>
 </section><div class="grid grid-2" style="min-height: calc(100vh - 96px); align-items:center"><section><div class="eyebrow">Ultrasound Sales Growth</div><h1>智能销售接待与客户洞察 Agent</h1><p class="muted">把官网、邮箱和展会名片里的询盘收进一个可反馈、可报表、可再营销的闭环。</p></section><section class="card"><h2>登录后台</h2><div class="status-line" data-login-error aria-live="assertive" style="margin-bottom:16px;color:var(--muted)">请输入后台账号和密码；登录失败或会话过期时在此显示原因。</div><label>账号<input class="input" placeholder="name@company.com" autocomplete="username"></label><label>密码<input class="input" type="password" placeholder="请输入密码" autocomplete="current-password"></label><button class="btn primary" style="width:100%;margin-top:16px">登录</button></section></div></main>
   </div>
-  <script>
-    function toast(text){var n=document.querySelector('[data-toast]'); if(n){n.textContent=text || '操作已保存';}}
-  </script>
+
 </body>
 </html>

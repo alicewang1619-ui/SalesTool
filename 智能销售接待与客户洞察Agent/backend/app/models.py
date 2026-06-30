@@ -178,6 +178,28 @@ class CustomerBackground(Base):
     customer: Mapped[Customer] = relationship(back_populates="background")
 
 
+class NurtureTask(Base):
+    __tablename__ = "nurture_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+    recommended_next_action: Mapped[str] = mapped_column(Text, nullable=False)
+    customer_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    nurture_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    draft_content: Mapped[str] = mapped_column(Text, nullable=False)
+    generation_prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    prompt_context_snapshot: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    attachment_refs: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    model_provider: Mapped[str] = mapped_column(String(80), nullable=False, default="ultrasound_growth_llm")
+    model_version: Mapped[str] = mapped_column(String(80), nullable=False, default="nurture-draft-v1")
+    approval_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    confirmed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

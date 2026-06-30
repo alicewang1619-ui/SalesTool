@@ -585,6 +585,60 @@ export type ForbiddenContext = {
   support_action: string;
 };
 
+export type NurtureAttachment = {
+  filename: string;
+  content_type: string;
+  size: number;
+  uploaded_by: string;
+  uploaded_at: string;
+};
+
+export type NurturePromptContext = {
+  safety_boundary: string;
+  customer_summary: string;
+  customer_background: string;
+  customer_note: string;
+  sales_feedback: string[];
+  recommended_next_action: string;
+  attachments: NurtureAttachment[];
+  rendered_prompt: string;
+};
+
+export type NurtureTask = {
+  id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_tier: string;
+  product: string;
+  owner_name: string;
+  recommended_next_action: string;
+  customer_note: string;
+  nurture_reason: string;
+  draft_content: string;
+  generation_prompt: string;
+  prompt_context_snapshot: NurturePromptContext;
+  attachments: NurtureAttachment[];
+  model_provider: string;
+  model_version: string;
+  approval_status: "pending" | "confirmed" | "cancelled";
+  detail_path: string;
+  customer_detail_path: string;
+  updated_at: string;
+};
+
+export type NurtureTaskPageResult = {
+  page: number;
+  page_size: number;
+  total: number;
+  summary: Record<string, number>;
+  items: NurtureTask[];
+  empty_state?: {
+    title: string;
+    action_label: string;
+    action_path: string;
+  } | null;
+};
+
 const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET ?? "").trim();
 const API_BASE = import.meta.env.DEV && DEV_PROXY_TARGET ? "" : (import.meta.env.VITE_API_BASE ?? "").trim();
 
@@ -928,6 +982,65 @@ export function updateCustomerBackground(customerId: string, manualSummary: stri
   return request<Customer>(`/api/customers/${customerId}/background`, {
     method: "PUT",
     body: JSON.stringify({ manual_summary: manualSummary })
+  });
+}
+
+export function fetchNurtureTasks(filters: {
+  status?: string;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<NurtureTaskPageResult> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20)
+  });
+  if (filters.status) params.set("status", filters.status);
+  return request<NurtureTaskPageResult>(`/api/nurture-tasks?${params.toString()}`);
+}
+
+export function fetchNurtureTask(taskId: string): Promise<NurtureTask> {
+  return request<NurtureTask>(`/api/nurture-tasks/${taskId}`);
+}
+
+export function updateNurtureTask(
+  taskId: number,
+  payload: {
+    recommendedNextAction: string;
+    customerNote: string;
+    nurtureReason: string;
+    draftContent: string;
+    generationPrompt: string;
+  }
+): Promise<NurtureTask> {
+  return request<NurtureTask>(`/api/nurture-tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      recommended_next_action: payload.recommendedNextAction,
+      customer_note: payload.customerNote,
+      nurture_reason: payload.nurtureReason,
+      draft_content: payload.draftContent,
+      generation_prompt: payload.generationPrompt
+    })
+  });
+}
+
+export function uploadNurtureAttachment(taskId: number, file: File): Promise<NurtureTask> {
+  const body = new FormData();
+  body.append("file", file);
+  return requestForm<NurtureTask>(`/api/nurture-tasks/${taskId}/attachments`, body);
+}
+
+export function regenerateNurtureTask(taskId: number, generationPrompt: string): Promise<NurtureTask> {
+  return request<NurtureTask>(`/api/nurture-tasks/${taskId}/regenerate`, {
+    method: "POST",
+    body: JSON.stringify({ generation_prompt: generationPrompt })
+  });
+}
+
+export function confirmNurtureTask(taskId: number, draftContent: string): Promise<NurtureTask> {
+  return request<NurtureTask>(`/api/nurture-tasks/${taskId}/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ draft_content: draftContent })
   });
 }
 

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!DOCTYPE html>`r`n<!-- GOAL: visual blueprint only; production behavior runs in React routes and FastAPI APIs. -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -76,18 +76,18 @@
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark"><i class="ph ph-activity"></i></div><div>Ultrasound<br>Growth</div></div>
       <nav class="nav">
-        <a href="阶段1_工作台_工作台首页.html"><i class="ph ph-caret-right"></i>工作台</a>
-        <a href="阶段1_线索池_线索池列表.html"><i class="ph ph-caret-right"></i>线索池</a>
-        <a href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
-        <a href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
-        <a href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="active" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a href="/admin/dashboard"><i class="ph ph-caret-right"></i>工作台</a>
+        <a href="/admin/leads"><i class="ph ph-caret-right"></i>线索池</a>
+        <a href="/admin/customers"><i class="ph ph-caret-right"></i>客户池</a>
+        <a href="/admin/reports"><i class="ph ph-caret-right"></i>报表</a>
+        <a href="/admin/nurture"><i class="ph ph-caret-right"></i>再营销</a>
+        <a class="active" href="/admin/settings"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
 
     <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
   <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
-  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
+  <a class="banner-action" href="/admin/settings">管理 Banner</a>
 </section>
       <div class="topbar">
         <div>
@@ -96,9 +96,9 @@
           <p class="muted">集中维护销售账号、角色权限、国家区域销售映射、产品知识库、渠道导入和提醒规则。</p>
         </div>
         <div class="actions">
-          <button class="btn" onclick="toast('已打开账号导入模板')"><i class="ph ph-upload-simple"></i>导入账号</button>
-          <button class="btn" onclick="toast('已进入审计日志筛选')"><i class="ph ph-clock-counter-clockwise"></i>审计日志</button>
-          <button class="btn primary" onclick="toast('新增销售表单已打开')"><i class="ph ph-user-plus"></i>新增销售</button>
+          <button class="btn" data-prototype-action="visual-only"><i class="ph ph-upload-simple"></i>导入账号</button>
+          <button class="btn" data-prototype-action="visual-only"><i class="ph ph-clock-counter-clockwise"></i>审计日志</button>
+          <button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-user-plus"></i>新增销售</button>
         </div>
       </div>
       <div data-toast class="toast"></div>
@@ -116,16 +116,16 @@
               <label class="muted" style="display:block;margin-top:12px">标题文案</label>
               <input class="input" value="Ultrasound Growth 管理后台">
               <label class="muted" style="display:block;margin-top:12px">跳转链接</label>
-              <input class="input" value="阶段1_系统配置_设置管理.html">
+              <input class="input" value="/admin/settings">
             </div>
             <div>
               <div id="bannerPreview" class="global-banner" style="position:relative;margin:0;min-height:150px;border-radius:8px;overflow:hidden">
                 <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告。</span></div>
-                <a class="banner-action" href="阶段1_系统配置_设置管理.html">查看详情</a>
+                <a class="banner-action" href="/admin/settings">查看详情</a>
               </div>
               <div class="filters" style="margin-top:12px">
-                <button class="btn" onclick="toast('Banner 已保存为草稿')"><i class="ph ph-floppy-disk"></i>保存草稿</button>
-                <button class="btn primary" onclick="toast('Banner 已发布到全部页面')"><i class="ph ph-broadcast"></i>发布到全部页面</button>
+                <button class="btn" data-prototype-action="visual-only"><i class="ph ph-floppy-disk"></i>保存草稿</button>
+                <button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-broadcast"></i>发布到全部页面</button>
               </div>
             </div>
           </div>
@@ -152,10 +152,10 @@
           <span class="pill warn"><i class="ph ph-warning-circle"></i>3 项配置需处理</span>
         </div>
         <div class="grid grid-4">
-          <a class="card link-card" href="阶段2_系统配置_账号权限.html"><h3><i class="ph ph-users-three"></i> 账号与权限</h3><p class="muted">销售、管理员、角色权限、登录安全。</p><span class="pill accent">38 个账号</span></a>
-          <a class="card link-card" href="阶段1_系统配置_国家区域销售映射.html"><h3><i class="ph ph-map-trifold"></i> 销售分发</h3><p class="muted">国家、区域、销售负责人和待分配规则。</p><span class="pill warn">6 个国家缺负责人</span></a>
-          <a class="card link-card" href="阶段1_系统配置_产品知识库.html"><h3><i class="ph ph-books"></i> 产品与 AI</h3><p class="muted">产品知识库、接待 Playbook、评分规则。</p><span class="pill ok">知识库已更新</span></a>
-          <a class="card link-card" href="阶段2_系统配置_渠道配置.html"><h3><i class="ph ph-plugs-connected"></i> 渠道与提醒</h3><p class="muted">Webhook、邮箱同步、展会导入和未反馈提醒。</p><span class="pill danger">1 个渠道异常</span></a>
+          <a class="card link-card" href="/admin/settings"><h3><i class="ph ph-users-three"></i> 账号与权限</h3><p class="muted">销售、管理员、角色权限、登录安全。</p><span class="pill accent">38 个账号</span></a>
+          <a class="card link-card" href="/admin/settings/country-sales"><h3><i class="ph ph-map-trifold"></i> 销售分发</h3><p class="muted">国家、区域、销售负责人和待分配规则。</p><span class="pill warn">6 个国家缺负责人</span></a>
+          <a class="card link-card" href="/admin/settings/product-knowledge"><h3><i class="ph ph-books"></i> 产品与 AI</h3><p class="muted">产品知识库、接待 Playbook、评分规则。</p><span class="pill ok">知识库已更新</span></a>
+          <a class="card link-card" href="/admin/settings"><h3><i class="ph ph-plugs-connected"></i> 渠道与提醒</h3><p class="muted">Webhook、邮箱同步、展会导入和未反馈提醒。</p><span class="pill danger">1 个渠道异常</span></a>
         </div>
       </section>
 
@@ -163,7 +163,7 @@
         <div class="card">
           <div class="section-head">
             <div><h2>销售账号</h2><p class="muted">维护销售状态、角色和负责区域。</p></div>
-            <button class="btn" onclick="toast('销售账号筛选已更新')"><i class="ph ph-funnel"></i>筛选</button>
+            <button class="btn" data-prototype-action="visual-only"><i class="ph ph-funnel"></i>筛选</button>
           </div>
           <table>
             <thead><tr><th>姓名</th><th>角色</th><th>负责区域</th><th>状态</th><th>最近反馈</th></tr></thead>
@@ -179,7 +179,7 @@
         <div class="card">
           <div class="section-head">
             <div><h2>角色权限矩阵</h2><p class="muted">保存后立即影响菜单、按钮和接口权限。</p></div>
-            <button class="btn primary" onclick="toast('权限变更已保存并写入审计日志')"><i class="ph ph-floppy-disk"></i>保存权限</button>
+            <button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-floppy-disk"></i>保存权限</button>
           </div>
           <div class="permission-grid" aria-label="角色权限矩阵">
             <div class="head">功能权限</div><div class="head">超级管理员</div><div class="head">营销运营</div><div class="head">销售主管</div><div class="head">销售</div>
@@ -218,19 +218,6 @@
       </section>
     </main>
   </div>
-  <script>
-    function toast(text){var n=document.querySelector('[data-toast]'); if(n){n.textContent=text || '操作已保存';}}
-    function previewBanner(event){
-      var file = event.target.files && event.target.files[0];
-      var preview = document.getElementById('bannerPreview');
-      if(!file || !preview) return;
-      var reader = new FileReader();
-      reader.onload = function(e){
-        preview.style.backgroundImage = "linear-gradient(105deg, rgba(17,24,39,.76), rgba(91,75,219,.72)), url('" + e.target.result + "')";
-        toast('Banner 图片已载入预览，发布后同步到全部页面');
-      };
-      reader.readAsDataURL(file);
-    }
-  </script>
+
 </body>
 </html>

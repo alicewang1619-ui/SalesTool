@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!DOCTYPE html>`r`n<!-- GOAL: visual blueprint only; production behavior runs in React routes and FastAPI APIs. -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -161,10 +161,10 @@ tr:last-child td { border-bottom: 0; }
 <body>
   <main class="phone-shell"><section class="global-banner" aria-label="全局运营 Banner">
   <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
-  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
+  <a class="banner-action" href="/admin/settings">管理 Banner</a>
 </section>
-    <section class="phone-screen"><div class="eyebrow">销售反馈卡片</div><h1 style="font-size:28px">Dr. Sofia Ramirez</h1><p class="muted">Mexico · Cardiology · Handheld Ultrasound</p><section class="card status-line"><h3>AI 判断理由</h3><p>客户身份明确，临床应用为 Cardiology，已说明需要便携式设备用于诊所筛查，属于有效线索。</p></section><section class="grid"><button class="btn">已联系</button><button class="btn">已报价</button><button class="btn">需跟进</button><button class="btn">无效</button><button class="btn">已成交</button></section><section class="card"><h3>客户判断</h3><div class="grid"><label><input type="radio" name="judge"> 有效客户，继续跟进</label><label><input type="radio" name="judge"> 确认真实需求</label><label><input type="radio" name="judge"> 放入资料库</label><label><input type="radio" name="judge"> 已转代理商</label></div><textarea class="input" rows="4" placeholder="可选备注：客户预算、下一步、风险点"></textarea><button class="btn primary" style="width:100%;margin-top:16px" onclick="showToast(); setTimeout(function(){location.href='阶段1_客户池_客户详情.html'},800)">提交反馈</button><p data-toast class="muted"></p></section></section>
+    <section class="phone-screen"><div class="eyebrow">销售反馈卡片</div><h1 style="font-size:28px">Dr. Sofia Ramirez</h1><p class="muted">Mexico · Cardiology · Handheld Ultrasound</p><section class="card status-line"><h3>AI 判断理由</h3><p>客户身份明确，临床应用为 Cardiology，已说明需要便携式设备用于诊所筛查，属于有效线索。</p></section><section class="grid"><button class="btn">已联系</button><button class="btn">已报价</button><button class="btn">需跟进</button><button class="btn">无效</button><button class="btn">已成交</button></section><section class="card"><h3>客户判断</h3><div class="grid"><label><input type="radio" name="judge"> 有效客户，继续跟进</label><label><input type="radio" name="judge"> 确认真实需求</label><label><input type="radio" name="judge"> 放入资料库</label><label><input type="radio" name="judge"> 已转代理商</label></div><textarea class="input" rows="4" placeholder="可选备注：客户预算、下一步、风险点"></textarea><button class="btn primary" style="width:100%;margin-top:16px" data-prototype-action="visual-only">提交反馈</button><p data-toast class="muted"></p></section></section>
   </main>
-  <script>function showToast(){var el=document.querySelector('[data-toast]'); if(el){el.textContent='已提交反馈，系统会同步到报表和客户池';}}</script>
+
 </body>
 </html>

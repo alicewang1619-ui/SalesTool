@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!DOCTYPE html>`r`n<!-- GOAL: visual blueprint only; production behavior runs in React routes and FastAPI APIs. -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -163,21 +163,19 @@ tr:last-child td { border-bottom: 0; }
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark"><i class="ph ph-activity"></i></div><div>Ultrasound<br>Growth</div></div>
       <nav class="nav">
-        <a class="active" href="阶段1_工作台_工作台首页.html"><i class="ph ph-caret-right"></i>工作台</a>
-        <a class="" href="阶段1_线索池_线索池列表.html"><i class="ph ph-caret-right"></i>线索池</a>
-        <a class="" href="阶段1_客户池_客户池列表.html"><i class="ph ph-caret-right"></i>客户池</a>
-        <a class="" href="阶段1_报表中心_报表中心首页.html"><i class="ph ph-caret-right"></i>报表</a>
-        <a class="" href="阶段2_再营销待办_再营销待办列表.html"><i class="ph ph-caret-right"></i>再营销</a>
-        <a class="" href="阶段1_系统配置_设置管理.html"><i class="ph ph-caret-right"></i>配置</a>
+        <a class="active" href="/admin/dashboard"><i class="ph ph-caret-right"></i>工作台</a>
+        <a class="" href="/admin/leads"><i class="ph ph-caret-right"></i>线索池</a>
+        <a class="" href="/admin/customers"><i class="ph ph-caret-right"></i>客户池</a>
+        <a class="" href="/admin/reports"><i class="ph ph-caret-right"></i>报表</a>
+        <a class="" href="/admin/nurture"><i class="ph ph-caret-right"></i>再营销</a>
+        <a class="" href="/admin/settings"><i class="ph ph-caret-right"></i>配置</a>
       </nav>
     </aside>
     <main class="main"><section class="global-banner" aria-label="全局运营 Banner">
   <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告；管理员可在设置管理页上传图片并更新文案。</span></div>
-  <a class="banner-action" href="阶段1_系统配置_设置管理.html">管理 Banner</a>
-</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 异常与权限</div><h1>无权限页</h1><p class="muted">当用户访问无权限页面或动作时展示说明和返回入口。</p></div><div class="filters"><button class="btn" onclick="toast('筛选已更新')"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" onclick="toast('已保存当前操作')"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="card status-line"><h2>无权限页</h2><p class="muted">当前账号或链接无法继续操作。请返回工作台，或联系管理员重新发送销售反馈链接。</p><a class="btn primary" href="阶段1_工作台_工作台首页.html">回到工作台</a></section></main>
+  <a class="banner-action" href="/admin/settings">管理 Banner</a>
+</section><div class="topbar"><div><div class="eyebrow">阶段1(MVP) · 异常与权限</div><h1>无权限页</h1><p class="muted">当用户访问无权限页面或动作时展示说明和返回入口。</p></div><div class="filters"><button class="btn" data-prototype-action="visual-only"><i class="ph ph-funnel"></i>筛选</button><button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-check"></i>确认</button></div></div><div data-toast class="muted"></div><section class="card status-line"><h2>无权限页</h2><p class="muted">当前账号或链接无法继续操作。请返回工作台，或联系管理员重新发送销售反馈链接。</p><a class="btn primary" href="/admin/dashboard">回到工作台</a></section></main>
   </div>
-  <script>
-    function toast(text){var n=document.querySelector('[data-toast]'); if(n){n.textContent=text || '操作已保存';}}
-  </script>
+
 </body>
 </html>

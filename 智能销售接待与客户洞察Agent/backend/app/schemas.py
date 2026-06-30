@@ -508,6 +508,72 @@ class CustomerBackgroundUpdate(BaseModel):
     manual_summary: str = Field(min_length=10, max_length=4000)
 
 
+class NurtureAttachmentOut(BaseModel):
+    filename: str
+    content_type: str
+    size: int
+    uploaded_by: str
+    uploaded_at: datetime
+
+
+class NurturePromptContextOut(BaseModel):
+    safety_boundary: str
+    customer_summary: str
+    customer_background: str
+    customer_note: str
+    sales_feedback: list[str]
+    recommended_next_action: str
+    attachments: list[NurtureAttachmentOut]
+    rendered_prompt: str
+
+
+class NurtureTaskOut(BaseModel):
+    id: int
+    customer_id: int
+    customer_name: str
+    customer_tier: str
+    product: str
+    owner_name: str
+    recommended_next_action: str
+    customer_note: str
+    nurture_reason: str
+    draft_content: str
+    generation_prompt: str
+    prompt_context_snapshot: NurturePromptContextOut
+    attachments: list[NurtureAttachmentOut]
+    model_provider: str
+    model_version: str
+    approval_status: str
+    detail_path: str
+    customer_detail_path: str
+    updated_at: datetime
+
+
+class NurtureTaskPage(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    summary: dict[str, int]
+    items: list[NurtureTaskOut]
+    empty_state: EmptyStateOut | None = None
+
+
+class NurtureTaskUpdateRequest(BaseModel):
+    recommended_next_action: str = Field(min_length=5, max_length=1000)
+    customer_note: str = Field(default="", max_length=2000)
+    nurture_reason: str = Field(min_length=5, max_length=2000)
+    draft_content: str = Field(min_length=10, max_length=8000)
+    generation_prompt: str = Field(default="", max_length=4000)
+
+
+class NurtureTaskRegenerateRequest(BaseModel):
+    generation_prompt: str = Field(default="", max_length=4000)
+
+
+class NurtureTaskConfirmRequest(BaseModel):
+    draft_content: str = Field(min_length=10, max_length=8000)
+
+
 class SalesUserOut(BaseModel):
     id: int
     name: str

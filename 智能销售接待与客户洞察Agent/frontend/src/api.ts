@@ -69,6 +69,12 @@ export function saveSession(token: string, name: string, role: string): void {
   window.localStorage.setItem("ug_role", role);
 }
 
+export function clearSession(): void {
+  window.localStorage.removeItem("ug_token");
+  window.localStorage.removeItem("ug_name");
+  window.localStorage.removeItem("ug_role");
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
@@ -79,7 +85,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!response.ok) {
     const detail = await response.json().catch(() => ({ detail: "请求失败" }));
-    throw new Error(typeof detail.detail === "string" ? detail.detail : "请求失败");
+    const rawDetail = detail.detail;
+    const message =
+      typeof rawDetail === "string" ? rawDetail : typeof rawDetail?.message === "string" ? rawDetail.message : "请求失败";
+    const error = new Error(message);
+    error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
+    throw error;
   }
   return response.json() as Promise<T>;
 }
@@ -89,6 +100,10 @@ export function login(email: string, password: string): Promise<LoginResponse> {
     method: "POST",
     body: JSON.stringify({ email, password })
   });
+}
+
+export function fetchMe(): Promise<SalesUser> {
+  return request<SalesUser>("/api/me");
 }
 
 export function fetchBanner(): Promise<Banner> {
@@ -121,4 +136,3 @@ export function fetchSettingsSummary(): Promise<Record<string, number>> {
 export function fetchSalesUsers(): Promise<SalesUser[]> {
   return request<SalesUser[]>("/api/settings/sales-users");
 }
-

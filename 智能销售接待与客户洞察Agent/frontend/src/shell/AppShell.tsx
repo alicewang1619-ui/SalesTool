@@ -1,6 +1,8 @@
 import { Layout, Menu, Typography } from "antd";
 import { BarChart3, Database, Home, Settings, UsersRound } from "lucide-react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { clearSession, fetchMe, getToken } from "../api";
 import { GlobalBanner } from "./GlobalBanner";
 
 const { Sider, Content } = Layout;
@@ -16,9 +18,33 @@ const items = [
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [sessionState, setSessionState] = useState<"checking" | "valid" | "expired">("checking");
+
+  useEffect(() => {
+    if (!getToken()) {
+      setSessionState("expired");
+      return;
+    }
+    let alive = true;
+    fetchMe()
+      .then(() => {
+        if (alive) setSessionState("valid");
+      })
+      .catch(() => {
+        clearSession();
+        if (alive) setSessionState("expired");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (sessionState === "expired") {
+    return <Navigate to="/?reason=expired" replace />;
+  }
 
   return (
-    <Layout className="app-shell">
+    <Layout className="app-shell" aria-busy={sessionState === "checking"}>
       <Sider width={256} className="side-nav">
         <div className="brand">
           <div className="brand-mark">⌁</div>

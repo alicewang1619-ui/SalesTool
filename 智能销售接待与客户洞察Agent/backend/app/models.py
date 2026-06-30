@@ -91,6 +91,15 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(120), nullable=False)
     target_type: Mapped[str] = mapped_column(String(80), nullable=False)
     target_id: Mapped[int | None] = mapped_column(Integer)
+    trace_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     detail: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+
+class LoginAttempt(Base):
+    __tablename__ = "login_attempts"
+
+    email: Mapped[str] = mapped_column(String(255), primary_key=True)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -83,19 +83,87 @@ body {
   margin-bottom: 24px;
 }
 
-.login-page {
+.login-app {
   display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
-  place-items: center;
-  background: linear-gradient(135deg, #eef2ff, #f8fbff);
+  background: #f5f7fb;
+}
+
+.login-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 28px 24px;
+  background: #fff;
+  border-right: 1px solid #e5e9f2;
+}
+
+.login-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.login-nav span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: #374151;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+}
+
+.login-nav span.active {
+  color: #172033;
+  background: #f1f0ff;
+  border-left-color: #5b4be8;
+}
+
+.login-main {
+  min-width: 0;
+}
+
+.login-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+  gap: 32px;
+  align-items: center;
+  min-height: calc(100vh - 96px);
+  padding: 32px;
+}
+
+.login-copy h1 {
+  max-width: 720px;
+  margin: 8px 0 12px;
+  font-size: 44px;
+  line-height: 1.16;
+}
+
+.login-copy p {
+  max-width: 620px;
+  font-size: 16px;
 }
 
 .login-card {
-  width: min(420px, calc(100vw - 32px));
+  width: 100%;
+  border: 1px solid #e5e9f2;
+  box-shadow: 0 0 0 1px #e5e9f2;
 }
 
-.login-brand {
-  margin-bottom: 20px;
+.login-error,
+.login-error-placeholder {
+  margin-bottom: 16px;
+}
+
+.login-error-placeholder {
+  min-height: 40px;
+  padding: 9px 12px;
+  color: #6b7689;
+  border: 1px solid #e5e9f2;
+  border-radius: 8px;
+  background: #fbfaff;
 }
 
 .muted {
@@ -105,6 +173,25 @@ body {
 @media (max-width: 800px) {
   .side-nav {
     display: none;
+  }
+
+  .login-app {
+    grid-template-columns: 1fr;
+  }
+
+  .login-sidebar {
+    position: static;
+    height: auto;
+  }
+
+  .login-hero-grid {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding: 20px;
+  }
+
+  .login-copy h1 {
+    font-size: 32px;
   }
 
   .global-banner {
@@ -117,4 +204,3 @@ body {
     padding: 20px;
   }
 }
-

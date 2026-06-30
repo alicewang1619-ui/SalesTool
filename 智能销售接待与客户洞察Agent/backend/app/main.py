@@ -1,13 +1,18 @@
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from datetime import datetime, timedelta
+from uuid import uuid4
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .database import Base, engine, get_db
 from .dependencies import current_user, require_admin_or_ops
-from .models import AuditLog, Banner, Customer, CustomerBackground, Lead, SourceDictionary, User
+from .models import AuditLog, Banner, Customer, CustomerBackground, Lead, LoginAttempt, SourceDictionary, User
 from .schemas import (
+    AuditLogOut,
+    AuditLogPage,
     BannerOut,
     CustomerBackgroundUpdate,
     CustomerOut,
@@ -31,9 +36,31 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def add_trace_id(request: Request, call_next):
+    trace_id = request.headers.get("x-trace-id") or uuid4().hex
+    request.state.trace_id = trace_id
+    response = await call_next(request)
+    response.headers["x-trace-id"] = trace_id
+    return response
+
+
+def ensure_sqlite_compatibility() -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(engine)
+    if "audit_logs" not in inspector.get_table_names():
+        return
+    column_names = {column["name"] for column in inspector.get_columns("audit_logs")}
+    if "trace_id" not in column_names:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE audit_logs ADD COLUMN trace_id VARCHAR(64) NOT NULL DEFAULT ''"))
+
+
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_sqlite_compatibility()
     with next(get_db()) as db:
         seed_data(db)
 
@@ -43,11 +70,64 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def error_detail(code: str, message: str, **extra: object) -> dict[str, object]:
+    return {"code": code, "message": message, **extra}
+
+
+def add_audit(
+    db: Session,
+    trace_id: str,
+    action: str,
+    detail: str,
+    actor_id: int | None = None,
+    target_type: str = "auth",
+    target_id: int | None = None,
+) -> None:
+    db.add(
+        AuditLog(
+            actor_id=actor_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            trace_id=trace_id,
+            detail=detail,
+        )
+    )
+
+
 @app.post("/api/auth/login", response_model=LoginResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> LoginResponse:
+    now = datetime.utcnow()
+    trace_id = request.state.trace_id
+    attempt = db.get(LoginAttempt, payload.email)
+    if attempt and attempt.locked_until and attempt.locked_until > now:
+        add_audit(db, trace_id, "login_locked", f"{payload.email} 在锁定期内继续尝试登录")
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=error_detail("LOGIN_LOCKED", "登录失败次数过多，请稍后再试", locked_until=attempt.locked_until.isoformat()),
+        )
+
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not user.enabled or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账号或密码错误")
+        if not attempt:
+            attempt = LoginAttempt(email=payload.email, failed_count=0)
+            db.add(attempt)
+        attempt.failed_count += 1
+        if attempt.failed_count >= 5:
+            attempt.locked_until = now + timedelta(minutes=15)
+        add_audit(db, trace_id, "login_failed", f"{payload.email} 登录失败 {attempt.failed_count} 次")
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=error_detail("INVALID_CREDENTIALS", "账号或密码错误"),
+        )
+
+    if attempt:
+        attempt.failed_count = 0
+        attempt.locked_until = None
+    add_audit(db, trace_id, "login_succeeded", f"{payload.email} 登录成功", actor_id=user.id, target_id=user.id)
+    db.commit()
     return LoginResponse(
         access_token=create_access_token(user.id, user.role),
         role=user.role,
@@ -145,3 +225,21 @@ def settings_summary(db: Session = Depends(get_db), user: User = Depends(require
 def sales_users(db: Session = Depends(get_db), user: User = Depends(require_admin_or_ops)) -> list[User]:
     return db.scalars(select(User).where(User.role.in_(["sales", "admin", "ops"])).order_by(User.id)).all()
 
+
+@app.get("/api/audit-logs", response_model=AuditLogPage)
+def audit_logs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> AuditLogPage:
+    total = db.scalar(select(func.count()).select_from(AuditLog)) or 0
+    rows = db.scalars(
+        select(AuditLog).order_by(AuditLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    ).all()
+    return AuditLogPage(
+        page=page,
+        page_size=page_size,
+        total=total,
+        items=[AuditLogOut.model_validate(row, from_attributes=True) for row in rows],
+    )

@@ -1,11 +1,17 @@
 from fastapi.testclient import TestClient
 import pytest
+from sqlalchemy import delete
 
+from app.database import SessionLocal
 from app.main import app
+from app.models import LoginAttempt
 
 
 @pytest.fixture()
 def client() -> TestClient:
+    with SessionLocal() as db:
+        db.execute(delete(LoginAttempt))
+        db.commit()
     with TestClient(app) as test_client:
         yield test_client
 
@@ -33,6 +39,30 @@ def test_login_returns_role_and_token(client: TestClient) -> None:
     body = response.json()
     assert body["role"] == "admin"
     assert body["access_token"]
+    me = client.get("/api/me", headers={"Authorization": f"Bearer {body['access_token']}"})
+    assert me.status_code == 200
+    assert me.json()["email"] == "admin@ultrasound-growth.local"
+
+
+def test_login_locks_after_repeated_wrong_passwords_and_audits_trace(client: TestClient) -> None:
+    headers = auth_headers(client)
+    payload = {"email": "unknown@ultrasound-growth.local", "password": "wrong-password"}
+
+    for _ in range(5):
+        response = client.post("/api/auth/login", json=payload)
+        assert response.status_code == 401
+        assert response.json()["detail"]["code"] == "INVALID_CREDENTIALS"
+        assert response.headers["x-trace-id"]
+
+    locked = client.post("/api/auth/login", json=payload)
+    assert locked.status_code == 429
+    assert locked.json()["detail"]["code"] == "LOGIN_LOCKED"
+    assert locked.headers["x-trace-id"]
+
+    audit = client.get("/api/audit-logs", headers=headers)
+    assert audit.status_code == 200
+    events = audit.json()["items"]
+    assert any(event["action"] == "login_failed" and event["trace_id"] for event in events)
 
 
 def test_leads_are_paginated_and_source_filtered(client: TestClient) -> None:

@@ -71,3 +71,20 @@ class SalesUserOut(BaseModel):
     role: str
     data_scope: str
     enabled: bool
+
+
+class AuditLogOut(BaseModel):
+    id: int
+    action: str
+    target_type: str
+    target_id: int | None
+    trace_id: str
+    detail: str
+    created_at: datetime
+
+
+class AuditLogPage(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    items: list[AuditLogOut]

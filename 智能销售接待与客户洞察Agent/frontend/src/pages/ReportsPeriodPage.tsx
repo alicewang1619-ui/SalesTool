@@ -14,9 +14,7 @@ const periodOptions: Array<{ value: ReportPeriod; label: string }> = [
 type TraceableError = Error & { traceId?: string };
 
 function asTraceableError(error: unknown): TraceableError {
-  if (error instanceof Error) {
-    return error as TraceableError;
-  }
+  if (error instanceof Error) return error as TraceableError;
   return new Error("报表数据加载失败");
 }
 
@@ -32,6 +30,11 @@ function compactFilters(filters: {
     product: filters.product.trim() || undefined,
     feedbackStatus: filters.feedbackStatus.trim() || undefined
   };
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
 }
 
 function BreakdownTable({ rows }: { rows: ReportBreakdownItem[] }) {
@@ -109,10 +112,10 @@ export function ReportsPeriodPage() {
     <section className="reports-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1(MVP) · 报表中心</Typography.Text>
+          <Typography.Text className="stage-label">阶段 1 (MVP) · 报表中心</Typography.Text>
           <Typography.Title level={2}>周期报表视图</Typography.Title>
           <Typography.Paragraph className="muted">
-            按日/月/季/年查看询盘量、有效量、国家、渠道、产品和销售反馈。
+            按日/月/季度/年查看询盘量、有效量、国家、渠道、产品和销售反馈，并明确展示当前数据对应的时间段。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -181,6 +184,14 @@ export function ReportsPeriodPage() {
         />
       ) : null}
 
+      <Alert
+        showIcon
+        type="info"
+        className="login-error"
+        message={`当前报表周期：${data?.period_label ?? periodOptions.find((item) => item.value === period)?.label ?? period}`}
+        description={`统计粒度：${data?.period_granularity ?? "—"}；数据范围：${formatDate(data?.query_window.start_at)} 至 ${formatDate(data?.query_window.end_at)}`}
+      />
+
       <Row gutter={[16, 16]} className="metric-row">
         {metricCards.map((metric) => (
           <Col xs={24} md={12} xl={6} key={metric.key}>
@@ -219,6 +230,8 @@ export function ReportsPeriodPage() {
 
       <Card className="dashboard-toolbar">
         <Space wrap>
+          <Tag color="purple">{data?.period_label ?? period}</Tag>
+          <Tag>{formatDate(data?.query_window.start_at)} - {formatDate(data?.query_window.end_at)}</Tag>
           <Link to={data?.downstream.metrics_path ?? `/admin/reports/metrics?period=${period}`}>
             <Button>查看指标明细</Button>
           </Link>
@@ -230,7 +243,7 @@ export function ReportsPeriodPage() {
           {data?.downstream.export_requires_confirmation ? <Tag color="purple">导出前二次确认</Tag> : null}
         </Space>
         <Typography.Text className="muted">
-          当前显示 {data?.items.length ?? 0} / {data?.total ?? 0} 条
+          当前显示 {data?.items.length ?? 0} / {data?.total ?? 0} 条。
         </Typography.Text>
       </Card>
 

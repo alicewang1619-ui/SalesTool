@@ -1,5 +1,5 @@
-﻿import { Layout, Menu, Typography } from "antd";
-import { Activity, BarChart3, ClipboardList, Database, Home, Send, Settings, UsersRound } from "lucide-react";
+import { Layout, Menu, Typography } from "antd";
+import { BarChart3, CircleUserRound, ClipboardList, Database, Home, Send, Settings, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, fetchMe, getToken } from "../api";
@@ -7,15 +7,15 @@ import { GlobalBanner } from "./GlobalBanner";
 
 const { Sider, Content } = Layout;
 
-const items = [
-  { key: "/admin/dashboard", icon: <Home size={18} />, label: "工作台" },
-  { key: "/admin/leads", icon: <Database size={18} />, label: "线索池" },
-  { key: "/admin/assignments/pending", icon: <ClipboardList size={18} />, label: "待分配" },
-  { key: "/admin/customers", icon: <UsersRound size={18} />, label: "客户池" },
-  { key: "/admin/customer-signals", icon: <Activity size={18} />, label: "客户态势" },
-  { key: "/admin/nurture", icon: <Send size={18} />, label: "再营销" },
-  { key: "/admin/reports", icon: <BarChart3 size={18} />, label: "报表" },
-  { key: "/admin/settings", icon: <Settings size={18} />, label: "配置" }
+const navItems = [
+  { key: "/admin/dashboard", icon: <Home size={18} />, label: "工作台", roles: ["admin", "ops", "sales"] },
+  { key: "/admin/leads", icon: <Database size={18} />, label: "线索池", roles: ["admin", "ops", "sales"] },
+  { key: "/admin/assignments/pending", icon: <ClipboardList size={18} />, label: "待分配", roles: ["admin", "ops"] },
+  { key: "/admin/customers", icon: <UsersRound size={18} />, label: "客户池", roles: ["admin", "ops", "sales"] },
+  { key: "/admin/nurture", icon: <Send size={18} />, label: "再营销", roles: ["admin", "ops", "sales"] },
+  { key: "/admin/reports", icon: <BarChart3 size={18} />, label: "报表", roles: ["admin", "ops"] },
+  { key: "/admin/settings", icon: <Settings size={18} />, label: "配置", roles: ["admin", "ops"] },
+  { key: "/admin/me", icon: <CircleUserRound size={18} />, label: "我的", roles: ["admin", "ops", "sales"] }
 ];
 
 export function AppShell() {
@@ -32,10 +32,9 @@ export function AppShell() {
     let alive = true;
     fetchMe()
       .then((currentUser) => {
-        if (alive) {
-          setUser(currentUser);
-          setSessionState("valid");
-        }
+        if (!alive) return;
+        setUser(currentUser);
+        setSessionState("valid");
       })
       .catch(() => {
         clearSession();
@@ -49,27 +48,38 @@ export function AppShell() {
   if (sessionState === "expired") {
     return <Navigate to="/?reason=expired" replace />;
   }
+
   const salesRestricted =
     user?.role === "sales" &&
     !location.pathname.startsWith("/admin/forbidden") &&
-    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/nurture", "/admin/customer-signals"].some((path) => location.pathname.startsWith(path));
+    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/customer-signals"].some((path) =>
+      location.pathname.startsWith(path)
+    );
+
   if (salesRestricted) {
     const from = `${location.pathname}${location.search}`;
     return <Navigate to={`/admin/forbidden?from=${encodeURIComponent(from)}&reason=FORBIDDEN`} replace />;
   }
+
+  const allowedItems = navItems
+    .filter((item) => !user?.role || item.roles.includes(user.role))
+    .map(({ roles, ...item }) => item);
+
   const selectedKey = location.pathname.startsWith("/admin/leads")
     ? "/admin/leads"
     : location.pathname.startsWith("/admin/assignments")
       ? "/admin/assignments/pending"
-      : location.pathname.startsWith("/admin/customer-signals")
-        ? "/admin/customer-signals"
-      : location.pathname.startsWith("/admin/customers")
+      : location.pathname.startsWith("/admin/customers") || location.pathname.startsWith("/admin/customer-signals")
         ? "/admin/customers"
-      : location.pathname.startsWith("/admin/nurture")
-        ? "/admin/nurture"
-      : location.pathname.startsWith("/admin/reports")
-        ? "/admin/reports"
-      : location.pathname;
+        : location.pathname.startsWith("/admin/nurture")
+          ? "/admin/nurture"
+          : location.pathname.startsWith("/admin/reports")
+            ? "/admin/reports"
+            : location.pathname.startsWith("/admin/settings")
+              ? "/admin/settings"
+              : location.pathname.startsWith("/admin/me")
+                ? "/admin/me"
+                : location.pathname;
 
   return (
     <Layout className="app-shell" aria-busy={sessionState === "checking"}>
@@ -78,12 +88,7 @@ export function AppShell() {
           <div className="brand-mark">UG</div>
           <Typography.Title level={4}>Ultrasound Growth</Typography.Title>
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          items={items}
-          onClick={(event) => navigate(event.key)}
-        />
+        <Menu mode="inline" selectedKeys={[selectedKey]} items={allowedItems} onClick={(event) => navigate(event.key)} />
       </Sider>
       <Layout>
         <GlobalBanner />

@@ -128,6 +128,7 @@ from .schemas import (
     ProductKnowledgeStatusRequest,
     ProductKnowledgeUpdateRequest,
     SalesUserCreateRequest,
+    SalesUserUpdateRequest,
     SettingsEntryOut,
     SettingsOverviewOut,
     SettingsPermissionOut,
@@ -2890,6 +2891,8 @@ def update_nurture_task(
     task.recommended_next_action = payload.recommended_next_action
     task.customer_note = payload.customer_note
     task.nurture_reason = payload.nurture_reason
+    if payload.email_subject is not None:
+        task.email_subject = payload.email_subject
     task.draft_content = payload.draft_content
     task.generation_prompt = payload.generation_prompt
     task.approval_status = "pending"
@@ -3082,8 +3085,6 @@ def country_sales_mapping_out(
         risk_reasons.append("OWNER_NOT_SALES")
     elif not owner.enabled:
         risk_reasons.append("SALES_USER_DISABLED")
-    if pending_count:
-        risk_reasons.append("PENDING_LEADS_WAITING")
     danger_reasons = {"SALES_USER_MISSING", "OWNER_NOT_SALES", "SALES_USER_DISABLED"}
     risk_level = "danger" if danger_reasons.intersection(risk_reasons) else "warning" if risk_reasons else "normal"
     return CountrySalesMappingOut(
@@ -3474,6 +3475,39 @@ def create_sales_user(
     db.commit()
     db.refresh(new_user)
     return new_user
+
+
+@app.put("/api/settings/sales-users/{user_id}", response_model=SalesUserOut)
+def update_sales_user(
+    user_id: int,
+    payload: SalesUserUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> User:
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail=error_detail("USER_NOT_FOUND", "User not found"))
+    existing = db.scalar(select(User).where(User.email == payload.email, User.id != user_id))
+    if existing:
+        raise HTTPException(status_code=409, detail=error_detail("USER_EMAIL_EXISTS", "User email already exists"))
+    target.name = payload.name
+    target.email = payload.email
+    target.role = payload.role
+    target.data_scope = payload.data_scope
+    target.enabled = payload.enabled
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_sales_user_updated",
+        f"Settings sales user updated: {payload.email}",
+        actor_id=user.id,
+        target_type="user",
+        target_id=target.id,
+    )
+    db.commit()
+    db.refresh(target)
+    return target
 
 
 def validate_banner_payload(payload: BannerUpdateRequest) -> None:

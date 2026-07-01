@@ -637,6 +637,7 @@ class NurtureTaskUpdateRequest(BaseModel):
     recommended_next_action: str = Field(min_length=5, max_length=1000)
     customer_note: str = Field(default="", max_length=2000)
     nurture_reason: str = Field(min_length=5, max_length=2000)
+    email_subject: str | None = Field(default=None, max_length=255)
     draft_content: str = Field(min_length=10, max_length=8000)
     generation_prompt: str = Field(default="", max_length=4000)
 
@@ -719,6 +720,14 @@ class SalesUserCreateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: str = Field(min_length=5, max_length=255)
     password: str = Field(min_length=8, max_length=120)
+    role: str = Field(pattern="^(sales|ops|admin)$")
+    data_scope: str = Field(default="all", max_length=255)
+    enabled: bool = True
+
+
+class SalesUserUpdateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=5, max_length=255)
     role: str = Field(pattern="^(sales|ops|admin)$")
     data_scope: str = Field(default="all", max_length=255)
     enabled: bool = True

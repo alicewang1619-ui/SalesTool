@@ -53,7 +53,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 32px;
+  padding: 28px 44px;
   color: #fff;
   background: linear-gradient(105deg, #4d5567, #8277ee);
 }

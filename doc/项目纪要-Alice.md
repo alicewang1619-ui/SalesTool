@@ -460,3 +460,11 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 - [07-01-2026 15:07:40] 统一返修红灯测试结果｜背景：已按返修 TDD 增加后端契约测试，需要先验证失败点是否对应真实缺口。｜结论：py -m pytest .\tests -q -k "REFIT or import_template or auto_assigns or time_scope or basic_info_demand or me_profile or report_period_aggregates or scoped_nurture or customer_signals" 结果为 8 failed、1 passed、87 deselected；失败集中在 /api/import-template、/api/me/profile、时间范围字段、客户详情基础信息、导入自动分配统计、报表 period_label、销售再营销范围和客户详情态势信号访问，符合本轮待实现范围。｜来源：AI
 
 - [07-01-2026 15:13:23] 统一返修后端专项转绿｜背景：完成导入模板、自动分配、时间范围、客户详情基础信息、个人资料邮箱、报表周期、销售再营销范围和客户态势详情范围的后端实现后，需要复跑专项契约。｜结论：py -m pytest .\tests -q -k "REFIT or import_template or auto_assigns or time_scope or basic_info_demand or me_profile or report_period_aggregates or scoped_nurture or customer_signals" 结果为 9 passed、87 deselected；仅保留既有 datetime/on_event deprecation warnings。｜来源：AI
+
+- [07-01-2026 15:13:38] 统一返修后端阶段提交推送完成｜背景：后端契约专项已转绿，需要阶段性提交并同步远端，便于前端阶段独立回滚和审查。｜结论：已提交并推送 commit e5930a1e，提交信息为 实现统一返修后端契约；下一步进入 React 前端页面和导航实现。｜来源：AI
+
+- [07-01-2026 15:27:06] 统一返修前端实现策略｜背景：配置、导入、时间线、客户详情、再营销邮件和我的账号等反馈需要同时落到 React 页面，且旧页面终端读取存在中文编码噪声。｜结论：按后端契约重写受影响前端页面，保留现有路由与 API 结构；新增我的账号页面，销售无权限入口前端隐藏，客户态势并入客户详情，配置页 8 个入口改为可点击设置区。｜来源：AI
+- [07-01-2026 15:27:06] 销售账号编辑接口补齐｜背景：用户指出配置页销售账号只有启用状态但缺少增删改查，前端若只展示编辑按钮会出现能点不能存。｜结论：在已有新增账号接口基础上补充销售账号编辑/启停接口，采用软启停而非物理删除，避免误删账号并保留审计追踪。｜来源：AI
+- [07-01-2026 15:27:06] 统一返修前端构建通过｜背景：完成前端受影响页面改造后需要验证类型和生产构建。｜结论：npm.cmd run build 在 frontend 目录通过；保留既有 Vite chunk size warning，未发现 TypeScript 错误。｜来源：AI
+- [07-01-2026 15:28:04] 国家销售映射风险口径修正｜背景：后端全量测试发现 Peru 有待分配数量时 risk_level 被标为 warning，但旧契约和业务语义要求有效映射本身仍为 normal。｜结论：待分配数量继续展示为 pending_count，但不再作为映射配置风险原因；只有映射停用、负责人缺失、负责人非销售或销售停用才影响 risk_level。｜来源：AI
+- [07-01-2026 15:28:37] 统一返修全量门禁通过｜背景：完成前端页面、后端账号编辑、再营销主题保存和映射风险口径修正后，需要复跑最终验收门禁。｜结论：后端 py -m pytest .\tests -q 结果为 96 passed；前端 npm.cmd run build 通过；仅保留既有 datetime/on_event deprecation warnings 和 Vite chunk size warning。｜来源：AI

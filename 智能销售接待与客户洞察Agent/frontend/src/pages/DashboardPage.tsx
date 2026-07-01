@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Col, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
 import { Check, Filter, RefreshCw, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,14 +16,35 @@ import {
 const scoreColor: Record<string, string> = {
   有效: "green",
   高意向: "purple",
-  待补充: "orange",
+  待补全: "orange",
   资料库: "gold"
 };
+
+const timeScopeOptions: Array<{ value: NonNullable<DashboardFilters["cycle"]>; label: string }> = [
+  { value: "all", label: "全部历史" },
+  { value: "today", label: "今日" },
+  { value: "yesterday", label: "昨天" },
+  { value: "date", label: "指定日期" }
+];
 
 const pageSizeOptions = [5, 10, 20];
 
 function uniq(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
+function appendDateIfNeeded(path: string, filters: DashboardFilters): string {
+  if (filters.cycle !== "date" || !filters.date) return path;
+  const [base, rawQuery = ""] = path.split("?");
+  const params = new URLSearchParams(rawQuery);
+  params.set("time_scope", "date");
+  params.set("date", filters.date);
+  return `${base}?${params.toString()}`;
 }
 
 export function DashboardPage() {
@@ -88,14 +109,18 @@ export function DashboardPage() {
     setFilters(nextFilters);
   };
 
+  const goMetric = (key: string, fallback: string) => {
+    navigate(appendDateIfNeeded(dashboard?.metric_links[key] ?? fallback, filters));
+  };
+
   return (
     <section className="dashboard-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1 (MVP) · 工作台</Typography.Text>
+          <Typography.Text className="stage-label">阶段 1 (MVP) · 工作台</Typography.Text>
           <Typography.Title level={2}>工作台首页</Typography.Title>
           <Typography.Paragraph className="muted">
-            统一查看今日询盘、有效线索、未反馈和官网 KPI；筛选、分页和指标均由后端按当前账号权限计算。
+            统一查看总询盘、今日询盘、有效线索和待跟进任务；点击指标可直接进入带筛选条件的明细列表。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -122,35 +147,63 @@ export function DashboardPage() {
         />
       ) : null}
 
+      <Alert
+        showIcon
+        type="info"
+        className="login-error"
+        message={`当前时间范围：${dashboard?.time_scope.label ?? "全部历史"}`}
+        description={
+          dashboard?.time_scope.start_at
+            ? `${formatDate(dashboard.time_scope.start_at)} 至 ${formatDate(dashboard.time_scope.end_at)}`
+            : "展示当前权限范围内的全部历史询盘。"
+        }
+      />
+
       <Row gutter={[16, 16]} className="metric-row">
         <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
+          <Card loading={loading} hoverable onClick={() => goMetric("total_inquiries", "/admin/leads?time_scope=all")}>
+            <Statistic title="总询盘" value={dashboard?.total ?? 0} />
+            <div className="metric-chip">点击查看当前筛选下全部线索</div>
+          </Card>
+        </Col>
+        <Col xs={24} md={12} xl={6}>
+          <Card loading={loading} hoverable onClick={() => goMetric("today_inquiries", "/admin/leads?time_scope=today")}>
             <Statistic title="今日询盘" value={metrics?.today_inquiries ?? 0} />
-            <div className="metric-chip">按当前筛选实时归集</div>
+            <div className="metric-chip">自动跳转今日明细</div>
           </Card>
         </Col>
         <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
+          <Card loading={loading} hoverable onClick={() => goMetric("valid_leads", "/admin/leads?score=valid")}>
             <Statistic title="有效线索" value={metrics?.valid_leads ?? 0} />
-            <div className="metric-chip green">后端评分与人工状态合并</div>
+            <div className="metric-chip green">点击查看有效线索列表</div>
           </Card>
         </Col>
         <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
-            <Statistic title="未反馈" value={metrics?.unfeedback ?? 0} />
-            <div className="metric-chip amber">需要继续跟进</div>
-          </Card>
-        </Col>
-        <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
-            <Statistic title="官网 KPI" value={metrics?.website_kpi ?? 0} suffix="%" />
-            <div className="metric-chip">按可归因来源计算</div>
+          <Card loading={loading} hoverable onClick={() => goMetric("unfeedback", "/admin/assignments/pending")}>
+            <Statistic title="待跟进" value={metrics?.unfeedback ?? 0} />
+            <div className="metric-chip amber">待分配/待反馈任务</div>
           </Card>
         </Col>
       </Row>
 
       <Card id="dashboard-filters" className="dashboard-toolbar">
         <Space wrap size="middle">
+          <Select
+            aria-label="时间范围"
+            value={draftFilters.cycle ?? "all"}
+            options={timeScopeOptions}
+            onChange={(cycle) => updateDraft({ cycle, date: cycle === "date" ? draftFilters.date : undefined })}
+            style={{ width: 140 }}
+          />
+          {draftFilters.cycle === "date" ? (
+            <Input
+              aria-label="指定日期"
+              type="date"
+              value={draftFilters.date}
+              onChange={(event) => updateDraft({ date: event.target.value })}
+              style={{ width: 160 }}
+            />
+          ) : null}
           <Select
             allowClear
             aria-label="来源"
@@ -191,15 +244,6 @@ export function DashboardPage() {
             options={salesUsers.map((user) => ({ value: user.id, label: user.name }))}
             onChange={(ownerId) => updateDraft({ ownerId })}
           />
-          <Select
-            aria-label="周期"
-            value={draftFilters.cycle ?? "all"}
-            options={[
-              { value: "all", label: "全部周期" },
-              { value: "today", label: "今日" }
-            ]}
-            onChange={(cycle) => updateDraft({ cycle })}
-          />
           <Button type="primary" icon={<Check size={16} />} onClick={applyFilters}>
             应用
           </Button>
@@ -212,7 +256,7 @@ export function DashboardPage() {
           </Button>
         </Space>
         <Typography.Text className="muted">
-          当前显示：按后端筛选条件返回的 {dashboard?.total ?? 0} 条待办记录
+          当前显示：{dashboard?.time_scope.label ?? "全部历史"}，共 {dashboard?.total ?? 0} 条线索记录。
         </Typography.Text>
       </Card>
 
@@ -241,7 +285,7 @@ export function DashboardPage() {
           rowKey="id"
           loading={loading}
           dataSource={dashboard?.items ?? []}
-          scroll={{ x: 980 }}
+          scroll={{ x: 1120 }}
           pagination={{
             current: dashboard?.page ?? filters.page ?? 1,
             pageSize: dashboard?.page_size ?? filters.pageSize ?? 10,
@@ -255,12 +299,13 @@ export function DashboardPage() {
             }
           }}
           columns={[
-            { title: "客户", dataIndex: "customer_name" },
-            { title: "国家", dataIndex: "country" },
-            { title: "类型", dataIndex: "customer_type" },
-            { title: "产品", dataIndex: "product" },
+            { title: "进入时间", dataIndex: "created_at", width: 180, render: formatDate },
+            { title: "客户", dataIndex: "customer_name", width: 180 },
+            { title: "国家", dataIndex: "country", width: 110 },
+            { title: "产品", dataIndex: "product", width: 180 },
             {
               title: "来源",
+              width: 180,
               render: (_, record) => (
                 <Space>
                   <Tag color="purple">{record.source_category}</Tag>
@@ -271,16 +316,16 @@ export function DashboardPage() {
             {
               title: "评分",
               dataIndex: "score_label",
+              width: 110,
               render: (value: string) => <Tag color={scoreColor[value] ?? "default"}>{value}</Tag>
             },
-            { title: "反馈", dataIndex: "feedback_status" },
+            { title: "负责人", dataIndex: "owner_name", width: 140 },
+            { title: "反馈", dataIndex: "feedback_status", width: 120 },
             {
               title: "动作",
-              render: (_, record) => (
-                <Button onClick={() => navigate(record.detail_path)}>
-                  查看详情
-                </Button>
-              )
+              fixed: "right",
+              width: 120,
+              render: (_, record) => <Button onClick={() => navigate(record.detail_path)}>查看详情</Button>
             }
           ]}
         />

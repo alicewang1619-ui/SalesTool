@@ -15,6 +15,8 @@ export type Banner = {
 export type Lead = {
   id: number;
   customer_name: string;
+  email: string;
+  organization: string;
   country: string;
   customer_type: string;
   product: string;
@@ -22,6 +24,9 @@ export type Lead = {
   source_label: string;
   score_label: string;
   feedback_status: string;
+  owner_id: number | null;
+  owner_name: string;
+  created_at: string | null;
 };
 
 export type LeadDetail = Lead & {
@@ -68,6 +73,13 @@ export type DashboardResult = {
     unfeedback: number;
     website_kpi: number;
   };
+  time_scope: {
+    scope: string;
+    label: string;
+    start_at: string | null;
+    end_at: string | null;
+  };
+  metric_links: Record<string, string>;
   ai_summary: string;
   assignment_timeline: Array<{
     label: string;
@@ -132,6 +144,8 @@ export type ReportBreakdownItem = {
 
 export type ReportPeriodViewResult = {
   period: ReportPeriod;
+  period_label: string;
+  period_granularity: string;
   query_window: {
     start_at: string;
     end_at: string;
@@ -293,6 +307,8 @@ export type ImportJob = {
   processed_rows: number;
   success_rows: number;
   failed_rows: number;
+  auto_assigned_rows: number;
+  pending_assignment_rows: number;
   failures: ImportFailure[];
 };
 
@@ -358,22 +374,31 @@ export type DashboardFilters = {
   customerType?: string;
   product?: string;
   ownerId?: number;
-  cycle?: "today" | "all";
+  cycle?: "today" | "yesterday" | "date" | "all";
+  date?: string;
 };
 
 export type LeadFilters = {
   page?: number;
   pageSize?: number;
   sourceCategory?: string;
+  timeScope?: "today" | "yesterday" | "date" | "all";
+  date?: string;
+  score?: string;
 };
 
 export type Customer = {
   id: number;
   name: string;
+  email: string;
+  organization: string;
   country: string;
   customer_type: string;
   product: string;
   tier: string;
+  demand_summary: string;
+  source_summary: string;
+  first_inquiry_at: string;
   owner_id: number | null;
   owner_name: string;
   can_edit_background: boolean;
@@ -413,15 +438,20 @@ export type Customer = {
     summary: string;
     happened_at: string;
   }>;
+  signals: CustomerSignal[];
 };
 
 export type CustomerListItem = {
   id: number;
   name: string;
+  email: string;
+  organization: string;
   country: string;
   customer_type: string;
   product: string;
   tier: string;
+  first_inquiry_at: string;
+  source_summary: string;
   owner_id: number | null;
   owner_name: string;
   background_summary: string;
@@ -452,6 +482,8 @@ export type CustomerFilters = {
   country?: string;
   product?: string;
   tier?: string;
+  timeScope?: "today" | "yesterday" | "date" | "all";
+  date?: string;
 };
 
 export type CustomerSignalSource = "website_public" | "email_interaction" | "sales_feedback" | "manual";
@@ -666,12 +698,16 @@ export type NurtureTask = {
   recommended_next_action: string;
   customer_note: string;
   nurture_reason: string;
+  sender_email: string;
+  recipient_email: string;
+  email_subject: string;
   draft_content: string;
   generation_prompt: string;
   prompt_context_snapshot: NurturePromptContext;
   attachments: NurtureAttachment[];
   model_provider: string;
   model_version: string;
+  email_status: string;
   approval_status: "pending" | "confirmed" | "cancelled";
   detail_path: string;
   customer_detail_path: string;
@@ -689,6 +725,20 @@ export type NurtureTaskPageResult = {
     action_label: string;
     action_path: string;
   } | null;
+};
+
+export type MyProfile = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  data_scope: string;
+  email_settings: {
+    sender_email: string;
+    sender_name: string;
+    smtp_host: string;
+    configured: boolean;
+  };
 };
 
 const DEV_PROXY_TARGET = (import.meta.env.VITE_DEV_PROXY_TARGET ?? "").trim();
@@ -803,6 +853,9 @@ export function fetchLeads(filters: LeadFilters = {}): Promise<PageResult<Lead>>
   if (filters.sourceCategory) {
     params.set("source_category", filters.sourceCategory);
   }
+  if (filters.timeScope && filters.timeScope !== "all") params.set("time_scope", filters.timeScope);
+  if (filters.date) params.set("date", filters.date);
+  if (filters.score) params.set("score", filters.score);
   return request<PageResult<Lead>>(`/api/leads?${params.toString()}`);
 }
 
@@ -830,6 +883,19 @@ export function createImportJob(file: File): Promise<ImportJob> {
   return requestForm<ImportJob>("/api/import-jobs", form);
 }
 
+export async function downloadImportTemplate(): Promise<string> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_BASE}/api/import-template`, { headers });
+  if (!response.ok) {
+    throw new Error("导入模板下载失败");
+  }
+  return response.text();
+}
+
 export function fetchImportJob(taskId: string): Promise<ImportJob> {
   return request<ImportJob>(`/api/import-jobs/${taskId}`);
 }
@@ -838,11 +904,13 @@ export function retryImportJob(taskId: string): Promise<ImportJob> {
   return request<ImportJob>(`/api/import-jobs/${taskId}/retry`, { method: "POST" });
 }
 
-export function fetchPendingAssignments(filters: { page?: number; pageSize?: number } = {}): Promise<PageResult<PendingAssignment>> {
+export function fetchPendingAssignments(filters: { page?: number; pageSize?: number; timeScope?: string; date?: string } = {}): Promise<PageResult<PendingAssignment>> {
   const params = new URLSearchParams({
     page: String(filters.page ?? 1),
     page_size: String(filters.pageSize ?? 20)
   });
+  if (filters.timeScope && filters.timeScope !== "all") params.set("time_scope", filters.timeScope);
+  if (filters.date) params.set("date", filters.date);
   return request<PageResult<PendingAssignment>>(`/api/assignments/pending?${params.toString()}`);
 }
 
@@ -902,6 +970,7 @@ export function fetchDashboard(filters: DashboardFilters = {}): Promise<Dashboar
   if (filters.product) params.set("product", filters.product);
   if (filters.ownerId) params.set("owner_id", String(filters.ownerId));
   if (filters.cycle && filters.cycle !== "all") params.set("cycle", filters.cycle);
+  if (filters.date) params.set("date", filters.date);
   return request<DashboardResult>(`/api/dashboard?${params.toString()}`);
 }
 
@@ -1027,6 +1096,8 @@ export function fetchCustomers(filters: CustomerFilters = {}): Promise<CustomerP
   if (filters.country) params.set("country", filters.country);
   if (filters.product) params.set("product", filters.product);
   if (filters.tier) params.set("tier", filters.tier);
+  if (filters.timeScope && filters.timeScope !== "all") params.set("time_scope", filters.timeScope);
+  if (filters.date) params.set("date", filters.date);
   return request<CustomerPageResult>(`/api/customers?${params.toString()}`);
 }
 
@@ -1103,6 +1174,7 @@ export function updateNurtureTask(
     recommendedNextAction: string;
     customerNote: string;
     nurtureReason: string;
+    emailSubject?: string;
     draftContent: string;
     generationPrompt: string;
   }
@@ -1113,6 +1185,7 @@ export function updateNurtureTask(
       recommended_next_action: payload.recommendedNextAction,
       customer_note: payload.customerNote,
       nurture_reason: payload.nurtureReason,
+      email_subject: payload.emailSubject ?? null,
       draft_content: payload.draftContent,
       generation_prompt: payload.generationPrompt
     })
@@ -1132,10 +1205,38 @@ export function regenerateNurtureTask(taskId: number, generationPrompt: string):
   });
 }
 
-export function confirmNurtureTask(taskId: number, draftContent: string): Promise<NurtureTask> {
+export function confirmNurtureTask(taskId: number, draftContent: string, emailSubject?: string): Promise<NurtureTask> {
   return request<NurtureTask>(`/api/nurture-tasks/${taskId}/confirm`, {
     method: "POST",
-    body: JSON.stringify({ draft_content: draftContent })
+    body: JSON.stringify({ draft_content: draftContent, email_subject: emailSubject || null })
+  });
+}
+
+export function fetchMyProfile(): Promise<MyProfile> {
+  return request<MyProfile>("/api/me/profile");
+}
+
+export function updateMyProfile(payload: {
+  name: string;
+  senderEmail: string;
+  senderName: string;
+  smtpHost: string;
+}): Promise<MyProfile> {
+  return request<MyProfile>("/api/me/profile", {
+    method: "PUT",
+    body: JSON.stringify({
+      name: payload.name,
+      sender_email: payload.senderEmail,
+      sender_name: payload.senderName,
+      smtp_host: payload.smtpHost
+    })
+  });
+}
+
+export function updateMyPassword(payload: { oldPassword: string; newPassword: string }): Promise<{ changed: boolean }> {
+  return request<{ changed: boolean }>("/api/me/password", {
+    method: "PUT",
+    body: JSON.stringify({ old_password: payload.oldPassword, new_password: payload.newPassword })
   });
 }
 
@@ -1257,6 +1358,28 @@ export function createSalesUser(payload: {
       name: payload.name,
       email: payload.email,
       password: payload.password,
+      role: payload.role,
+      data_scope: payload.dataScope,
+      enabled: payload.enabled
+    })
+  });
+}
+
+export function updateSalesUser(
+  userId: number,
+  payload: {
+    name: string;
+    email: string;
+    role: string;
+    dataScope: string;
+    enabled: boolean;
+  }
+): Promise<SalesUser> {
+  return request<SalesUser>(`/api/settings/sales-users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
       role: payload.role,
       data_scope: payload.dataScope,
       enabled: payload.enabled

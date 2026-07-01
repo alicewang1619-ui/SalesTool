@@ -3,10 +3,9 @@ import ReactDOM from "react-dom/client";
 import "@ant-design/v5-patch-for-react-19";
 import { App as AntApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { AppShell } from "./shell/AppShell";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
-import { CustomerSignalsPage } from "./pages/CustomerSignalsPage";
 import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadsPage } from "./pages/LeadsPage";
@@ -25,6 +24,7 @@ import { ReportsPeriodPage } from "./pages/ReportsPeriodPage";
 import { CountrySalesMappingPage } from "./pages/CountrySalesMappingPage";
 import { ProductKnowledgePage } from "./pages/ProductKnowledgePage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { MyProfilePage } from "./pages/MyProfilePage";
 import "./styles.css";
 
 const router = createBrowserRouter([
@@ -41,7 +41,7 @@ const router = createBrowserRouter([
       { path: "assignments/pending", element: <PendingAssignmentsPage /> },
       { path: "customers", element: <CustomersPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
-      { path: "customer-signals", element: <CustomerSignalsPage /> },
+      { path: "customer-signals", element: <Navigate to="/admin/customers" replace /> },
       { path: "nurture", element: <NurtureTasksPage /> },
       { path: "nurture/:taskId", element: <NurtureTaskDetailPage /> },
       { path: "reports", element: <ReportsHomePage /> },
@@ -51,7 +51,8 @@ const router = createBrowserRouter([
       { path: "forbidden", element: <ForbiddenPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "settings/country-sales", element: <CountrySalesMappingPage /> },
-      { path: "settings/product-knowledge", element: <ProductKnowledgePage /> }
+      { path: "settings/product-knowledge", element: <ProductKnowledgePage /> },
+      { path: "me", element: <MyProfilePage /> }
     ]
   }
 ]);

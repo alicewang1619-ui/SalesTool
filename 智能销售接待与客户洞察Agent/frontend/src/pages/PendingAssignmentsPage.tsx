@@ -1,12 +1,13 @@
-import { Alert, Button, Card, Empty, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, Empty, Input, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { RefreshCw, Route, Save, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   confirmPendingAssignment,
   fetchPendingAssignments,
   fetchSalesUsers,
+  type LeadFilters,
   type PendingAssignment,
   type SalesUser
 } from "../api";
@@ -20,16 +21,43 @@ const reasonLabel: Record<string, string> = {
 const scoreColor: Record<string, string> = {
   有效: "green",
   高意向: "purple",
-  待补充: "orange",
+  待补全: "orange",
   资料库: "gold",
   pending: "orange"
 };
 
+const timeScopeOptions: Array<{ value: NonNullable<LeadFilters["timeScope"]>; label: string }> = [
+  { value: "all", label: "全部历史" },
+  { value: "today", label: "今日" },
+  { value: "yesterday", label: "昨天" },
+  { value: "date", label: "指定日期" }
+];
+
+function normalizeScope(value: string | null): LeadFilters["timeScope"] {
+  if (value === "today" || value === "yesterday" || value === "date" || value === "all") return value;
+  return "all";
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
+function scopeLabel(scope?: string, date?: string): string {
+  if (scope === "today") return "今日";
+  if (scope === "yesterday") return "昨天";
+  if (scope === "date") return date ? `指定日期 ${date}` : "指定日期";
+  return "全部历史";
+}
+
 export function PendingAssignmentsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<PendingAssignment[]>([]);
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
   const [assigneeByLead, setAssigneeByLead] = useState<Record<number, number>>({});
+  const [timeScope, setTimeScope] = useState<LeadFilters["timeScope"]>(normalizeScope(searchParams.get("time_scope")));
+  const [date, setDate] = useState<string | undefined>(searchParams.get("date") ?? undefined);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -50,10 +78,17 @@ export function PendingAssignmentsPage() {
     [items]
   );
 
+  const syncSearchParams = () => {
+    const params = new URLSearchParams();
+    if (timeScope && timeScope !== "all") params.set("time_scope", timeScope);
+    if (date) params.set("date", date);
+    setSearchParams(params);
+  };
+
   const loadPage = () => {
     setLoading(true);
     setError(null);
-    Promise.all([fetchPendingAssignments({ page, pageSize }), fetchSalesUsers().catch(() => [])])
+    Promise.all([fetchPendingAssignments({ page, pageSize, timeScope, date }), fetchSalesUsers().catch(() => [])])
       .then(([result, users]) => {
         setItems(result.items);
         setTotal(result.total);
@@ -74,7 +109,7 @@ export function PendingAssignmentsPage() {
 
   useEffect(() => {
     loadPage();
-  }, [page, pageSize]);
+  }, [page, pageSize, timeScope, date]);
 
   async function assignLead(lead: PendingAssignment) {
     const ownerId = assigneeByLead[lead.id];
@@ -94,10 +129,16 @@ export function PendingAssignmentsPage() {
     }
   }
 
+  const applyTimeFilter = () => {
+    setPage(1);
+    syncSearchParams();
+    loadPage();
+  };
+
   const columns: ColumnsType<PendingAssignment> = [
+    { title: "创建时间", dataIndex: "created_at", width: 180, render: formatDate },
     { title: "客户", dataIndex: "customer_name", fixed: "left", width: 180 },
     { title: "国家", dataIndex: "country", width: 120 },
-    { title: "类型", dataIndex: "customer_type", width: 120 },
     { title: "产品", dataIndex: "product", width: 180 },
     {
       title: "评分",
@@ -109,7 +150,7 @@ export function PendingAssignmentsPage() {
     {
       title: "待处理原因",
       dataIndex: "pending_reasons",
-      width: 220,
+      width: 230,
       render: (reasons: string[]) => (
         <Space wrap>
           {reasons.map((reason) => (
@@ -122,7 +163,7 @@ export function PendingAssignmentsPage() {
     },
     {
       title: "动作",
-      width: 270,
+      width: 280,
       fixed: "right",
       render: (_, lead) => (
         <Space direction="vertical" size={8}>
@@ -154,10 +195,10 @@ export function PendingAssignmentsPage() {
     <section className="pending-assignments-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1 (MVP) · 分发与反馈</Typography.Text>
+          <Typography.Text className="stage-label">阶段 1 (MVP) · 分发与反馈</Typography.Text>
           <Typography.Title level={2}>待分配列表</Typography.Title>
           <Typography.Paragraph className="muted">
-            集中处理国家缺失、国家映射缺失或销售负责人缺失的线索，确认后生成 7 天有效的销售反馈链接。
+            集中处理国家缺失、国家映射缺失或负责人缺失的线索；支持查看今日、昨天、指定日期和全部历史任务。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -184,10 +225,35 @@ export function PendingAssignmentsPage() {
         />
       ) : null}
 
+      <Card className="dashboard-toolbar">
+        <Space wrap>
+          <Select
+            aria-label="时间范围"
+            value={timeScope}
+            options={timeScopeOptions}
+            onChange={(value) => {
+              setTimeScope(value);
+              if (value !== "date") setDate(undefined);
+              setPage(1);
+            }}
+            style={{ width: 140 }}
+          />
+          {timeScope === "date" ? (
+            <Input aria-label="指定日期" type="date" value={date} onChange={(event) => setDate(event.target.value)} style={{ width: 160 }} />
+          ) : null}
+          <Button type="primary" onClick={applyTimeFilter}>
+            应用时间线
+          </Button>
+        </Space>
+        <Typography.Text className="muted">
+          当前时间线：{scopeLabel(timeScope, date)}，共 {total} 条待分配。
+        </Typography.Text>
+      </Card>
+
       <div className="assignment-metrics">
         <Card>
           <Statistic title="待处理线索" value={total} />
-          <div className="metric-chip">来自后端待分配队列</div>
+          <div className="metric-chip">{scopeLabel(timeScope, date)}</div>
         </Card>
         <Card>
           <Statistic title="映射缺失" value={metrics.mappingMissing} />
@@ -205,7 +271,7 @@ export function PendingAssignmentsPage() {
           loading={loading}
           dataSource={items}
           columns={columns}
-          scroll={{ x: 1220 }}
+          scroll={{ x: 1320 }}
           locale={{
             emptyText: (
               <Empty description="暂无待分配线索">

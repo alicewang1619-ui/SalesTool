@@ -1,5 +1,5 @@
 import { Button, Card, Col, Empty, Row, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
-import { CheckCircle2, Filter, FileText } from "lucide-react";
+import { CheckCircle2, FileText, Filter } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchNurtureTasks, type NurtureTask, type NurtureTaskPageResult } from "../api";
@@ -14,6 +14,12 @@ const statusColors: Record<string, string> = {
   pending: "purple",
   confirmed: "green",
   cancelled: "default"
+};
+
+const emailStatusLabels: Record<string, string> = {
+  draft: "草稿",
+  pending: "待发送",
+  sent: "已发送"
 };
 
 export function NurtureTasksPage() {
@@ -48,7 +54,7 @@ export function NurtureTasksPage() {
           <Typography.Text className="stage-label">阶段 2 · 再营销待办</Typography.Text>
           <Typography.Title level={2}>再营销待办列表</Typography.Title>
           <Typography.Paragraph className="muted">
-            从客户池选择适合下一步触达的客户，查看建议动作、提示词、附件素材和待确认草稿。
+            管理员和运营可查看全部潜在客户；销售可查看自己负责国家/客户范围内的再营销任务，并用自己的邮箱发送。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -74,7 +80,7 @@ export function NurtureTasksPage() {
         </Col>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic title="带附件素材" value={data?.summary.with_attachments ?? 0} />
+            <Statistic title="带参考附件" value={data?.summary.with_attachments ?? 0} />
           </Card>
         </Col>
       </Row>
@@ -94,6 +100,9 @@ export function NurtureTasksPage() {
             style={{ width: 180 }}
           />
         </Space>
+        <Typography.Text className="muted">
+          附件默认作为 AI 写邮件的参考素材；是否随邮件发送需要在详情页人工确认。
+        </Typography.Text>
       </Card>
 
       <Card className="table-card">
@@ -112,10 +121,12 @@ export function NurtureTasksPage() {
             onChange: (page, pageSize) => void load(page, pageSize)
           }}
           columns={[
-            { title: "客户", dataIndex: "customer_name", fixed: "left", width: 190 },
-            { title: "客户分层", dataIndex: "customer_tier", width: 130, render: (tier) => <Tag color="purple">{tier}</Tag> },
-            { title: "建议下一步动作", dataIndex: "recommended_next_action", width: 300 },
-            { title: "客户备注", dataIndex: "customer_note", width: 260 },
+            { title: "客户", dataIndex: "customer_name", fixed: "left", width: 180 },
+            { title: "客户分层", dataIndex: "customer_tier", width: 120, render: (tier) => <Tag color="purple">{tier}</Tag> },
+            { title: "发件人", dataIndex: "sender_email", width: 220 },
+            { title: "收件人", dataIndex: "recipient_email", width: 220 },
+            { title: "邮件主题", dataIndex: "email_subject", width: 240 },
+            { title: "建议动作", dataIndex: "recommended_next_action", width: 280 },
             {
               title: "提示词/附件",
               key: "prompt",
@@ -126,6 +137,12 @@ export function NurtureTasksPage() {
                   <Tag color={record.attachments.length ? "green" : "gold"}>{record.attachments.length} 附件</Tag>
                 </Space>
               )
+            },
+            {
+              title: "邮件状态",
+              dataIndex: "email_status",
+              width: 110,
+              render: (status) => <Tag color={status === "sent" ? "green" : "gold"}>{emailStatusLabels[status] ?? status}</Tag>
             },
             {
               title: "草稿状态",
@@ -145,7 +162,7 @@ export function NurtureTasksPage() {
               )
             }
           ]}
-          scroll={{ x: 1320 }}
+          scroll={{ x: 1780 }}
         />
       </Card>
     </>

@@ -3401,6 +3401,10 @@ AI_MODEL_DEFAULT_OPTIONS = [
         "scenario": "线索预处理、短摘要、低延迟接待",
         "capability": "响应快，适合高频批量任务",
         "status": "available",
+        "api_base_url": "",
+        "endpoint_path": "/v1/chat/completions",
+        "auth_type": "bearer",
+        "api_key_configured": False,
     },
     {
         "value": "ug-balanced-v1",
@@ -3409,6 +3413,10 @@ AI_MODEL_DEFAULT_OPTIONS = [
         "scenario": "AI 接待、客户摘要、评分和再营销草稿",
         "capability": "质量与速度平衡，默认推荐",
         "status": "available",
+        "api_base_url": "",
+        "endpoint_path": "/v1/chat/completions",
+        "auth_type": "bearer",
+        "api_key_configured": False,
     },
     {
         "value": "ug-quality-v1",
@@ -3417,6 +3425,10 @@ AI_MODEL_DEFAULT_OPTIONS = [
         "scenario": "复杂客户背景调查、长邮件草稿和高价值客户触达",
         "capability": "推理更强，成本和耗时更高",
         "status": "available",
+        "api_base_url": "",
+        "endpoint_path": "/v1/chat/completions",
+        "auth_type": "bearer",
+        "api_key_configured": False,
     },
     {
         "value": "claude-sonnet",
@@ -3425,6 +3437,10 @@ AI_MODEL_DEFAULT_OPTIONS = [
         "scenario": "邮件草稿和高价值客户触达",
         "capability": "长文本写作、语气控制和复杂客户沟通",
         "status": "available",
+        "api_base_url": "https://api.anthropic.com",
+        "endpoint_path": "/v1/messages",
+        "auth_type": "x-api-key",
+        "api_key_configured": False,
     },
     {
         "value": "codex",
@@ -3433,6 +3449,10 @@ AI_MODEL_DEFAULT_OPTIONS = [
         "scenario": "AI 接待流程、结构化推理和内部工作流辅助",
         "capability": "适合拆解流程、生成结构化摘要和工具化任务",
         "status": "available",
+        "api_base_url": "https://api.openai.com",
+        "endpoint_path": "/v1/responses",
+        "auth_type": "bearer",
+        "api_key_configured": False,
     },
     {
         "value": "deepseek-chat",
@@ -3441,6 +3461,10 @@ AI_MODEL_DEFAULT_OPTIONS = [
         "scenario": "客户背景调研、中文资料整理和批量摘要",
         "capability": "适合低成本批量分析和多语言背景摘要",
         "status": "available",
+        "api_base_url": "https://api.deepseek.com",
+        "endpoint_path": "/chat/completions",
+        "auth_type": "bearer",
+        "api_key_configured": False,
     },
 ]
 AI_MODEL_OPTIONS = AI_MODEL_DEFAULT_OPTIONS
@@ -3524,8 +3548,8 @@ EMAIL_WRITER_DEFAULT_ROLES = [
 ]
 
 
-def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[dict[str, str]]:
-    options_by_value: dict[str, dict[str, str]] = {
+def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[dict[str, object]]:
+    options_by_value: dict[str, dict[str, object]] = {
         item["value"]: dict(item)
         for item in AI_MODEL_DEFAULT_OPTIONS
     }
@@ -3542,6 +3566,13 @@ def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[
         scenario = str(item.get("scenario", "")).strip()
         capability = str(item.get("capability", "")).strip()
         status_value = str(item.get("status", "available")).strip() or "available"
+        api_base_url = str(item.get("api_base_url", "")).strip()
+        endpoint_path = str(item.get("endpoint_path", "")).strip()
+        auth_type = str(item.get("auth_type", "bearer")).strip() or "bearer"
+        raw_api_key = item.get("api_key")
+        api_key_configured = bool(item.get("api_key_configured")) or (
+            isinstance(raw_api_key, str) and bool(raw_api_key.strip())
+        )
         if not value or not label or not provider or not scenario or not capability:
             continue
         options_by_value[value] = {
@@ -3551,6 +3582,10 @@ def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[
             "scenario": scenario,
             "capability": capability,
             "status": status_value,
+            "api_base_url": api_base_url,
+            "endpoint_path": endpoint_path,
+            "auth_type": auth_type,
+            "api_key_configured": api_key_configured,
         }
     return list(options_by_value.values())
 

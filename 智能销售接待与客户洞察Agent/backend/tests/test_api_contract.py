@@ -1865,6 +1865,10 @@ def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_reg
                     "scenario": "邮件草稿和高价值客户触达",
                     "capability": "长文本写作和复杂语气控制",
                     "status": "available",
+                    "api_base_url": "https://api.anthropic.com",
+                    "endpoint_path": "/v1/messages",
+                    "auth_type": "x-api-key",
+                    "api_key": "secret-test-key",
                 },
                 {
                     "value": "codex",
@@ -1898,6 +1902,12 @@ def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_reg
     assert body["use_case_bindings"]["email_draft"] == "claude-sonnet"
     assert body["use_case_bindings"]["customer_research"] == "deepseek-chat"
     assert {option["provider"] for option in body["options"]}.issuperset({"Anthropic", "OpenAI", "DeepSeek"})
+    claude = next(option for option in body["options"] if option["value"] == "claude-sonnet")
+    assert claude["api_base_url"] == "https://api.anthropic.com"
+    assert claude["endpoint_path"] == "/v1/messages"
+    assert claude["auth_type"] == "x-api-key"
+    assert claude["api_key_configured"] is True
+    assert "api_key" not in claude
 
     task = client.get("/api/nurture-tasks", headers=headers).json()["items"][0]
     regenerated = client.post(

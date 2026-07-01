@@ -568,6 +568,11 @@ export type AIModelOption = {
   scenario: string;
   capability: string;
   status: string;
+  api_base_url?: string;
+  endpoint_path?: string;
+  auth_type?: string;
+  api_key_configured?: boolean;
+  api_key?: string;
 };
 
 export type AIModelUseCase = {

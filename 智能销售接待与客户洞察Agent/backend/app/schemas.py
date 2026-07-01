@@ -722,6 +722,14 @@ class AIModelOptionOut(BaseModel):
     scenario: str
     capability: str
     status: str
+    api_base_url: str = ""
+    endpoint_path: str = ""
+    auth_type: str = "bearer"
+    api_key_configured: bool = False
+
+
+class AIModelOptionUpdateRequest(AIModelOptionOut):
+    api_key: str | None = Field(default=None, max_length=2000)
 
 
 class AIModelUseCaseOut(BaseModel):
@@ -882,7 +890,7 @@ class PermissionUpdateRequest(BaseModel):
 
 class AIModelUpdateRequest(BaseModel):
     selected_model: str = Field(min_length=2, max_length=120)
-    options: list[AIModelOptionOut] | None = None
+    options: list[AIModelOptionUpdateRequest] | None = None
     use_cases: list[AIModelUseCaseOut] | None = None
     use_case_bindings: dict[str, str] | None = None
     email_writers: list[EmailWriterRoleOut] | None = None

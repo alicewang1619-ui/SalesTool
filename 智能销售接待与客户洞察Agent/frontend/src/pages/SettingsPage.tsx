@@ -206,6 +206,9 @@ function readBannerImage(file: File): Promise<{ url: string; meta: BannerImageMe
 export function SettingsPage() {
   const [searchParams] = useSearchParams();
   const [accountForm] = Form.useForm<AccountFormValues>();
+  const [modelForm] = Form.useForm<AIModelOption & { apiKey?: string }>();
+  const [writerForm] = Form.useForm<EmailWriterRole & { skillsText?: string }>();
+  const [useCaseForm] = Form.useForm<AIModelUseCase>();
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
   const [activeMenu, setActiveMenu] = useState(sectionMenuMap[searchParams.get("section") ?? ""] ?? "overview");
   const [loading, setLoading] = useState(true);
@@ -233,11 +236,40 @@ export function SettingsPage() {
   const [emailWriters, setEmailWriters] = useState<EmailWriterRole[]>(fallbackWriters);
   const [defaultEmailWriter, setDefaultEmailWriter] = useState("baymax");
   const [savingAIModel, setSavingAIModel] = useState(false);
+  const [selectedSourceCategory, setSelectedSourceCategory] = useState("网站");
+  const [selectedUseCaseKey, setSelectedUseCaseKey] = useState("email_draft");
+  const [selectedModelValue, setSelectedModelValue] = useState("ug-balanced-v1");
+  const [selectedWriterKey, setSelectedWriterKey] = useState("baymax");
+  const [modelModalOpen, setModelModalOpen] = useState(false);
+  const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null);
+  const [useCaseModalOpen, setUseCaseModalOpen] = useState(false);
+  const [writerModalOpen, setWriterModalOpen] = useState(false);
+  const [editingWriterIndex, setEditingWriterIndex] = useState<number | null>(null);
 
   const aiModelConfig = normaliseAIModelConfig({ ...overview?.ai_model, options: modelOptions, use_cases: aiModelUseCases, use_case_bindings: aiModelBindings, email_writers: emailWriters, default_email_writer: defaultEmailWriter });
   const selectedAIModel = aiModelConfig.options.find((item) => item.value === aiModelDraft) ?? aiModelConfig.options[0];
   const enabledEmailWriters = useMemo(() => emailWriters.filter((writer) => writer.status === "enabled"), [emailWriters]);
   const currentPermission = useMemo(() => overview?.permissions.find((row) => row.role === selectedRole), [overview, selectedRole]);
+  const sourceCategories = useMemo(() => {
+    const categories = Array.from(new Set(sourceRows.map((row) => row.category || "未分组")));
+    return categories.length ? categories : ["网站"];
+  }, [sourceRows]);
+  const selectedSourceRows = useMemo(
+    () => sourceRows.map((row, index) => ({ row, index })).filter((item) => (item.row.category || "未分组") === selectedSourceCategory),
+    [selectedSourceCategory, sourceRows]
+  );
+  const modelSelectOptions = useMemo(
+    () => modelOptions.map((item) => ({ value: item.value, label: `${item.label || item.value} · ${item.provider || "未填供应商"}` })),
+    [modelOptions]
+  );
+  const selectedUseCase = useMemo(
+    () => aiModelUseCases.find((item) => item.key === selectedUseCaseKey) ?? aiModelUseCases[0],
+    [aiModelUseCases, selectedUseCaseKey]
+  );
+  const selectedBindingValue = selectedUseCase ? aiModelBindings[selectedUseCase.key] ?? aiModelDraft : aiModelDraft;
+  const selectedBindingModel = modelOptions.find((item) => item.value === selectedBindingValue) ?? selectedAIModel;
+  const selectedModelForDetails = modelOptions.find((item) => item.value === selectedModelValue) ?? modelOptions[0];
+  const selectedWriterForDetails = emailWriters.find((writer) => writer.key === selectedWriterKey) ?? enabledEmailWriters[0] ?? emailWriters[0];
 
   async function load() {
     setLoading(true);
@@ -258,7 +290,12 @@ export function SettingsPage() {
       setAIModelBindings(config.use_case_bindings);
       setEmailWriters(config.email_writers);
       setDefaultEmailWriter(config.default_email_writer);
-      setSourceRows(result.source_dictionary ?? []);
+      setSelectedUseCaseKey((current) => config.use_cases.some((item) => item.key === current) ? current : config.use_cases[0]?.key ?? "email_draft");
+      setSelectedModelValue((current) => config.options.some((item) => item.value === current) ? current : config.selected_model);
+      setSelectedWriterKey((current) => config.email_writers.some((writer) => writer.key === current) ? current : config.default_email_writer);
+      const nextSources = result.source_dictionary ?? [];
+      setSourceRows(nextSources);
+      setSelectedSourceCategory((current) => nextSources.some((row) => row.category === current) ? current : nextSources[0]?.category ?? "网站");
       setChannelRows(result.channel_configs ?? []);
       setReminderRows(result.reminder_rules ?? []);
       setMailDraft(mailDraftFrom(result.mail_settings));
@@ -311,6 +348,121 @@ export function SettingsPage() {
       }
       return { ...row, ...patch };
     }));
+  }
+
+  function addSourceForSelectedCategory() {
+    setSourceRows((rows) => [...rows, { id: null, category: selectedSourceCategory || "网站", label: "", enabled: true }]);
+  }
+
+  function openCreateUseCase() {
+    useCaseForm.setFieldsValue({ key: `scene_${Date.now()}`, label: "", description: "" });
+    setUseCaseModalOpen(true);
+  }
+
+  function submitUseCase(values: AIModelUseCase) {
+    const clean = {
+      key: values.key.trim(),
+      label: values.label.trim(),
+      description: values.description.trim()
+    };
+    setAIModelUseCases((rows) => [...rows.filter((item) => item.key !== clean.key), clean]);
+    setAIModelBindings((bindings) => ({ ...bindings, [clean.key]: bindings[clean.key] ?? aiModelDraft }));
+    setSelectedUseCaseKey(clean.key);
+    setUseCaseModalOpen(false);
+  }
+
+  function openCreateModel() {
+    setEditingModelIndex(null);
+    modelForm.setFieldsValue({
+      value: modelValueFrom("provider", `model-${Date.now()}`),
+      label: "",
+      provider: "",
+      scenario: "",
+      capability: "",
+      status: "available",
+      api_base_url: "",
+      endpoint_path: "/v1/chat/completions",
+      auth_type: "bearer",
+      api_key_configured: false,
+      apiKey: ""
+    });
+    setModelModalOpen(true);
+  }
+
+  function openEditModel(index: number) {
+    const model = modelOptions[index];
+    setEditingModelIndex(index);
+    modelForm.setFieldsValue({ ...model, apiKey: "" });
+    setModelModalOpen(true);
+  }
+
+  function submitModel(values: AIModelOption & { apiKey?: string }) {
+    const { apiKey, ...rest } = values;
+    const nextModel: AIModelOption = {
+      ...rest,
+      value: (rest.value || modelValueFrom(rest.provider, rest.label)).trim(),
+      label: rest.label.trim(),
+      provider: rest.provider.trim(),
+      scenario: rest.scenario.trim(),
+      capability: rest.capability.trim(),
+      status: rest.status || "available",
+      api_base_url: rest.api_base_url?.trim() ?? "",
+      endpoint_path: rest.endpoint_path?.trim() ?? "",
+      auth_type: rest.auth_type || "bearer",
+      api_key_configured: Boolean(apiKey?.trim()) || rest.api_key_configured === true,
+      api_key: apiKey?.trim() || undefined
+    };
+    setModelOptions((rows) => {
+      if (editingModelIndex === null) return [...rows, nextModel];
+      return rows.map((row, index) => index === editingModelIndex ? nextModel : row);
+    });
+    setAIModelDraft((current) => current || nextModel.value);
+    setSelectedModelValue(nextModel.value);
+    setModelModalOpen(false);
+  }
+
+  function openCreateWriter() {
+    setEditingWriterIndex(null);
+    writerForm.setFieldsValue({
+      key: `writer_${Date.now()}`,
+      name: "",
+      display_name: "",
+      style: "",
+      skillsText: "",
+      best_for: "",
+      status: "enabled"
+    });
+    setWriterModalOpen(true);
+  }
+
+  function openEditWriter(index: number) {
+    const writer = emailWriters[index];
+    setEditingWriterIndex(index);
+    writerForm.setFieldsValue({ ...writer, skillsText: writer.skills.join("、") });
+    setWriterModalOpen(true);
+  }
+
+  function submitWriter(values: EmailWriterRole & { skillsText?: string }) {
+    const skills = (values.skillsText || "")
+      .split(/[、,，\n]/)
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+    const nextWriter: EmailWriterRole = {
+      key: values.key.trim(),
+      name: values.name.trim(),
+      display_name: values.display_name.trim(),
+      style: values.style.trim(),
+      skills,
+      best_for: values.best_for.trim(),
+      status: values.status || "enabled"
+    };
+    setEmailWriters((rows) => {
+      if (editingWriterIndex === null) return [...rows, nextWriter];
+      return rows.map((row, index) => index === editingWriterIndex ? nextWriter : row);
+    });
+    setSelectedWriterKey(nextWriter.key);
+    setDefaultEmailWriter((current) => current || nextWriter.key);
+    setWriterModalOpen(false);
   }
 
   async function publishBanner() {
@@ -554,12 +706,46 @@ export function SettingsPage() {
       {activeMenu === "routing" ? (
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
           <Card title="国家区域销售映射" extra={<Link to="/admin/settings/country-sales"><Button>进入映射配置</Button></Link>}><Typography.Text className="muted">一个销售可以负责多个国家；客户导入时会按国家自动分配销售，你只需要确认异常结果。</Typography.Text></Card>
-          <Card id="sources" title="客户来源字典" extra={<Space><Button icon={<Plus size={16} />} onClick={() => setSourceRows((rows) => [...rows, { id: null, category: "网站", label: "", enabled: true }])}>新增来源</Button><Button type="primary" loading={savingRouting} onClick={() => void saveRouting("source")}>保存来源</Button></Space>}>
-            <Table<SourceDictionarySetting> rowKey={(record, index) => String(record.id ?? `new-source-${index}`)} dataSource={sourceRows} pagination={false} columns={[
-              { title: "来源类型", render: (_, row, index) => <Input value={row.category} onChange={(event) => updateSourceRow(index, { category: event.target.value })} /> },
-              { title: "来源名称", render: (_, row, index) => <Input value={row.label} onChange={(event) => updateSourceRow(index, { label: event.target.value })} /> },
-              { title: "启用", width: 120, render: (_, row, index) => <Switch checked={row.enabled} onChange={(enabled) => updateSourceRow(index, { enabled })} /> }
-            ]} />
+          <Card id="sources" title="客户来源字典" extra={<Space><Button icon={<Plus size={16} />} onClick={addSourceForSelectedCategory}>在当前类型新增来源</Button><Button type="primary" loading={savingRouting} onClick={() => void saveRouting("source")}>保存来源</Button></Space>}>
+            <Space direction="vertical" size={16} style={{ width: "100%" }}>
+              <Alert type="info" showIcon message="先选择来源类型，再维护该类型下的来源" description="默认不铺开全部来源。切换下拉菜单后，只编辑当前类型的来源项；保存后会同步影响线索池筛选和导入校验。" />
+              <Row gutter={[16, 12]} align="middle">
+                <Col xs={24} md={10}>
+                  <Typography.Text className="field-label">来源类型下拉菜单</Typography.Text>
+                  <Select
+                    value={selectedSourceCategory}
+                    options={sourceCategories.map((category) => ({
+                      value: category,
+                      label: `${category}（${sourceRows.filter((row) => (row.category || "未分组") === category).length} 个来源）`
+                    }))}
+                    onChange={setSelectedSourceCategory}
+                    style={{ width: "100%" }}
+                  />
+                </Col>
+                <Col xs={24} md={14}>
+                  <Tag color="purple">当前类型：{selectedSourceCategory}</Tag>
+                  <Tag color="blue">已展开 {selectedSourceRows.length} 个来源</Tag>
+                </Col>
+              </Row>
+              <div className="source-dictionary-editor">
+                {selectedSourceRows.map(({ row, index }) => (
+                  <Row gutter={[12, 12]} align="middle" key={row.id ?? `new-source-${index}`} className="source-dictionary-row">
+                    <Col xs={24} md={8}>
+                      <Typography.Text className="field-label">来源类型</Typography.Text>
+                      <Input value={row.category} onChange={(event) => updateSourceRow(index, { category: event.target.value })} />
+                    </Col>
+                    <Col xs={24} md={10}>
+                      <Typography.Text className="field-label">来源名称</Typography.Text>
+                      <Input value={row.label} onChange={(event) => updateSourceRow(index, { label: event.target.value })} placeholder="例如 官网聊天 / Facebook / 线下展会" />
+                    </Col>
+                    <Col xs={24} md={6}>
+                      <Typography.Text className="field-label">是否启用</Typography.Text>
+                      <Space><Switch checked={row.enabled} onChange={(enabled) => updateSourceRow(index, { enabled })} /><Typography.Text>{row.enabled ? "启用" : "停用"}</Typography.Text></Space>
+                    </Col>
+                  </Row>
+                ))}
+              </div>
+            </Space>
           </Card>
           <Card id="channels" title="渠道配置" extra={<Space><Button icon={<Plus size={16} />} onClick={() => setChannelRows((rows) => [...rows, { key: `channel_${Date.now()}`, name: "", source_category: "网站", access_method: "Webhook", endpoint: "", enabled: true, status: "active" }])}>新增渠道</Button><Button type="primary" loading={savingRouting} onClick={() => void saveRouting("channel")}>保存渠道</Button></Space>}>
             <Table<ChannelConfig> rowKey="key" dataSource={channelRows} pagination={false} scroll={{ x: 1000 }} columns={[
@@ -590,14 +776,16 @@ export function SettingsPage() {
             <Col xs={24} xl={10}><Alert type="info" showIcon message="发信邮箱用途" description="管理员和运营可使用全局主邮箱给潜在客户发邮件；销售也可以在“我的”里配置个人邮箱，用于给自己负责的客户发邮件。" /></Col>
             <Col xs={24} xl={14}>
               <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <Input prefix={<Mail size={16} />} value={mailDraft.senderEmail} onChange={(event) => setMailDraft((draft) => ({ ...draft, senderEmail: event.target.value }))} placeholder="发信邮箱，例如 sales@company.com" />
-                <Input value={mailDraft.senderName} onChange={(event) => setMailDraft((draft) => ({ ...draft, senderName: event.target.value }))} placeholder="发件人名称" />
-                <Input value={mailDraft.smtpHost} onChange={(event) => setMailDraft((draft) => ({ ...draft, smtpHost: event.target.value }))} placeholder="SMTP Host，例如 smtp.office365.com" />
-                <Input type="number" value={mailDraft.smtpPort} onChange={(event) => setMailDraft((draft) => ({ ...draft, smtpPort: Number(event.target.value || 587) }))} placeholder="SMTP Port" />
-                <Input value={mailDraft.username} onChange={(event) => setMailDraft((draft) => ({ ...draft, username: event.target.value }))} placeholder="SMTP 用户名" />
-                <Input.Password value={mailDraft.password} onChange={(event) => setMailDraft((draft) => ({ ...draft, password: event.target.value }))} placeholder="SMTP 密码或应用专用密码（不会明文回显）" />
-                <Input value={mailDraft.testSendTo} onChange={(event) => setMailDraft((draft) => ({ ...draft, testSendTo: event.target.value }))} placeholder="测试收件人邮箱，可选" />
-                <Space><Switch checked={mailDraft.useTls} onChange={(useTls) => setMailDraft((draft) => ({ ...draft, useTls }))} /><Typography.Text>启用 TLS</Typography.Text><Switch checked={mailDraft.enabled} onChange={(enabled) => setMailDraft((draft) => ({ ...draft, enabled }))} /><Typography.Text>启用全局主邮箱</Typography.Text></Space>
+                <Form layout="vertical" className="settings-inline-form">
+                  <Form.Item label="发信邮箱"><Input prefix={<Mail size={16} />} value={mailDraft.senderEmail} onChange={(event) => setMailDraft((draft) => ({ ...draft, senderEmail: event.target.value }))} placeholder="例如 sales@company.com" /></Form.Item>
+                  <Form.Item label="发件人名称"><Input value={mailDraft.senderName} onChange={(event) => setMailDraft((draft) => ({ ...draft, senderName: event.target.value }))} placeholder="例如 Ultrasound Growth Ops" /></Form.Item>
+                  <Form.Item label="SMTP Host"><Input value={mailDraft.smtpHost} onChange={(event) => setMailDraft((draft) => ({ ...draft, smtpHost: event.target.value }))} placeholder="例如 smtp.office365.com" /></Form.Item>
+                  <Form.Item label="SMTP Port"><Input type="number" value={mailDraft.smtpPort} onChange={(event) => setMailDraft((draft) => ({ ...draft, smtpPort: Number(event.target.value || 587) }))} placeholder="例如 587" /></Form.Item>
+                  <Form.Item label="SMTP 用户名"><Input value={mailDraft.username} onChange={(event) => setMailDraft((draft) => ({ ...draft, username: event.target.value }))} placeholder="通常为邮箱账号或服务用户名" /></Form.Item>
+                  <Form.Item label="SMTP 密码 / 应用专用密码"><Input.Password value={mailDraft.password} onChange={(event) => setMailDraft((draft) => ({ ...draft, password: event.target.value }))} placeholder="保存后不会明文回显" /></Form.Item>
+                  <Form.Item label="测试收件人邮箱（可选）"><Input value={mailDraft.testSendTo} onChange={(event) => setMailDraft((draft) => ({ ...draft, testSendTo: event.target.value }))} placeholder="用于保存时发送测试邮件" /></Form.Item>
+                </Form>
+                <Space wrap><Switch checked={mailDraft.useTls} onChange={(useTls) => setMailDraft((draft) => ({ ...draft, useTls }))} /><Typography.Text>启用 TLS 加密连接</Typography.Text><Switch checked={mailDraft.enabled} onChange={(enabled) => setMailDraft((draft) => ({ ...draft, enabled }))} /><Typography.Text>启用全局主邮箱</Typography.Text></Space>
                 <Button type="primary" icon={<Save size={16} />} loading={savingMail} onClick={() => void saveMailSettings()}>保存并测试配置</Button>
               </Space>
             </Col>
@@ -607,42 +795,62 @@ export function SettingsPage() {
 
       {activeMenu === "ai" ? (
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
-          <Card title="大模型选择与场景绑定" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={() => setModelOptions((rows) => [...rows, { value: modelValueFrom("provider", `model-${Date.now()}`), label: "", provider: "", scenario: "", capability: "", status: "available" }])}>添加模型选项</Button><Button icon={<Plus size={16} />} onClick={() => setAIModelUseCases((rows) => [...rows, { key: `scene_${Date.now()}`, label: "", description: "" }])}>添加模型场景</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存配置</Button></Space>}>
+          <Card title="场景模型绑定" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateUseCase}>添加模型场景</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存配置</Button></Space>}>
             <Row gutter={[16, 16]}>
-              <Col xs={24} md={8}>
-                <Select value={aiModelDraft} options={modelOptions.map((item) => ({ value: item.value, label: `${item.label || item.value} · ${item.provider || "未填供应商"}` }))} onChange={setAIModelDraft} style={{ width: "100%" }} />
-                <Alert type="info" showIcon className="login-error" message={selectedAIModel?.label || "请选择默认模型"} description={`${selectedAIModel?.provider ?? ""} · ${selectedAIModel?.scenario ?? ""} · ${selectedAIModel?.capability ?? ""}`} />
+              <Col xs={24} md={10}>
+                <Typography.Text className="field-label">先选择模型场景</Typography.Text>
+                <Select value={selectedUseCaseKey} options={aiModelUseCases.map((item) => ({ value: item.key, label: `${item.label} · ${item.key}` }))} onChange={setSelectedUseCaseKey} style={{ width: "100%" }} />
+                {selectedUseCase ? <Alert type="info" showIcon className="login-error" message={selectedUseCase.label} description={selectedUseCase.description} /> : null}
               </Col>
-              <Col xs={24} md={16}>
-                <Table<AIModelUseCase> rowKey="key" dataSource={aiModelUseCases} pagination={false} columns={[
-                  { title: "场景 Key", width: 160, render: (_, row, index) => <Input value={row.key} onChange={(event) => updateUseCaseRow(index, { key: event.target.value })} /> },
-                  { title: "模型场景", width: 180, render: (_, row, index) => <Input value={row.label} onChange={(event) => updateUseCaseRow(index, { label: event.target.value })} /> },
-                  { title: "说明", render: (_, row, index) => <Input value={row.description} onChange={(event) => updateUseCaseRow(index, { description: event.target.value })} /> },
-                  { title: "绑定模型", width: 260, render: (_, useCase) => <Select value={aiModelBindings[useCase.key] ?? aiModelDraft} options={modelOptions.map((item) => ({ value: item.value, label: `${item.label || item.value} · ${item.provider || "未填供应商"}` }))} onChange={(value) => setAIModelBindings((bindings) => ({ ...bindings, [useCase.key]: value }))} style={{ width: "100%" }} /> }
-                ]} />
+              <Col xs={24} md={14}>
+                <Typography.Text className="field-label">再为该场景选择大模型</Typography.Text>
+                <Select value={selectedBindingValue} options={modelSelectOptions} onChange={(value) => selectedUseCase && setAIModelBindings((bindings) => ({ ...bindings, [selectedUseCase.key]: value }))} style={{ width: "100%" }} />
+                <div className="config-detail-card">
+                  <Tag color="purple">当前绑定：{selectedBindingModel?.label}</Tag>
+                  <Tag color={selectedBindingModel?.api_key_configured ? "green" : "gold"}>{selectedBindingModel?.api_key_configured ? "API Key 已配置" : "API Key 未配置"}</Tag>
+                  <Typography.Paragraph className="muted">{selectedBindingModel?.provider} · {selectedBindingModel?.scenario} · {selectedBindingModel?.capability}</Typography.Paragraph>
+                </div>
               </Col>
             </Row>
           </Card>
-          <Card title="模型库" loading={loading}>
-            <Table<AIModelOption> rowKey={(record, index) => `${record.value}-${index}`} dataSource={modelOptions} pagination={false} scroll={{ x: 1100 }} columns={[
-              { title: "模型 Key", width: 180, render: (_, row, index) => <Input value={row.value} onChange={(event) => updateModelRow(index, { value: event.target.value })} /> },
-              { title: "模型", width: 180, render: (_, row, index) => <Input value={row.label} onChange={(event) => updateModelRow(index, { label: event.target.value })} /> },
-              { title: "供应商", width: 160, render: (_, row, index) => <Input value={row.provider} onChange={(event) => updateModelRow(index, { provider: event.target.value })} /> },
-              { title: "适用场景", width: 260, render: (_, row, index) => <Input value={row.scenario} onChange={(event) => updateModelRow(index, { scenario: event.target.value })} /> },
-              { title: "能力说明", width: 260, render: (_, row, index) => <Input value={row.capability} onChange={(event) => updateModelRow(index, { capability: event.target.value })} /> },
-              { title: "状态", width: 120, render: (_, row, index) => <Select value={row.status} options={[{ value: "available", label: "可用" }, { value: "disabled", label: "停用" }]} onChange={(status) => updateModelRow(index, { status })} /> }
-            ]} />
+          <Card title="大模型连接配置" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateModel}>添加大模型</Button><Button onClick={() => { const index = modelOptions.findIndex((item) => item.value === selectedModelValue); if (index >= 0) openEditModel(index); }}>编辑所选模型</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存模型库</Button></Space>}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={10}>
+                <Typography.Text className="field-label">模型库下拉菜单</Typography.Text>
+                <Select value={selectedModelValue} options={modelSelectOptions} onChange={setSelectedModelValue} style={{ width: "100%" }} />
+              </Col>
+              <Col xs={24} md={14}>
+                <div className="config-detail-card">
+                  <Typography.Title level={5}>{selectedModelForDetails?.label} · {selectedModelForDetails?.provider}</Typography.Title>
+                  <Space wrap>
+                    <Tag color={selectedModelForDetails?.status === "available" ? "green" : "default"}>{selectedModelForDetails?.status === "available" ? "可用" : "停用"}</Tag>
+                    <Tag color={selectedModelForDetails?.api_key_configured ? "green" : "gold"}>{selectedModelForDetails?.api_key_configured ? "API Key 已配置" : "API Key 未配置"}</Tag>
+                    <Tag>{selectedModelForDetails?.auth_type || "bearer"}</Tag>
+                  </Space>
+                  <Typography.Paragraph className="muted">API：{selectedModelForDetails?.api_base_url || "未配置"}{selectedModelForDetails?.endpoint_path || ""}</Typography.Paragraph>
+                  <Typography.Paragraph className="muted">能力：{selectedModelForDetails?.capability}</Typography.Paragraph>
+                </div>
+              </Col>
+            </Row>
           </Card>
-          <Card title="邮件写手角色" loading={loading} extra={<Space wrap><Select value={defaultEmailWriter} options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))} onChange={setDefaultEmailWriter} style={{ width: 240 }} /><Button icon={<Plus size={16} />} onClick={() => setEmailWriters((rows) => [...rows, { key: `writer_${Date.now()}`, name: "", display_name: "", style: "", skills: [], best_for: "", status: "enabled" }])}>新增写手</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存写手配置</Button></Space>}>
-            <Table<EmailWriterRole> rowKey={(record, index) => `${record.key}-${index}`} dataSource={emailWriters} pagination={false} scroll={{ x: 1200 }} columns={[
-              { title: "Key", width: 160, render: (_, row, index) => <Input value={row.key} onChange={(event) => updateWriterRow(index, { key: event.target.value })} /> },
-              { title: "英文角色", width: 160, render: (_, row, index) => <Input value={row.name} onChange={(event) => updateWriterRow(index, { name: event.target.value })} /> },
-              { title: "中文名", width: 160, render: (_, row, index) => <Input value={row.display_name} onChange={(event) => updateWriterRow(index, { display_name: event.target.value })} /> },
-              { title: "风格", width: 240, render: (_, row, index) => <Input value={row.style} onChange={(event) => updateWriterRow(index, { style: event.target.value })} /> },
-              { title: "技能", width: 240, render: (_, row, index) => <Input value={row.skills.join("、")} onChange={(event) => updateWriterRow(index, { skillsText: event.target.value })} /> },
-              { title: "适用", width: 240, render: (_, row, index) => <Input value={row.best_for} onChange={(event) => updateWriterRow(index, { best_for: event.target.value })} /> },
-              { title: "状态", width: 120, render: (_, row, index) => <Select value={row.status} options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} onChange={(status) => updateWriterRow(index, { status })} /> }
-            ]} />
+          <Card title="邮件写手角色" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateWriter}>新增写手</Button><Button onClick={() => { const index = emailWriters.findIndex((writer) => writer.key === selectedWriterKey); if (index >= 0) openEditWriter(index); }}>编辑所选角色</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存写手配置</Button></Space>}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={8}>
+                <Typography.Text className="field-label">默认邮件写手</Typography.Text>
+                <Select value={defaultEmailWriter} options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
+              </Col>
+              <Col xs={24} md={8}>
+                <Typography.Text className="field-label">角色下拉菜单</Typography.Text>
+                <Select value={selectedWriterKey} options={emailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
+              </Col>
+              <Col xs={24} md={8}>
+                <div className="config-detail-card compact">
+                  <strong>{selectedWriterForDetails?.display_name} / {selectedWriterForDetails?.name}</strong>
+                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.style}</Typography.Paragraph>
+                  <Space wrap>{selectedWriterForDetails?.skills.map((skill) => <Tag key={skill}>{skill}</Tag>)}</Space>
+                </div>
+              </Col>
+            </Row>
           </Card>
           <Card title="产品与 AI 配置入口"><Link to="/admin/settings/product-knowledge"><Button>进入产品知识库</Button></Link></Card>
         </Space>
@@ -668,6 +876,46 @@ export function SettingsPage() {
           <Form.Item name="dataScope" label="负责范围" rules={[{ required: true }]}><Input placeholder="例如 all / Latam / Peru" /></Form.Item>
           <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>
           <Button type="primary" htmlType="submit" loading={savingAccount}>保存账号</Button>
+        </Form>
+      </Modal>
+
+      <Modal title="新增模型场景" open={useCaseModalOpen} onCancel={() => setUseCaseModalOpen(false)} footer={null} destroyOnClose>
+        <Form form={useCaseForm} layout="vertical" onFinish={submitUseCase}>
+          <Form.Item name="key" label="场景 Key" rules={[{ required: true, min: 2 }]}><Input placeholder="例如 pricing_followup" /></Form.Item>
+          <Form.Item name="label" label="场景名称" rules={[{ required: true, min: 2 }]}><Input placeholder="例如 报价后跟进" /></Form.Item>
+          <Form.Item name="description" label="场景说明" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={3} /></Form.Item>
+          <Button type="primary" htmlType="submit">保存场景</Button>
+        </Form>
+      </Modal>
+
+      <Modal title={editingModelIndex === null ? "添加大模型" : "编辑大模型"} open={modelModalOpen} onCancel={() => setModelModalOpen(false)} footer={null} destroyOnClose width={720}>
+        <Form form={modelForm} layout="vertical" onFinish={submitModel}>
+          <Row gutter={12}>
+            <Col xs={24} md={12}><Form.Item name="value" label="模型 Key" rules={[{ required: true, min: 2 }]}><Input placeholder="例如 claude-sonnet-4" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="label" label="模型名称" rules={[{ required: true, min: 2 }]}><Input placeholder="例如 Claude Sonnet" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="provider" label="供应商" rules={[{ required: true, min: 2 }]}><Input placeholder="Anthropic / OpenAI / DeepSeek" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="status" label="状态" rules={[{ required: true }]}><Select options={[{ value: "available", label: "可用" }, { value: "disabled", label: "停用" }]} /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="scenario" label="适用场景" rules={[{ required: true, min: 4 }]}><Input placeholder="例如 邮件草稿、客户背景调研" /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="capability" label="能力说明" rules={[{ required: true, min: 4 }]}><Input placeholder="例如 长文本写作、语气控制、多语言摘要" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="api_base_url" label="API Base URL"><Input placeholder="https://api.openai.com" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="endpoint_path" label="Endpoint Path"><Input placeholder="/v1/responses" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="auth_type" label="鉴权方式"><Select options={[{ value: "bearer", label: "Bearer Token" }, { value: "x-api-key", label: "x-api-key" }, { value: "custom", label: "自定义 Header" }]} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="apiKey" label="API Key / Token"><Input.Password placeholder="填写后只显示已配置，不明文回显" /></Form.Item></Col>
+          </Row>
+          <Button type="primary" htmlType="submit">保存模型</Button>
+        </Form>
+      </Modal>
+
+      <Modal title={editingWriterIndex === null ? "新增邮件写手" : "编辑邮件写手"} open={writerModalOpen} onCancel={() => setWriterModalOpen(false)} footer={null} destroyOnClose width={640}>
+        <Form form={writerForm} layout="vertical" onFinish={submitWriter}>
+          <Form.Item name="key" label="角色 Key" rules={[{ required: true, min: 2 }]}><Input placeholder="例如 baymax" /></Form.Item>
+          <Form.Item name="name" label="英文角色" rules={[{ required: true, min: 2 }]}><Input placeholder="Baymax" /></Form.Item>
+          <Form.Item name="display_name" label="中文名" rules={[{ required: true, min: 1 }]}><Input placeholder="大白" /></Form.Item>
+          <Form.Item name="style" label="风格" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={2} placeholder="稳重、专业、可靠" /></Form.Item>
+          <Form.Item name="skillsText" label="技能（用顿号或换行分隔）" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={3} placeholder="正式邮件、医疗客户、技术沟通" /></Form.Item>
+          <Form.Item name="best_for" label="适用场景" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item name="status" label="状态" rules={[{ required: true }]}><Select options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} /></Form.Item>
+          <Button type="primary" htmlType="submit">保存角色</Button>
         </Form>
       </Modal>
     </section>

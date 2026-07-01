@@ -1,106 +1,83 @@
-import { Alert, Button, Card, Form, Input, Typography } from "antd";
-import { Activity, ChevronRight } from "lucide-react";
+import { Alert, Button, Card, Form, Input, Space, Typography } from "antd";
+import { Activity, LockKeyhole, Mail } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { login, saveSession } from "../api";
-import { GlobalBanner } from "../shell/GlobalBanner";
 
 type LoginForm = {
   email: string;
   password: string;
 };
 
-const loginNavItems = ["工作台", "线索池", "客户池", "报表", "再营销", "配置"];
-
 export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(
     searchParams.get("reason") === "expired" ? "会话已过期，请重新登录。" : null
   );
 
   async function handleSubmit(values: LoginForm): Promise<void> {
+    setSubmitting(true);
     setErrorMessage(null);
     try {
       const session = await login(values.email, values.password);
       saveSession(session.access_token, session.name, session.role);
       navigate("/admin/dashboard");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "登录失败，请重试。");
+      setErrorMessage(error instanceof Error ? error.message : "登录失败，请检查账号和密码。");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="login-app">
-      <aside className="login-sidebar" aria-label="后台主导航预览">
-        <div className="brand">
-          <div className="brand-mark">
-            <Activity size={26} aria-hidden="true" />
-          </div>
-          <Typography.Title level={4}>Ultrasound Growth</Typography.Title>
-        </div>
-        <nav className="login-nav">
-          {loginNavItems.map((item) => (
-            <span key={item} className={item === "工作台" ? "active" : ""}>
-              <ChevronRight size={18} aria-hidden="true" />
-              {item}
-            </span>
-          ))}
-        </nav>
-      </aside>
-      <main className="login-main">
-        <GlobalBanner />
-        <section className="login-hero-grid">
-          <section className="login-copy" aria-labelledby="login-title">
-            <div className="stage-label">Ultrasound Sales Growth</div>
-            <Typography.Title id="login-title" level={1}>
-              智能销售接待与客户洞察 Agent
-            </Typography.Title>
-            <Typography.Paragraph className="muted">
-              把官网、邮箱和展会名片里的询盘收进一个可反馈、可报表、可再营销的闭环。
+    <main className="login-app">
+      <section className="login-panel" aria-labelledby="login-title">
+        <div className="login-brand-block">
+          <div className="brand-mark">UG</div>
+          <div>
+            <Typography.Text className="stage-label">Ultrasound Growth</Typography.Text>
+            <Typography.Title id="login-title" level={1}>智能销售接待与客户洞察 Agent</Typography.Title>
+            <Typography.Paragraph>
+              统一管理官网、邮箱和展会线索，让运营与销售在同一个后台完成分发、跟进和再营销。
             </Typography.Paragraph>
-          </section>
-          <Card className="login-card" title="登录后台">
-            {errorMessage ? (
-              <Alert
-                className="login-error"
-                type="error"
-                showIcon
-                message={errorMessage}
-                role="alert"
-                aria-live="assertive"
-              />
-            ) : (
-              <div className="login-error-placeholder" role="status" aria-live="polite">
-                请输入后台账号和密码。
-              </div>
-            )}
-            <Form<LoginForm>
-              layout="vertical"
-              requiredMark={false}
-              onFinish={(values) => void handleSubmit(values)}
-              autoComplete="on"
+          </div>
+        </div>
+
+        <Card className="login-card" title={<Space><Activity size={18} />登录后台</Space>}>
+          {errorMessage ? (
+            <Alert className="login-error" type="error" showIcon message={errorMessage} role="alert" aria-live="assertive" />
+          ) : (
+            <Alert className="login-error" type="info" showIcon message="请输入后台账号和密码，登录后才会显示左侧菜单。" />
+          )}
+
+          <Form<LoginForm> layout="vertical" requiredMark={false} onFinish={(values) => void handleSubmit(values)} autoComplete="on">
+            <Form.Item
+              label="账号邮箱"
+              name="email"
+              rules={[
+                { required: true, message: "请输入账号邮箱。" },
+                { type: "email", message: "请输入有效邮箱账号。" }
+              ]}
             >
-              <Form.Item
-                label="账号"
-                name="email"
-                rules={[
-                  { required: true, message: "请输入账号。" },
-                  { type: "email", message: "请输入有效邮箱账号。" }
-                ]}
-              >
-                <Input autoComplete="username" placeholder="name@company.com" aria-describedby="login-title" />
-              </Form.Item>
-              <Form.Item label="密码" name="password" rules={[{ required: true, message: "请输入密码。" }]}>
-                <Input.Password autoComplete="current-password" placeholder="请输入密码" />
-              </Form.Item>
-              <Button type="primary" htmlType="submit" block>
-                登录
-              </Button>
-            </Form>
-          </Card>
-        </section>
-      </main>
-    </div>
+              <Input prefix={<Mail size={16} />} autoComplete="username" placeholder="admin@ultrasound-growth.local" />
+            </Form.Item>
+            <Form.Item label="登录密码" name="password" rules={[{ required: true, message: "请输入密码。" }]}>
+              <Input.Password prefix={<LockKeyhole size={16} />} autoComplete="current-password" placeholder="请输入密码" />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" block loading={submitting}>
+              登录
+            </Button>
+          </Form>
+
+          <div className="login-test-accounts">
+            <Typography.Text>测试账号：</Typography.Text>
+            <Typography.Text copyable>admin@ultrasound-growth.local / Admin123!</Typography.Text>
+            <Typography.Text copyable>maria@ultrasound-growth.local / Sales123!</Typography.Text>
+          </div>
+        </Card>
+      </section>
+    </main>
   );
 }

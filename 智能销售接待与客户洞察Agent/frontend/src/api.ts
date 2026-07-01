@@ -1153,6 +1153,7 @@ export function fetchCustomerSignalContext(customerId?: number): Promise<Custome
 
 export function fetchNurtureTasks(filters: {
   status?: string;
+  customerId?: number;
   page?: number;
   pageSize?: number;
 } = {}): Promise<NurtureTaskPageResult> {
@@ -1161,6 +1162,7 @@ export function fetchNurtureTasks(filters: {
     page_size: String(filters.pageSize ?? 20)
   });
   if (filters.status) params.set("status", filters.status);
+  if (filters.customerId) params.set("customer_id", String(filters.customerId));
   return request<NurtureTaskPageResult>(`/api/nurture-tasks?${params.toString()}`);
 }
 

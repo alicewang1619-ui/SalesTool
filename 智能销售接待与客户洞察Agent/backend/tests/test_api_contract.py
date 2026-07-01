@@ -2065,6 +2065,24 @@ def test_nurture_tasks_list_uses_persistent_prompt_context_and_pagination(client
     assert task["model_provider"]
     assert task["model_version"]
 
+    scoped = client.get(
+        "/api/nurture-tasks",
+        params={"page": 1, "page_size": 10, "status": "pending", "customer_id": task["customer_id"]},
+        headers=headers,
+    )
+    assert scoped.status_code == 200
+    scoped_body = scoped.json()
+    assert scoped_body["total"] >= 1
+    assert {item["customer_id"] for item in scoped_body["items"]} == {task["customer_id"]}
+
+    empty_scoped = client.get(
+        "/api/nurture-tasks",
+        params={"page": 1, "page_size": 10, "status": "pending", "customer_id": 999999},
+        headers=headers,
+    )
+    assert empty_scoped.status_code == 200
+    assert empty_scoped.json()["total"] == 0
+
 
 def test_nurture_prompt_update_persists_snapshot_and_writes_audit(client: TestClient) -> None:
     headers = {**auth_headers(client), "x-trace-id": "nurture-update-test"}

@@ -752,6 +752,7 @@ sequenceDiagram
 | AC-12 | 日报 | 展示询盘总量、有效数量、国家分布、未反馈 | 主流程 | FR-8 |
 | AC-13 | 客户池 | 反馈后客户进入正确分层 | 状态切换 | FR-9 |
 | AC-13A | 客户详情页 | 每个客户均可进入客户详情页，详情中包含客户背景调查模块 | 主流程 | FR-9 |
+| AC-13B | 客户级建议动作 | 客户池列表不展示建议动作；点击客户详情后只展示当前客户自己的下一步建议和邮件草稿入口 | 主流程 | FR-9 / FR-10 |
 | AC-14 | 再营销草稿 | 大模型结合客户摘要、背景调查、客户备注、销售反馈、提示词和附件素材生成草稿，但需人工确认 | 主流程 | FR-10 |
 | AC-15 | 未授权社媒数据 | 系统不执行未授权抓取 | 合规 | FR-11 |
 | AC-16 | 设置管理 | 管理员可进入设置管理页维护销售账号、角色权限和核心配置入口 | 主流程 | FR-12 |
@@ -889,4 +890,4 @@ sequenceDiagram
 | 销售轻反馈 | 移动端 H5 反馈卡片、带过期时间的安全链接、邮件/微信消息中的反馈入口、SalesAssignment 负责人校验 | 反馈服务和权限校验层，销售只看到自己负责的最小反馈页 | SalesFeedback |
 | 设置管理 | RBAC、账号状态、销售数据范围、全局 Banner、配置审计、设置总览、权限拦截 | Auth/Permission 服务和 Web 管理后台，统一控制菜单、按钮、接口权限、销售数据范围和页面顶部 Banner | User、Role、Permission、SalesAssignment、BannerConfig、AuditLog、Config |
 | 未反馈提醒和日报 | 定时任务、消息/邮件通知、报表聚合 SQL、缓存表或报表快照 | 后台任务服务和报表模块 | ReportMetric、Reminder |
-| 客户池和再营销草稿 | 客户状态机、任务队列、邮件模板、大模型草稿生成、提示词输入、附件素材解析、建议下一步动作生成、人工审批流、退订/合规标记 | 客户池模块和再营销待办模块，发送前必须人工确认，客户备注上方展示 recommended_next_action，并把 generation_prompt、prompt_context_snapshot、attachment_refs 留痕 | CustomerPoolRecord、NurtureTask |
+| 客户池、客户详情和再营销草稿 | 客户状态机、任务队列、邮件模板、大模型草稿生成、提示词输入、附件素材解析、建议下一步动作生成、人工审批流、退订/合规标记 | 客户池只作为客户管理列表；客户详情展示当前客户自己的 recommended_next_action 和邮件草稿入口；再营销待办/草稿详情负责邮件编辑、人工确认和发送，并把 generation_prompt、prompt_context_snapshot、attachment_refs 留痕 | CustomerPoolRecord、NurtureTask |

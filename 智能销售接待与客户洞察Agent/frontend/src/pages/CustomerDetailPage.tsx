@@ -1,8 +1,8 @@
-import { Alert, App, Button, Card, Col, Descriptions, Form, Input, Row, Space, Table, Tag, Timeline, Typography } from "antd";
-import { ArrowLeft, Save, ShieldCheck } from "lucide-react";
+import { Alert, App, Button, Card, Col, Descriptions, Empty, Form, Input, Row, Space, Table, Tag, Timeline, Typography } from "antd";
+import { ArrowLeft, FileText, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchCustomer, updateCustomerBackground, type Customer } from "../api";
+import { fetchCustomer, fetchNurtureTasks, updateCustomerBackground, type Customer, type NurtureTask } from "../api";
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -24,15 +24,21 @@ export function CustomerDetailPage() {
   const { message } = App.useApp();
   const { customerId = "1" } = useParams();
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [nurtureTask, setNurtureTask] = useState<NurtureTask | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<{ manualSummary: string }>();
 
   useEffect(() => {
     let alive = true;
     setCustomer(null);
-    void fetchCustomer(customerId).then((item) => {
+    setNurtureTask(null);
+    void Promise.all([
+      fetchCustomer(customerId),
+      fetchNurtureTasks({ status: "pending", customerId: Number(customerId), page: 1, pageSize: 1 }).catch(() => null)
+    ]).then(([item, tasks]) => {
       if (!alive) return;
       setCustomer(item);
+      setNurtureTask((tasks?.items ?? []).find((task) => task.customer_id === item.id) ?? null);
     });
     return () => {
       alive = false;
@@ -125,6 +131,35 @@ export function CustomerDetailPage() {
           </Card>
         </Col>
       </Row>
+
+      <Card title="建议动作" style={{ marginTop: 16 }}>
+        {nurtureTask ? (
+          <Space direction="vertical" size={12} style={{ width: "100%" }}>
+            <Alert
+              type="info"
+              showIcon
+              message={nurtureTask.recommended_next_action}
+              description={nurtureTask.customer_note}
+            />
+            <Space wrap>
+              <Tag color="purple">{nurtureTask.approval_status === "pending" ? "待确认" : nurtureTask.approval_status}</Tag>
+              <Tag>{nurtureTask.email_status === "sent" ? "已发送" : "邮件草稿"}</Tag>
+              <Tag color={nurtureTask.attachments.length ? "green" : "gold"}>{nurtureTask.attachments.length} 个参考附件</Tag>
+              <Link to={nurtureTask.detail_path}>
+                <Button type="primary" icon={<FileText size={16} />}>
+                  查看邮件草稿
+                </Button>
+              </Link>
+            </Space>
+          </Space>
+        ) : (
+          <Empty description="暂无该客户的建议动作" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+            <Link to="/admin/nurture">
+              <Button>查看再营销列表</Button>
+            </Link>
+          </Empty>
+        )}
+      </Card>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>

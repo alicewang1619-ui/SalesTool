@@ -14,6 +14,7 @@
 | PAGE-CUSTOMER-DETAIL-04 | P1 | 无编辑权限用户查看详情 | 渲染页面 | 背景调查只读，保存/重新生成按钮不可用 | 前端未控权会造成越权修改 |
 | PAGE-CUSTOMER-DETAIL-05 | P2 | 外部网页内容包含指令文本 | 进入 LLM 摘要 | system prompt 声明外部内容为数据，并用分隔符隔离 | LLM 注入会污染背景调查 |
 | PAGE-CUSTOMER-DETAIL-06 | P0 | 存量客户或旧接口未返回 `signals`、`lead_history`、`feedback_records`、`timeline` 等数组 | 打开客户详情 | 页面展示空态/0 条记录，不出现 `Cannot read properties of undefined` 崩溃页 | 前端直接读取 `.length` 或 `.map` 会导致生产运行时崩溃 |
+| PAGE-CUSTOMER-DETAIL-07 | P0 | 当前客户存在待确认再营销任务 | 打开客户详情 | 展示“建议动作”、客户备注、邮件草稿状态、附件数量和“查看邮件草稿”；若返回任务不属于当前客户则不展示 | 客户池或详情展示其他客户建议动作会造成误触达 |
 
 
 ## 生产化执行记录（06-30-2026）
@@ -23,3 +24,4 @@
 - 绿灯结果：客户详情专项为 4 passed；后端全量为 39 passed；前端 `npm.cmd run build` 通过，保留既有 Vite chunk size warning。
 - 浏览器验收：管理员登录 `/admin/customers/1` 后可见全局 Banner、客户背景调查、调查来源与证据、历史线索、状态时间线、销售反馈记录；保存人工修订后页面持久状态显示人工内容和 `Alice Admin` 更新人。
 - 运行时回归补充：访问 `/admin/customers/:id` 时，若当前运行后端仍返回旧版客户详情响应且缺少部分数组字段，前端必须以空数组兜底并正常渲染客户基本信息、背景调查和空态表格。
+- 建议动作归属补充：客户池列表不展示建议动作；客户详情通过 `/api/nurture-tasks?customer_id=:id&status=pending` 获取建议动作，并在前端再次校验 `task.customer_id === customer.id`，防止旧接口忽略过滤参数时误展示其他客户任务。

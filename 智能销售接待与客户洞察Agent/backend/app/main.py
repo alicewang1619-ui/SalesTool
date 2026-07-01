@@ -2831,6 +2831,7 @@ def list_nurture_tasks(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status_filter: str | None = Query(default=None, alias="status"),
+    customer_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ) -> NurtureTaskPage:
@@ -2844,6 +2845,9 @@ def list_nurture_tasks(
     if status_filter:
         query = query.where(NurtureTask.approval_status == status_filter)
         count_query = count_query.where(NurtureTask.approval_status == status_filter)
+    if customer_id is not None:
+        query = query.where(NurtureTask.customer_id == customer_id)
+        count_query = count_query.where(NurtureTask.customer_id == customer_id)
     total = db.scalar(count_query) or 0
     rows = db.scalars(
         query.order_by(NurtureTask.updated_at.desc(), NurtureTask.id.desc()).offset((page - 1) * page_size).limit(page_size)

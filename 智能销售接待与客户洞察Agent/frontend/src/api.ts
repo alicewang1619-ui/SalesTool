@@ -454,6 +454,58 @@ export type CustomerFilters = {
   tier?: string;
 };
 
+export type CustomerSignalSource = "website_public" | "email_interaction" | "sales_feedback" | "manual";
+
+export type CustomerSignal = {
+  id: number;
+  customer_id: number;
+  customer_name: string;
+  country: string;
+  product: string;
+  signal_source: CustomerSignalSource;
+  source_label: string;
+  signal_title: string;
+  signal_summary: string;
+  evidence_url?: string | null;
+  evidence_text: string;
+  confidence: "高" | "中" | "低" | "待复核";
+  status: "待复核" | "已确认" | "可再营销" | "已归档";
+  observed_at: string;
+  created_by: number | null;
+  created_by_name: string;
+  updated_at: string;
+  customer_detail_path: string;
+};
+
+export type CustomerSignalPageResult = {
+  page: number;
+  page_size: number;
+  total: number;
+  summary: Record<string, number>;
+  items: CustomerSignal[];
+  empty_state?: {
+    title: string;
+    action_label: string;
+    action_path: string;
+  } | null;
+};
+
+export type CustomerSignalContext = {
+  safety_boundary: string;
+  customer_id: number | null;
+  authorized_sources: CustomerSignalSource[];
+  signals: CustomerSignal[];
+  rendered_prompt: string;
+};
+
+export type CustomerSignalFilters = {
+  page?: number;
+  pageSize?: number;
+  source?: CustomerSignalSource;
+  status?: string;
+  customerId?: number;
+};
+
 export type SalesUser = {
   id: number;
   name: string;
@@ -983,6 +1035,49 @@ export function updateCustomerBackground(customerId: string, manualSummary: stri
     method: "PUT",
     body: JSON.stringify({ manual_summary: manualSummary })
   });
+}
+
+export function fetchCustomerSignals(filters: CustomerSignalFilters = {}): Promise<CustomerSignalPageResult> {
+  const params = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20)
+  });
+  if (filters.source) params.set("source", filters.source);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.customerId) params.set("customer_id", String(filters.customerId));
+  return request<CustomerSignalPageResult>(`/api/customer-signals?${params.toString()}`);
+}
+
+export function createCustomerSignal(payload: {
+  customerId: number;
+  signalSource: CustomerSignalSource;
+  signalTitle: string;
+  signalSummary: string;
+  evidenceUrl?: string;
+  evidenceText: string;
+  confidence: string;
+  status: string;
+}): Promise<CustomerSignal> {
+  return request<CustomerSignal>("/api/customer-signals", {
+    method: "POST",
+    body: JSON.stringify({
+      customer_id: payload.customerId,
+      signal_source: payload.signalSource,
+      signal_title: payload.signalTitle,
+      signal_summary: payload.signalSummary,
+      evidence_url: payload.evidenceUrl || null,
+      evidence_text: payload.evidenceText,
+      confidence: payload.confidence,
+      status: payload.status
+    })
+  });
+}
+
+export function fetchCustomerSignalContext(customerId?: number): Promise<CustomerSignalContext> {
+  const params = new URLSearchParams();
+  if (customerId) params.set("customer_id", String(customerId));
+  const query = params.toString();
+  return request<CustomerSignalContext>(`/api/customer-signals/context${query ? `?${query}` : ""}`);
 }
 
 export function fetchNurtureTasks(filters: {

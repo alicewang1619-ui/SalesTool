@@ -508,6 +508,56 @@ class CustomerBackgroundUpdate(BaseModel):
     manual_summary: str = Field(min_length=10, max_length=4000)
 
 
+class CustomerSignalOut(BaseModel):
+    id: int
+    customer_id: int
+    customer_name: str
+    country: str
+    product: str
+    signal_source: str
+    source_label: str
+    signal_title: str
+    signal_summary: str
+    evidence_url: str | None = None
+    evidence_text: str
+    confidence: str
+    status: str
+    observed_at: datetime
+    created_by: int | None
+    created_by_name: str
+    updated_at: datetime
+    customer_detail_path: str
+
+
+class CustomerSignalPage(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    summary: dict[str, int]
+    items: list[CustomerSignalOut]
+    empty_state: EmptyStateOut | None = None
+
+
+class CustomerSignalCreateRequest(BaseModel):
+    customer_id: int
+    signal_source: str = Field(pattern="^(website_public|email_interaction|sales_feedback|manual)$")
+    signal_title: str = Field(min_length=2, max_length=160)
+    signal_summary: str = Field(min_length=5, max_length=4000)
+    evidence_url: str | None = Field(default=None, max_length=500)
+    evidence_text: str = Field(default="", max_length=4000)
+    confidence: str = Field(pattern="^(高|中|低|待复核)$")
+    status: str = Field(pattern="^(待复核|已确认|可再营销|已归档)$")
+    observed_at: datetime | None = None
+
+
+class CustomerSignalContextOut(BaseModel):
+    safety_boundary: str
+    customer_id: int | None = None
+    authorized_sources: list[str]
+    signals: list[CustomerSignalOut]
+    rendered_prompt: str
+
+
 class NurtureAttachmentOut(BaseModel):
     filename: str
     content_type: str

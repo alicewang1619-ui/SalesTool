@@ -1,10 +1,11 @@
-import { Alert, Button, Card, Col, Form, Input, Row, Space, Table, Tag, Timeline, Typography, message } from "antd";
+import { Alert, App, Button, Card, Col, Form, Input, Row, Space, Table, Tag, Timeline, Typography } from "antd";
 import { ArrowLeft, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchCustomer, updateCustomerBackground, type Customer } from "../api";
 
 export function CustomerDetailPage() {
+  const { message } = App.useApp();
   const { customerId = "1" } = useParams();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [saving, setSaving] = useState(false);
@@ -12,15 +13,15 @@ export function CustomerDetailPage() {
 
   useEffect(() => {
     let alive = true;
+    setCustomer(null);
     void fetchCustomer(customerId).then((item) => {
       if (!alive) return;
       setCustomer(item);
-      form.setFieldValue("manualSummary", item.background.current_summary);
     });
     return () => {
       alive = false;
     };
-  }, [customerId, form]);
+  }, [customerId]);
 
   async function saveBackground(values: { manualSummary: string }): Promise<void> {
     setSaving(true);
@@ -99,7 +100,13 @@ export function CustomerDetailPage() {
               className="login-error"
               message={`最近更新：${new Date(customer.background.updated_at).toLocaleString()} · ${customer.background.updated_by}`}
             />
-            <Form form={form} layout="vertical" onFinish={(values) => void saveBackground(values)}>
+            <Form
+              key={customer.id}
+              form={form}
+              layout="vertical"
+              initialValues={{ manualSummary: customer.background.current_summary }}
+              onFinish={(values) => void saveBackground(values)}
+            >
               <Form.Item name="manualSummary" label="人工修订内容" rules={[{ required: true, min: 10 }]}>
                 <Input.TextArea rows={8} disabled={!customer.can_edit_background} />
               </Form.Item>

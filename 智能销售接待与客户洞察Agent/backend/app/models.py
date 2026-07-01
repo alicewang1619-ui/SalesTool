@@ -178,6 +178,24 @@ class CustomerBackground(Base):
     customer: Mapped[Customer] = relationship(back_populates="background")
 
 
+class CustomerSignal(Base):
+    __tablename__ = "customer_signals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+    signal_source: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    signal_title: Mapped[str] = mapped_column(String(160), nullable=False)
+    signal_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_url: Mapped[str | None] = mapped_column(String(500))
+    evidence_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    confidence: Mapped[str] = mapped_column(String(40), nullable=False, default="待复核")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="待复核", index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class NurtureTask(Base):
     __tablename__ = "nurture_tasks"
 

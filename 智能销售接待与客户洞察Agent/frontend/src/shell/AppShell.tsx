@@ -1,5 +1,5 @@
 ﻿import { Layout, Menu, Typography } from "antd";
-import { BarChart3, ClipboardList, Database, Home, Send, Settings, UsersRound } from "lucide-react";
+import { Activity, BarChart3, ClipboardList, Database, Home, Send, Settings, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, fetchMe, getToken } from "../api";
@@ -12,6 +12,7 @@ const items = [
   { key: "/admin/leads", icon: <Database size={18} />, label: "线索池" },
   { key: "/admin/assignments/pending", icon: <ClipboardList size={18} />, label: "待分配" },
   { key: "/admin/customers", icon: <UsersRound size={18} />, label: "客户池" },
+  { key: "/admin/customer-signals", icon: <Activity size={18} />, label: "客户态势" },
   { key: "/admin/nurture", icon: <Send size={18} />, label: "再营销" },
   { key: "/admin/reports", icon: <BarChart3 size={18} />, label: "报表" },
   { key: "/admin/settings", icon: <Settings size={18} />, label: "配置" }
@@ -51,7 +52,7 @@ export function AppShell() {
   const salesRestricted =
     user?.role === "sales" &&
     !location.pathname.startsWith("/admin/forbidden") &&
-    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/nurture"].some((path) => location.pathname.startsWith(path));
+    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/nurture", "/admin/customer-signals"].some((path) => location.pathname.startsWith(path));
   if (salesRestricted) {
     const from = `${location.pathname}${location.search}`;
     return <Navigate to={`/admin/forbidden?from=${encodeURIComponent(from)}&reason=FORBIDDEN`} replace />;
@@ -60,6 +61,8 @@ export function AppShell() {
     ? "/admin/leads"
     : location.pathname.startsWith("/admin/assignments")
       ? "/admin/assignments/pending"
+      : location.pathname.startsWith("/admin/customer-signals")
+        ? "/admin/customer-signals"
       : location.pathname.startsWith("/admin/customers")
         ? "/admin/customers"
       : location.pathname.startsWith("/admin/nurture")

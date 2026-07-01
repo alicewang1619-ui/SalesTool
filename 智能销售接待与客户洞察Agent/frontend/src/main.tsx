@@ -1,11 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@ant-design/v5-patch-for-react-19";
-import { ConfigProvider } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AppShell } from "./shell/AppShell";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
+import { CustomerSignalsPage } from "./pages/CustomerSignalsPage";
 import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadsPage } from "./pages/LeadsPage";
@@ -40,6 +41,7 @@ const router = createBrowserRouter([
       { path: "assignments/pending", element: <PendingAssignmentsPage /> },
       { path: "customers", element: <CustomersPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },
+      { path: "customer-signals", element: <CustomerSignalsPage /> },
       { path: "nurture", element: <NurtureTasksPage /> },
       { path: "nurture/:taskId", element: <NurtureTaskDetailPage /> },
       { path: "reports", element: <ReportsHomePage /> },
@@ -66,7 +68,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         }
       }}
     >
-      <RouterProvider router={router} />
+      <AntApp>
+        <RouterProvider router={router} />
+      </AntApp>
     </ConfigProvider>
   </React.StrictMode>
 );

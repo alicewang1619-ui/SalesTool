@@ -411,3 +411,4 @@
 - [06-30-2026 22:29:54] GOAL 返修提交推送结果｜背景：GOAL 返修已通过本地门禁与独立复验，需要按协作规则提交并推送。｜结论：本地提交已完成，提交信息为「返修再营销生产化与GOAL验收阻塞」；`git push` 失败，原因是仓库没有 configured push destination/远端地址，当前不擅自配置 remote。｜来源：AI
 - [06-30-2026 22:36:53] 提供本地预览链接｜背景：用户在 GOAL 返修完成后询问“有链接给我吗”，需要给出可直接访问的页面入口。｜结论：本轮提供本地前端入口 `http://127.0.0.1:5180/`、再营销列表 `http://127.0.0.1:5180/admin/nurture`、草稿详情 `http://127.0.0.1:5180/admin/nurture/1` 和后端文档 `http://127.0.0.1:8000/docs`；当前检查前端返回 200，后端未登录访问再营销 API 返回 401，说明服务在线且鉴权生效。｜来源：用户
 - [07-01-2026 09:54:09] 配置 GitHub 远端并推送项目｜背景：用户要求“把我这个项目git到这个地址”，并提供 GitHub 仓库 `https://github.com/chenguozeng-png/chisonshpx.git`。｜结论：将当前工作区项目配置到该 GitHub 仓库作为远端并推送当前代码；若仓库没有远端则新增 `origin`，优先把当前 HEAD 推送到远端 `main` 分支，保留本地历史，不使用 force-push。｜来源：用户
+- [07-01-2026 09:56:26] GitHub 首次推送被远端历史拒绝｜背景：已将 `origin` 配置为 `https://github.com/chenguozeng-png/chisonshpx.git` 并执行 `git push -u origin HEAD:main`。｜结论：推送被拒，原因是远端 `main` 已存在本地没有的提交；本轮不使用 force-push，改为先 fetch/合并远端历史，再正常推送。｜来源：AI

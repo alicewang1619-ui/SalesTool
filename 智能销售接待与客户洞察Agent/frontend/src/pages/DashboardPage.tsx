@@ -87,6 +87,8 @@ export function DashboardPage() {
   }, []);
 
   const metrics = dashboard?.metrics;
+  const timeScope = dashboard?.time_scope;
+  const timeScopeLabel = timeScope?.label ?? "全部历史";
   const countryOptions = uniq(optionSource.map((item) => item.country));
   const customerTypeOptions = uniq(optionSource.map((item) => item.customer_type));
   const productOptions = uniq(optionSource.map((item) => item.product));
@@ -110,7 +112,7 @@ export function DashboardPage() {
   };
 
   const goMetric = (key: string, fallback: string) => {
-    navigate(appendDateIfNeeded(dashboard?.metric_links[key] ?? fallback, filters));
+    navigate(appendDateIfNeeded(dashboard?.metric_links?.[key] ?? fallback, filters));
   };
 
   return (
@@ -151,10 +153,10 @@ export function DashboardPage() {
         showIcon
         type="info"
         className="login-error"
-        message={`当前时间范围：${dashboard?.time_scope.label ?? "全部历史"}`}
+        message={`当前时间范围：${timeScopeLabel}`}
         description={
-          dashboard?.time_scope.start_at
-            ? `${formatDate(dashboard.time_scope.start_at)} 至 ${formatDate(dashboard.time_scope.end_at)}`
+          timeScope?.start_at
+            ? `${formatDate(timeScope.start_at)} 至 ${formatDate(timeScope.end_at)}`
             : "展示当前权限范围内的全部历史询盘。"
         }
       />
@@ -256,7 +258,7 @@ export function DashboardPage() {
           </Button>
         </Space>
         <Typography.Text className="muted">
-          当前显示：{dashboard?.time_scope.label ?? "全部历史"}，共 {dashboard?.total ?? 0} 条线索记录。
+          当前显示：{timeScopeLabel}，共 {dashboard?.total ?? 0} 条线索记录。
         </Typography.Text>
       </Card>
 
@@ -269,7 +271,7 @@ export function DashboardPage() {
         <Col xs={24} lg={12}>
           <Card title="分发与反馈" loading={loading}>
             <div className="timeline-list">
-              {dashboard?.assignment_timeline.map((item) => (
+              {(dashboard?.assignment_timeline ?? []).map((item) => (
                 <div className="timeline-item" key={item.label}>
                   <strong>{item.label}</strong>
                   <span>{item.value}</span>

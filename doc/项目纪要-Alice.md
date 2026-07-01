@@ -470,3 +470,6 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 - [07-01-2026 15:28:37] 统一返修全量门禁通过｜背景：完成前端页面、后端账号编辑、再营销主题保存和映射风险口径修正后，需要复跑最终验收门禁。｜结论：后端 py -m pytest .\tests -q 结果为 96 passed；前端 npm.cmd run build 通过；仅保留既有 datetime/on_event deprecation warnings 和 Vite chunk size warning。｜来源：AI
 - [07-01-2026 15:29:57] 统一返修前端与配置闭环提交推送完成｜背景：统一返修前端、后端补口、文档回写和门禁验证均已完成，需要按 Git 协作规则同步远端。｜结论：已创建并推送 commit 06205c4e，提交信息为 完成统一返修前端与配置闭环，远端 main 已从 e5930a1e 更新到 06205c4e；后续本条纪要将单独提交保持纪要完整。｜来源：AI
 - [07-01-2026 15:36:45] 请求本地预览链接｜背景：统一返修已完成并推送后，用户要求‘给我链接看下’，需要提供可直接打开的预览地址。｜结论：本回合启动或复用本地 FastAPI 与 Vite 预览服务，确认可访问后把后台登录链接发给用户。｜来源：用户
+
+- [07-01-2026 15:58:09] 工作台运行时报错修复｜背景：用户截图反馈访问 /admin/dashboard 时出现 Unexpected Application Error，错误为 Cannot read properties of undefined (reading 'label')，堆栈指向 DashboardPage。｜结论：本回合按文档驱动排查并修复工作台页面运行时错误，确保页面可打开并通过前端构建/必要接口验证后提交推送。｜来源：用户
+- [07-01-2026 16:00:54] 工作台 time_scope 缺省兼容修复完成｜背景：用户截图报错指向 DashboardPage 读取 undefined.label；实测当前本地 /api/dashboard 响应缺少 time_scope 和 metric_links，前端直接读 dashboard.time_scope.label 导致页面崩溃。｜结论：DashboardPage 已改为对 time_scope、metric_links、assignment_timeline 做二级空值保护；缺省时显示‘全部历史’并使用 fallback 跳转；已同步工作台页面文档和 TDD，npm.cmd run build 通过，静态检查确认危险读取已移除。｜来源：AI

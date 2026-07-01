@@ -13,6 +13,7 @@
 | PAGE-DASH-03 | P1 | 用户点击待办行查看详情 | 从工作台进入下游页面 | 路由携带真实记录 id，并打开对应线索/客户/再营销任务 | 假按钮或无 id 跳转无法支撑闭环 |
 | PAGE-DASH-04 | P1 | 工作台接口失败 | 页面加载 | 展示失败原因和重试入口，结构化日志记录 trace id | 只显示空白会让运营无法定位问题 |
 | PAGE-DASH-05 | P2 | 1366px 与 390px 视口 | 渲染工作台 | 指标卡、Banner、表格无重叠和横向溢出 | 原型复刻不做响应式会破坏移动查看 |
+| PAGE-DASH-06 | P0 | 后端短暂返回旧版本或缺省 `time_scope` / `metric_links` / `assignment_timeline` | 打开工作台 | 页面不崩溃；时间范围显示“全部历史”；指标卡使用 fallback 跳转；时间线为空数组渲染 | 前后端发布不同步会导致整页白屏 |
 
 ## 当前自动化落地（06-30-2026）
 - 已在 `backend/tests/test_api_contract.py` 增加工作台契约测试：未登录访问 `/api/dashboard` 返回 401；管理员获取后端聚合指标和分页待办；销售账号仅能看到自己负责的线索。
@@ -29,3 +30,8 @@
 - 真实浏览器发现成功加载数据后仍可能残留旧错误条，已要求工作台页在 `fetchDashboard()` 成功后同步清空错误状态。
 - 响应式复核覆盖 1366px 与 390px：全局 Banner、四个指标卡、待办表格动作可见，页面级 `scrollWidth <= clientWidth`。
 - “查看详情”复核要求点击后 URL 必须携带真实记录 id，例如 `/admin/leads?recordId=2`。
+
+## 07-01-2026 运行时错误回归用例
+- 用户在预览环境打开 `/admin/dashboard` 时曾触发 `Cannot read properties of undefined (reading 'label')`，堆栈指向 `DashboardPage`。
+- 前端必须使用 `dashboard?.time_scope?.label` 等二级空值保护，不允许只判断 `dashboard` 后直接读取 `time_scope.label`。
+- 构建验收之外，需要在浏览器预览中确认 `/admin/dashboard` 不再出现 React Router 的 `Unexpected Application Error` 页面。

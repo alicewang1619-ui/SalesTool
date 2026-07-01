@@ -1,13 +1,12 @@
+﻿
 import {
   Alert,
   Button,
   Card,
   Checkbox,
   Col,
-  Empty,
   Form,
   Input,
-  List,
   Modal,
   Row,
   Select,
@@ -18,9 +17,10 @@ import {
   Tabs,
   Tag,
   Typography,
-  Upload
+  Upload,
+  message
 } from "antd";
-import { FileUp, ImageUp, Plus, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { ImageUp, Mail, Plus, RefreshCw, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -29,13 +29,21 @@ import {
   updateSalesUser,
   updateSettingsAIModel,
   updateSettingsBanner,
+  updateSettingsChannels,
+  updateSettingsMail,
   updateSettingsPermissions,
+  updateSettingsReminderRules,
+  updateSettingsSourceDictionary,
   type AIModelConfig,
   type AIModelOption,
   type AIModelUseCase,
+  type ChannelConfig,
   type EmailWriterRole,
+  type GlobalMailSettings,
+  type ReminderRule,
   type SalesUser,
-  type SettingsOverview
+  type SettingsOverview,
+  type SourceDictionarySetting
 } from "../api";
 
 const roleOptions = [
@@ -61,6 +69,7 @@ const settingsMenuItems = [
   { key: "account", label: "账号权限" },
   { key: "banner", label: "全局 Banner" },
   { key: "routing", label: "线索分发" },
+  { key: "mail", label: "邮件接口" },
   { key: "ai", label: "AI 与模型" },
   { key: "audit", label: "配置审计" }
 ];
@@ -73,206 +82,53 @@ const sectionMenuMap: Record<string, string> = {
   sources: "routing",
   channels: "routing",
   reminders: "routing",
+  mail: "mail",
   "product-knowledge": "ai",
   "ai-model": "ai",
   audit: "audit"
 };
 
-const entryMenuMap: Record<string, string> = {
-  sales_accounts: "account",
-  role_permissions: "account",
-  global_banner: "banner",
-  country_sales_mapping: "routing",
-  source_dictionary: "routing",
-  channels: "routing",
-  reminder_rules: "routing",
-  product_knowledge: "ai",
-  ai_model_selection: "ai"
-};
+const fallbackModels: AIModelOption[] = [
+  { value: "ug-balanced-v1", label: "平衡模型（推荐）", provider: "Ultrasound Growth LLM", scenario: "AI 接待、客户摘要、评分和再营销草稿", capability: "质量与速度平衡", status: "available" },
+  { value: "claude-sonnet", label: "Claude Sonnet", provider: "Anthropic", scenario: "邮件草稿和高价值客户触达", capability: "长文本写作和语气控制", status: "available" },
+  { value: "codex", label: "Codex", provider: "OpenAI", scenario: "结构化推理与内部工作流辅助", capability: "流程拆解和结构化摘要", status: "available" },
+  { value: "deepseek-chat", label: "DeepSeek Chat", provider: "DeepSeek", scenario: "客户背景调研和批量摘要", capability: "低成本批量分析和多语言摘要", status: "available" }
+];
+
+const fallbackUseCases: AIModelUseCase[] = [
+  { key: "customer_research", label: "客户背景调查", description: "用于客户公开资料、邮箱域名和历史互动摘要。" },
+  { key: "email_draft", label: "邮件草稿写作", description: "用于按客户情况生成再营销邮件草稿。" }
+];
+
+const fallbackWriters: EmailWriterRole[] = [
+  { key: "doraemon", name: "Doraemon", display_name: "哆啦A梦", style: "温暖、可靠、什么都能帮你", skills: ["万能助手", "日常回复"], best_for: "万能助手、日常回复、客户维护", status: "enabled" },
+  { key: "mario", name: "Mario", display_name: "超级马里奥", style: "积极、行动派、有冲劲", skills: ["销售跟进", "推动决策"], best_for: "销售跟进、催单、推动决策", status: "enabled" },
+  { key: "pikachu", name: "Pikachu", display_name: "皮卡丘", style: "活泼、可爱、有亲和力", skills: ["社媒互动", "轻松话题"], best_for: "社媒互动、年轻客户、轻松话题", status: "enabled" },
+  { key: "totoro", name: "Totoro", display_name: "龙猫", style: "温柔、治愈、让人安心", skills: ["客户关怀", "暖心邮件"], best_for: "客户关怀、节日问候、暖心邮件", status: "enabled" },
+  { key: "baymax", name: "Baymax", display_name: "大白", style: "稳重、专业、可靠", skills: ["正式邮件", "技术沟通"], best_for: "正式邮件、医疗客户、技术沟通", status: "enabled" },
+  { key: "nemo", name: "Nemo", display_name: "海底总动员", style: "好奇、探索、愿意沟通", skills: ["陌生开发", "破冰邮件"], best_for: "陌生开发、初次接触、破冰邮件", status: "enabled" }
+];
 
 const fallbackAIModelConfig: AIModelConfig = {
   selected_model: "ug-balanced-v1",
   selected_label: "平衡模型（推荐）",
   provider: "Ultrasound Growth LLM",
   scenario: "AI 接待、客户摘要、评分和再营销草稿",
-  options: [
-    {
-      value: "ug-fast-v1",
-      label: "快速模型",
-      provider: "Ultrasound Growth LLM",
-      scenario: "线索预处理、短摘要、低延迟接待",
-      capability: "响应快，适合高频批量任务",
-      status: "available"
-    },
-    {
-      value: "ug-balanced-v1",
-      label: "平衡模型（推荐）",
-      provider: "Ultrasound Growth LLM",
-      scenario: "AI 接待、客户摘要、评分和再营销草稿",
-      capability: "质量与速度平衡，默认推荐",
-      status: "available"
-    },
-    {
-      value: "ug-quality-v1",
-      label: "高质量模型",
-      provider: "Ultrasound Growth LLM",
-      scenario: "复杂客户背景调查、长邮件草稿和高价值客户触达",
-      capability: "推理更强，成本和耗时更高",
-      status: "available"
-    },
-    {
-      value: "claude-sonnet",
-      label: "Claude Sonnet",
-      provider: "Anthropic",
-      scenario: "邮件草稿和高价值客户触达",
-      capability: "长文本写作、语气控制和复杂客户沟通",
-      status: "available"
-    },
-    {
-      value: "codex",
-      label: "Codex",
-      provider: "OpenAI",
-      scenario: "AI 接待流程、结构化推理和内部工作流辅助",
-      capability: "适合拆解流程、生成结构化摘要和工具化任务",
-      status: "available"
-    },
-    {
-      value: "deepseek-chat",
-      label: "DeepSeek Chat",
-      provider: "DeepSeek",
-      scenario: "客户背景调研、中文资料整理和批量摘要",
-      capability: "适合低成本批量分析和多语言背景摘要",
-      status: "available"
-    }
-  ],
-  use_cases: [
-    {
-      key: "default",
-      label: "AI 接待与线索摘要",
-      description: "用于官网接待、线索摘要、评分和通用 AI 辅助。"
-    },
-    {
-      key: "email_draft",
-      label: "邮件草稿",
-      description: "用于再营销邮件草稿、触达理由和发送前人工确认内容。"
-    },
-    {
-      key: "customer_research",
-      label: "客户背景调研",
-      description: "用于客户背景调查、公开资料摘要和客户画像补全。"
-    }
-  ],
-  use_case_bindings: {
-    default: "ug-balanced-v1",
-    email_draft: "claude-sonnet",
-    customer_research: "deepseek-chat"
-  },
-  email_writers: [
-    {
-      key: "doraemon",
-      name: "Doraemon",
-      display_name: "哆啦A梦",
-      style: "温暖、可靠、什么都能帮你",
-      skills: ["万能助手", "日常回复", "客户维护"],
-      best_for: "万能助手、日常回复、客户维护",
-      status: "enabled"
-    },
-    {
-      key: "mario",
-      name: "Mario",
-      display_name: "超级马里奥",
-      style: "积极、行动派、有冲劲",
-      skills: ["销售跟进", "催单", "推动决策"],
-      best_for: "销售跟进、催单、推动决策",
-      status: "enabled"
-    },
-    {
-      key: "pikachu",
-      name: "Pikachu",
-      display_name: "皮卡丘",
-      style: "活泼、可爱、有亲和力",
-      skills: ["社媒互动", "年轻客户", "轻松话题"],
-      best_for: "社媒互动、年轻客户、轻松话题",
-      status: "enabled"
-    },
-    {
-      key: "totoro",
-      name: "Totoro",
-      display_name: "龙猫",
-      style: "温柔、治愈、让人安心",
-      skills: ["客户关怀", "节日问候", "暖心邮件"],
-      best_for: "客户关怀、节日问候、暖心邮件",
-      status: "enabled"
-    },
-    {
-      key: "baymax",
-      name: "Baymax",
-      display_name: "大白",
-      style: "稳重、专业、可靠",
-      skills: ["正式邮件", "医疗客户", "技术沟通"],
-      best_for: "正式邮件、医疗客户、技术沟通",
-      status: "enabled"
-    },
-    {
-      key: "nemo",
-      name: "Nemo",
-      display_name: "海底总动员",
-      style: "好奇、探索、愿意沟通",
-      skills: ["陌生开发", "初次接触", "破冰邮件"],
-      best_for: "陌生开发、初次接触、破冰邮件",
-      status: "enabled"
-    }
-  ],
+  options: fallbackModels,
+  use_cases: fallbackUseCases,
+  use_case_bindings: { customer_research: "deepseek-chat", email_draft: "claude-sonnet", default: "ug-balanced-v1" },
+  email_writers: fallbackWriters,
   default_email_writer: "baymax",
   updated_by: null,
   updated_at: null
 };
 
-type TraceableError = Error & { traceId?: string };
+type AccountFormValues = { name: string; email: string; password?: string; role: string; dataScope: string; enabled: boolean };
+type MailDraft = { senderEmail: string; senderName: string; smtpHost: string; smtpPort: number; username: string; password: string; useTls: boolean; enabled: boolean; testSendTo: string };
+type BannerImageMeta = { width: number; height: number; originalSize: number; compressedSize: number };
 
-type BannerImageMeta = {
-  width: number;
-  height: number;
-  originalSize: number;
-  compressedSize: number;
-};
-
-type AccountFormValues = {
-  name: string;
-  email: string;
-  password?: string;
-  role: string;
-  dataScope: string;
-  enabled: boolean;
-};
-
-type AIModelFormValues = {
-  provider: string;
-  label: string;
-  value?: string;
-  scenario: string;
-  capability: string;
-};
-
-type AIModelUseCaseFormValues = {
-  key?: string;
-  label: string;
-  description: string;
-};
-
-type EmailWriterFormValues = {
-  key?: string;
-  name: string;
-  displayName: string;
-  style: string;
-  skills: string;
-  bestFor: string;
-  status: string;
-};
-
-function asTraceableError(error: unknown): TraceableError {
-  if (error instanceof Error) return error as TraceableError;
-  return new Error("设置管理加载失败");
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error("设置操作失败");
 }
 
 function formatFileSize(bytes: number) {
@@ -286,21 +142,28 @@ function normaliseAIModelConfig(config?: Partial<AIModelConfig> | null): AIModel
     ...config,
     options: config?.options?.length ? config.options : fallbackAIModelConfig.options,
     use_cases: config?.use_cases?.length ? config.use_cases : fallbackAIModelConfig.use_cases,
-    use_case_bindings: {
-      ...fallbackAIModelConfig.use_case_bindings,
-      ...(config?.use_case_bindings ?? {})
-    },
+    use_case_bindings: { ...fallbackAIModelConfig.use_case_bindings, ...(config?.use_case_bindings ?? {}) },
     email_writers: config?.email_writers?.length ? config.email_writers : fallbackAIModelConfig.email_writers,
     default_email_writer: config?.default_email_writer ?? fallbackAIModelConfig.default_email_writer
   };
 }
 
 function modelValueFrom(provider: string, label: string) {
-  const source = `${provider}-${label}`.toLowerCase();
-  return source
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 80);
+  return `${provider}-${label}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 80) || `model-${Date.now()}`;
+}
+
+function mailDraftFrom(settings?: GlobalMailSettings): MailDraft {
+  return {
+    senderEmail: settings?.sender_email || "sales@ultrasound-growth.local",
+    senderName: settings?.sender_name || "Ultrasound Growth",
+    smtpHost: settings?.smtp_host || "",
+    smtpPort: settings?.smtp_port || 587,
+    username: settings?.username || "",
+    password: "",
+    useTls: settings?.use_tls ?? true,
+    enabled: settings?.enabled ?? false,
+    testSendTo: ""
+  };
 }
 
 function readBannerImage(file: File): Promise<{ url: string; meta: BannerImageMeta }> {
@@ -312,9 +175,9 @@ function readBannerImage(file: File): Promise<{ url: string; meta: BannerImageMe
     const image = new Image();
     const objectUrl = URL.createObjectURL(file);
     image.onload = () => {
+      const canvas = document.createElement("canvas");
       const targetWidth = 1920;
       const targetHeight = 360;
-      const canvas = document.createElement("canvas");
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       const context = canvas.getContext("2d");
@@ -327,20 +190,10 @@ function readBannerImage(file: File): Promise<{ url: string; meta: BannerImageMe
       const targetRatio = targetWidth / targetHeight;
       const sourceWidth = sourceRatio > targetRatio ? image.naturalHeight * targetRatio : image.naturalWidth;
       const sourceHeight = sourceRatio > targetRatio ? image.naturalHeight : image.naturalWidth / targetRatio;
-      const sourceX = (image.naturalWidth - sourceWidth) / 2;
-      const sourceY = (image.naturalHeight - sourceHeight) / 2;
-      context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+      context.drawImage(image, (image.naturalWidth - sourceWidth) / 2, (image.naturalHeight - sourceHeight) / 2, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
       const url = canvas.toDataURL("image/jpeg", 0.86);
       URL.revokeObjectURL(objectUrl);
-      resolve({
-        url,
-        meta: {
-          width: image.naturalWidth,
-          height: image.naturalHeight,
-          originalSize: file.size,
-          compressedSize: Math.round((url.length * 3) / 4)
-        }
-      });
+      resolve({ url, meta: { width: image.naturalWidth, height: image.naturalHeight, originalSize: file.size, compressedSize: Math.round((url.length * 3) / 4) } });
     };
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl);
@@ -353,67 +206,64 @@ function readBannerImage(file: File): Promise<{ url: string; meta: BannerImageMe
 export function SettingsPage() {
   const [searchParams] = useSearchParams();
   const [accountForm] = Form.useForm<AccountFormValues>();
-  const [modelForm] = Form.useForm<AIModelFormValues>();
-  const [scenarioForm] = Form.useForm<AIModelUseCaseFormValues>();
-  const [writerForm] = Form.useForm<EmailWriterFormValues>();
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
   const [activeMenu, setActiveMenu] = useState(sectionMenuMap[searchParams.get("section") ?? ""] ?? "overview");
   const [loading, setLoading] = useState(true);
-  const [savingBanner, setSavingBanner] = useState(false);
-  const [savingPermission, setSavingPermission] = useState(false);
-  const [savingAIModel, setSavingAIModel] = useState(false);
-  const [savingModelOption, setSavingModelOption] = useState(false);
-  const [savingScenario, setSavingScenario] = useState(false);
-  const [savingWriterRole, setSavingWriterRole] = useState(false);
-  const [savingAccount, setSavingAccount] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
-  const [modelModalOpen, setModelModalOpen] = useState(false);
-  const [scenarioModalOpen, setScenarioModalOpen] = useState(false);
-  const [writerModalOpen, setWriterModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SalesUser | null>(null);
-  const [editingWriter, setEditingWriter] = useState<EmailWriterRole | null>(null);
+  const [savingAccount, setSavingAccount] = useState(false);
   const [selectedRole, setSelectedRole] = useState("ops");
   const [permissionValues, setPermissionValues] = useState<string[]>([]);
-  const [aiModelDraft, setAIModelDraft] = useState("ug-balanced-v1");
-  const [aiModelUseCases, setAIModelUseCases] = useState<AIModelUseCase[]>(fallbackAIModelConfig.use_cases);
-  const [aiModelBindings, setAIModelBindings] = useState<Record<string, string>>(fallbackAIModelConfig.use_case_bindings);
-  const [emailWriters, setEmailWriters] = useState<EmailWriterRole[]>(fallbackAIModelConfig.email_writers);
-  const [defaultEmailWriter, setDefaultEmailWriter] = useState(fallbackAIModelConfig.default_email_writer);
+  const [savingPermission, setSavingPermission] = useState(false);
+  const [bannerDraft, setBannerDraft] = useState({ title: "", body: "", imageUrl: "" });
   const [bannerImageMeta, setBannerImageMeta] = useState<BannerImageMeta | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<TraceableError | null>(null);
-  const [bannerDraft, setBannerDraft] = useState({
-    title: "",
-    body: "",
-    imageUrl: "",
-    linkUrl: ""
-  });
+  const [savingBanner, setSavingBanner] = useState(false);
+  const [sourceRows, setSourceRows] = useState<SourceDictionarySetting[]>([]);
+  const [channelRows, setChannelRows] = useState<ChannelConfig[]>([]);
+  const [reminderRows, setReminderRows] = useState<ReminderRule[]>([]);
+  const [savingRouting, setSavingRouting] = useState(false);
+  const [mailDraft, setMailDraft] = useState<MailDraft>(mailDraftFrom());
+  const [savingMail, setSavingMail] = useState(false);
+  const [aiModelDraft, setAIModelDraft] = useState("ug-balanced-v1");
+  const [modelOptions, setModelOptions] = useState<AIModelOption[]>(fallbackModels);
+  const [aiModelUseCases, setAIModelUseCases] = useState<AIModelUseCase[]>(fallbackUseCases);
+  const [aiModelBindings, setAIModelBindings] = useState<Record<string, string>>(fallbackAIModelConfig.use_case_bindings);
+  const [emailWriters, setEmailWriters] = useState<EmailWriterRole[]>(fallbackWriters);
+  const [defaultEmailWriter, setDefaultEmailWriter] = useState("baymax");
+  const [savingAIModel, setSavingAIModel] = useState(false);
+
+  const aiModelConfig = normaliseAIModelConfig({ ...overview?.ai_model, options: modelOptions, use_cases: aiModelUseCases, use_case_bindings: aiModelBindings, email_writers: emailWriters, default_email_writer: defaultEmailWriter });
+  const selectedAIModel = aiModelConfig.options.find((item) => item.value === aiModelDraft) ?? aiModelConfig.options[0];
+  const enabledEmailWriters = useMemo(() => emailWriters.filter((writer) => writer.status === "enabled"), [emailWriters]);
+  const currentPermission = useMemo(() => overview?.permissions.find((row) => row.role === selectedRole), [overview, selectedRole]);
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
       const result = await fetchSettingsOverview();
+      const config = normaliseAIModelConfig(result.ai_model);
       setOverview(result);
-      setBannerDraft({
-        title: result.banner.title,
-        body: result.banner.body,
-        imageUrl: result.banner.image_url,
-        linkUrl: result.banner.link_url ?? ""
-      });
+      setBannerDraft({ title: result.banner.title, body: result.banner.body, imageUrl: result.banner.image_url });
       const currentRole = result.permissions.find((row) => row.role === selectedRole) ?? result.permissions[0];
       if (currentRole) {
         setSelectedRole(currentRole.role);
         setPermissionValues(currentRole.permissions);
       }
-      const nextAIModelConfig = normaliseAIModelConfig(result.ai_model);
-      setAIModelDraft(nextAIModelConfig.selected_model);
-      setAIModelUseCases(nextAIModelConfig.use_cases);
-      setAIModelBindings(nextAIModelConfig.use_case_bindings);
-      setEmailWriters(nextAIModelConfig.email_writers);
-      setDefaultEmailWriter(nextAIModelConfig.default_email_writer);
+      setAIModelDraft(config.selected_model);
+      setModelOptions(config.options);
+      setAIModelUseCases(config.use_cases);
+      setAIModelBindings(config.use_case_bindings);
+      setEmailWriters(config.email_writers);
+      setDefaultEmailWriter(config.default_email_writer);
+      setSourceRows(result.source_dictionary ?? []);
+      setChannelRows(result.channel_configs ?? []);
+      setReminderRows(result.reminder_rules ?? []);
+      setMailDraft(mailDraftFrom(result.mail_settings));
     } catch (failure) {
-      setError(asTraceableError(failure));
+      setError(asError(failure));
     } finally {
       setLoading(false);
     }
@@ -425,46 +275,56 @@ export function SettingsPage() {
 
   useEffect(() => {
     const section = searchParams.get("section");
-    if (!section) {
-      setActiveMenu("overview");
-      return;
-    }
-    setActiveMenu(sectionMenuMap[section] ?? "overview");
-  }, [searchParams, overview]);
-
-  const currentPermission = useMemo(() => overview?.permissions.find((row) => row.role === selectedRole), [overview, selectedRole]);
-  const aiModelConfig = normaliseAIModelConfig(overview?.ai_model);
-  const selectedAIModel = useMemo(
-    () => aiModelConfig.options.find((item) => item.value === aiModelDraft) ?? aiModelConfig.options[0],
-    [aiModelConfig, aiModelDraft]
-  );
-  const enabledEmailWriters = useMemo(
-    () => emailWriters.filter((writer) => writer.status === "enabled"),
-    [emailWriters]
-  );
+    setActiveMenu(section ? sectionMenuMap[section] ?? "overview" : "overview");
+  }, [searchParams]);
 
   useEffect(() => {
     if (currentPermission) setPermissionValues(currentPermission.permissions);
   }, [currentPermission]);
 
+  function updateSourceRow(index: number, patch: Partial<SourceDictionarySetting>) {
+    setSourceRows((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
+  }
+
+  function updateChannelRow(index: number, patch: Partial<ChannelConfig>) {
+    setChannelRows((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
+  }
+
+  function updateReminderRow(index: number, patch: Partial<ReminderRule>) {
+    setReminderRows((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
+  }
+
+  function updateModelRow(index: number, patch: Partial<AIModelOption>) {
+    setModelOptions((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
+  }
+
+  function updateUseCaseRow(index: number, patch: Partial<AIModelUseCase>) {
+    setAIModelUseCases((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
+  }
+
+  function updateWriterRow(index: number, patch: Partial<EmailWriterRole> & { skillsText?: string }) {
+    setEmailWriters((rows) => rows.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      if (patch.skillsText !== undefined) {
+        const { skillsText, ...rest } = patch;
+        return { ...row, ...rest, skills: skillsText.split(/[、,，\n]/).map((skill) => skill.trim()).filter(Boolean) };
+      }
+      return { ...row, ...patch };
+    }));
+  }
+
   async function publishBanner() {
     setSavingBanner(true);
     setError(null);
     try {
-      if (!bannerDraft.imageUrl) {
-        throw new Error("请先上传 Banner 图片，建议 1920×360，PNG/JPG/WebP，不超过 2MB。");
-      }
-      await updateSettingsBanner({
-        title: bannerDraft.title,
-        body: bannerDraft.body,
-        imageUrl: bannerDraft.imageUrl,
-        linkUrl: null,
-        active: true
-      });
-      setNotice("Banner 已发布到全部后台页面；普通页面只显示图片、标题和正文。");
-      await load();
+      if (!bannerDraft.imageUrl) throw new Error("请先上传 Banner 图片，建议 1920×360，PNG/JPG/WebP，原图不超过 2MB。");
+      const saved = await updateSettingsBanner({ title: bannerDraft.title, body: bannerDraft.body, imageUrl: bannerDraft.imageUrl, linkUrl: null, active: true });
+      setBannerDraft({ title: saved.title, body: saved.body, imageUrl: saved.image_url });
+      setOverview((current) => current ? { ...current, banner: saved } : current);
+      window.dispatchEvent(new CustomEvent("global-banner-updated", { detail: saved }));
+      setNotice("Banner 已发布并同步刷新到全部后台页面。");
     } catch (failure) {
-      setError(asTraceableError(failure));
+      setError(asError(failure));
     } finally {
       setSavingBanner(false);
     }
@@ -475,12 +335,88 @@ export function SettingsPage() {
     setError(null);
     try {
       await updateSettingsPermissions({ role: selectedRole, permissions: permissionValues });
-      setNotice("角色权限矩阵已保存并写入配置审计记录");
+      setNotice("角色权限矩阵已保存。");
       await load();
     } catch (failure) {
-      setError(asTraceableError(failure));
+      setError(asError(failure));
     } finally {
       setSavingPermission(false);
+    }
+  }
+
+  async function submitAccount(values: AccountFormValues) {
+    setSavingAccount(true);
+    setError(null);
+    try {
+      if (editingAccount) {
+        await updateSalesUser(editingAccount.id, values);
+        setNotice("账号资料已更新。");
+      } else {
+        await createSalesUser({ name: values.name, email: values.email, password: values.password ?? "", role: values.role, dataScope: values.dataScope, enabled: values.enabled });
+        setNotice("账号已创建。");
+      }
+      setAccountModalOpen(false);
+      accountForm.resetFields();
+      await load();
+    } catch (failure) {
+      setError(asError(failure));
+    } finally {
+      setSavingAccount(false);
+    }
+  }
+
+  async function toggleAccount(user: SalesUser, enabled: boolean) {
+    setSavingAccount(true);
+    try {
+      await updateSalesUser(user.id, { name: user.name, email: user.email, role: user.role, dataScope: user.data_scope, enabled });
+      setNotice(enabled ? "账号已启用" : "账号已停用");
+      await load();
+    } catch (failure) {
+      setError(asError(failure));
+    } finally {
+      setSavingAccount(false);
+    }
+  }
+
+  async function saveRouting(kind: "source" | "channel" | "reminder") {
+    setSavingRouting(true);
+    setError(null);
+    try {
+      if (kind === "source") {
+        const saved = await updateSettingsSourceDictionary(sourceRows.filter((row) => row.category.trim() && row.label.trim()));
+        setSourceRows(saved);
+        setNotice("客户来源字典已保存，线索筛选和导入校验会使用这些来源。");
+      }
+      if (kind === "channel") {
+        const saved = await updateSettingsChannels(channelRows.filter((row) => row.key.trim() && row.name.trim() && row.source_category.trim() && row.access_method.trim()));
+        setChannelRows(saved);
+        setNotice("渠道配置已保存。");
+      }
+      if (kind === "reminder") {
+        const saved = await updateSettingsReminderRules(reminderRows.filter((row) => row.key.trim() && row.name.trim() && row.target.trim() && row.channel.trim()));
+        setReminderRows(saved);
+        setNotice("提醒规则已保存。");
+      }
+      await load();
+    } catch (failure) {
+      setError(asError(failure));
+    } finally {
+      setSavingRouting(false);
+    }
+  }
+
+  async function saveMailSettings() {
+    setSavingMail(true);
+    setError(null);
+    try {
+      const saved = await updateSettingsMail(mailDraft);
+      setMailDraft(mailDraftFrom(saved));
+      setNotice(saved.configured ? "邮件接口已保存并通过配置校验。" : "邮件接口已保存，但尚未启用或缺少 SMTP 主机。");
+      await load();
+    } catch (failure) {
+      setError(asError(failure));
+    } finally {
+      setSavingMail(false);
     }
   }
 
@@ -488,143 +424,23 @@ export function SettingsPage() {
     setSavingAIModel(true);
     setError(null);
     try {
-      const bindings = { ...aiModelBindings, default: aiModelDraft };
+      const cleanModels = modelOptions.filter((item) => item.value.trim() && item.label.trim() && item.provider.trim());
+      const cleanUseCases = aiModelUseCases.filter((item) => item.key.trim() && item.label.trim());
+      const cleanWriters = emailWriters.filter((item) => item.key.trim() && item.name.trim() && item.display_name.trim());
       const saved = await updateSettingsAIModel({
         selectedModel: aiModelDraft,
-        useCases: aiModelUseCases,
-        useCaseBindings: bindings,
-        emailWriters,
+        options: cleanModels,
+        useCases: cleanUseCases,
+        useCaseBindings: { ...aiModelBindings, default: aiModelDraft },
+        emailWriters: cleanWriters,
         defaultEmailWriter
       });
       setNotice(`AI 配置已保存：默认模型 ${saved.selected_label}，默认写手 ${saved.email_writers.find((writer) => writer.key === saved.default_email_writer)?.display_name ?? saved.default_email_writer}`);
       await load();
     } catch (failure) {
-      setError(asTraceableError(failure));
+      setError(asError(failure));
     } finally {
       setSavingAIModel(false);
-    }
-  }
-
-  async function addAIModelOption(values: AIModelFormValues) {
-    setSavingModelOption(true);
-    setError(null);
-    try {
-      const option: AIModelOption = {
-        value: (values.value?.trim() || modelValueFrom(values.provider, values.label)) || `model-${Date.now()}`,
-        label: values.label.trim(),
-        provider: values.provider.trim(),
-        scenario: values.scenario.trim(),
-        capability: values.capability.trim(),
-        status: "available"
-      };
-      const options = [...aiModelConfig.options.filter((item) => item.value !== option.value), option];
-      const saved = await updateSettingsAIModel({
-        selectedModel: aiModelDraft,
-        options,
-        useCases: aiModelUseCases,
-        useCaseBindings: { ...aiModelBindings, default: aiModelDraft },
-        emailWriters,
-        defaultEmailWriter
-      });
-      setNotice(`已添加模型选项：${option.label}`);
-      setModelModalOpen(false);
-      modelForm.resetFields();
-      setAIModelBindings(saved.use_case_bindings);
-      await load();
-    } catch (failure) {
-      setError(asTraceableError(failure));
-    } finally {
-      setSavingModelOption(false);
-    }
-  }
-
-  async function addAIModelUseCase(values: AIModelUseCaseFormValues) {
-    setSavingScenario(true);
-    setError(null);
-    try {
-      const key = (values.key?.trim() || modelValueFrom("scenario", values.label)) || `scenario-${Date.now()}`;
-      const useCase: AIModelUseCase = {
-        key,
-        label: values.label.trim(),
-        description: values.description.trim()
-      };
-      const nextUseCases = [...aiModelUseCases.filter((item) => item.key !== useCase.key), useCase];
-      const nextBindings = { ...aiModelBindings, [useCase.key]: aiModelDraft, default: aiModelDraft };
-      const saved = await updateSettingsAIModel({
-        selectedModel: aiModelDraft,
-        useCases: nextUseCases,
-        useCaseBindings: nextBindings,
-        emailWriters,
-        defaultEmailWriter
-      });
-      setAIModelUseCases(saved.use_cases);
-      setAIModelBindings(saved.use_case_bindings);
-      setScenarioModalOpen(false);
-      scenarioForm.resetFields();
-      setNotice(`已添加模型场景：${useCase.label}`);
-      await load();
-    } catch (failure) {
-      setError(asTraceableError(failure));
-    } finally {
-      setSavingScenario(false);
-    }
-  }
-
-  function openCreateWriter() {
-    setEditingWriter(null);
-    writerForm.resetFields();
-    writerForm.setFieldsValue({ status: "enabled" });
-    setWriterModalOpen(true);
-  }
-
-  function openEditWriter(writer: EmailWriterRole) {
-    setEditingWriter(writer);
-    writerForm.setFieldsValue({
-      key: writer.key,
-      name: writer.name,
-      displayName: writer.display_name,
-      style: writer.style,
-      skills: writer.skills.join("、"),
-      bestFor: writer.best_for,
-      status: writer.status
-    });
-    setWriterModalOpen(true);
-  }
-
-  async function saveEmailWriterRole(values: EmailWriterFormValues) {
-    setSavingWriterRole(true);
-    setError(null);
-    try {
-      const key = (values.key?.trim() || editingWriter?.key || modelValueFrom("writer", values.name)) || `writer-${Date.now()}`;
-      const writer: EmailWriterRole = {
-        key,
-        name: values.name.trim(),
-        display_name: values.displayName.trim(),
-        style: values.style.trim(),
-        skills: values.skills.split(/[、,，\n]/).map((skill) => skill.trim()).filter(Boolean),
-        best_for: values.bestFor.trim(),
-        status: values.status
-      };
-      const nextWriters = [...emailWriters.filter((item) => item.key !== writer.key), writer];
-      const nextDefaultWriter = defaultEmailWriter || writer.key;
-      const saved = await updateSettingsAIModel({
-        selectedModel: aiModelDraft,
-        useCases: aiModelUseCases,
-        useCaseBindings: { ...aiModelBindings, default: aiModelDraft },
-        emailWriters: nextWriters,
-        defaultEmailWriter: nextDefaultWriter
-      });
-      setEmailWriters(saved.email_writers);
-      setDefaultEmailWriter(saved.default_email_writer);
-      setWriterModalOpen(false);
-      writerForm.resetFields();
-      setEditingWriter(null);
-      setNotice(`邮件写手角色已保存：${writer.display_name}`);
-      await load();
-    } catch (failure) {
-      setError(asTraceableError(failure));
-    } finally {
-      setSavingWriterRole(false);
     }
   }
 
@@ -637,85 +453,8 @@ export function SettingsPage() {
 
   function openEditAccount(user: SalesUser) {
     setEditingAccount(user);
-    accountForm.setFieldsValue({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      dataScope: user.data_scope,
-      enabled: user.enabled
-    });
+    accountForm.setFieldsValue({ name: user.name, email: user.email, role: user.role, dataScope: user.data_scope, enabled: user.enabled });
     setAccountModalOpen(true);
-  }
-
-  async function submitAccount(values: AccountFormValues) {
-    setSavingAccount(true);
-    setError(null);
-    try {
-      if (editingAccount) {
-        await updateSalesUser(editingAccount.id, values);
-        setNotice("账号资料已更新，并写入配置审计记录");
-      } else {
-        await createSalesUser({
-          name: values.name,
-          email: values.email,
-          password: values.password ?? "",
-          role: values.role,
-          dataScope: values.dataScope,
-          enabled: values.enabled
-        });
-        setNotice("账号已创建，并写入配置审计记录");
-      }
-      setAccountModalOpen(false);
-      accountForm.resetFields();
-      await load();
-    } catch (failure) {
-      setError(asTraceableError(failure));
-    } finally {
-      setSavingAccount(false);
-    }
-  }
-
-  async function toggleAccount(user: SalesUser, enabled: boolean) {
-    setSavingAccount(true);
-    try {
-      await updateSalesUser(user.id, {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        dataScope: user.data_scope,
-        enabled
-      });
-      setNotice(enabled ? "账号已启用" : "账号已停用");
-      await load();
-    } catch (failure) {
-      setError(asTraceableError(failure));
-    } finally {
-      setSavingAccount(false);
-    }
-  }
-
-  function entryCards(menuKey: string) {
-    const entries = (overview?.entries ?? []).filter((entry) => entryMenuMap[entry.key] === menuKey);
-    if (!entries.length) return <Empty description="暂无该分组配置入口" />;
-    return (
-      <Row gutter={[16, 16]}>
-        {entries.map((entry) => (
-          <Col xs={24} md={12} xl={6} key={entry.key}>
-            <Link to={entry.path}>
-              <Card size="small" className="settings-entry-card" hoverable>
-                <Space direction="vertical" size={8}>
-                  <Typography.Text strong>{entry.title}</Typography.Text>
-                  <Typography.Text className="muted">{entry.description}</Typography.Text>
-                  <Tag color={entry.status === "warning" ? "gold" : "purple"}>
-                    {entry.risk_count > 0 ? `${entry.risk_count} 项风险` : "可进入"}
-                  </Tag>
-                </Space>
-              </Card>
-            </Link>
-          </Col>
-        ))}
-      </Row>
-    );
   }
 
   return (
@@ -724,63 +463,30 @@ export function SettingsPage() {
         <div>
           <Typography.Text className="stage-label">阶段 1 (MVP) · 系统配置</Typography.Text>
           <Typography.Title level={2}>配置中心</Typography.Title>
-          <Typography.Paragraph className="muted">
-            这里集中维护账号、角色权限、全局 Banner、国家销售映射、产品知识库、来源字典、渠道和提醒规则。
-          </Typography.Paragraph>
+          <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、配置审计分组；点击菜单后只展示对应配置。</Typography.Paragraph>
         </div>
       </div>
 
       {notice ? <Alert type="success" showIcon message={notice} closable onClose={() => setNotice(null)} /> : null}
       {error ? <Alert type="error" showIcon message="设置操作失败" description={error.message} /> : null}
-
       <Tabs activeKey={activeMenu} items={settingsMenuItems} onChange={setActiveMenu} className="settings-section" />
 
       {activeMenu === "overview" ? (
         <>
           <Row gutter={[16, 16]} className="metric-row">
-            <Col xs={24} md={12} xl={6}>
-              <Card loading={loading}>
-                <Statistic title="销售账号" value={overview?.summary.sales_users ?? 0} prefix={<Users size={18} />} />
-                <div className="metric-chip">管理员创建和维护账号</div>
-              </Card>
-            </Col>
-            <Col xs={24} md={12} xl={6}>
-              <Card loading={loading}>
-                <Statistic title="已启用来源" value={overview?.summary.sources ?? 0} />
-                <div className="metric-chip green">决定线索来源筛选项</div>
-              </Card>
-            </Col>
-            <Col xs={24} md={12} xl={6}>
-              <Card loading={loading}>
-                <Statistic title="来源国家映射" value={overview?.summary.country_mappings ?? 0} />
-                <div className="metric-chip amber">导入时自动分配销售</div>
-              </Card>
-            </Col>
-            <Col xs={24} md={12} xl={6}>
-              <Card loading={loading}>
-                <Statistic title="可选大模型" value={overview?.summary.ai_models ?? 0} />
-                <div className="metric-chip">当前：{aiModelConfig.selected_label}</div>
-              </Card>
-            </Col>
+            <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="销售账号" value={overview?.summary.sales_users ?? 0} prefix={<Users size={18} />} /><div className="metric-chip">账号创建和权限维护在“账号权限”菜单</div></Card></Col>
+            <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="已启用来源" value={overview?.summary.sources ?? 0} /><div className="metric-chip green">用于线索筛选与导入校验</div></Card></Col>
+            <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="国家销售映射" value={overview?.summary.country_mappings ?? 0} /><div className="metric-chip amber">导入时自动分配销售</div></Card></Col>
+            <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="邮件接口" value={overview?.summary.mail_configured ? "已配置" : "未配置"} /><div className="metric-chip">再营销发信读取这里的主邮箱</div></Card></Col>
           </Row>
-
-          <Alert
-            showIcon
-            type="info"
-            className="login-error"
-            message="配置页顶部菜单说明"
-            description="请先在顶部选择配置菜单，再在下方处理对应设置。账号、Banner、线索分发、AI 与模型、审计记录分开呈现，避免一屏堆叠全部配置。"
-          />
-
+          <Alert showIcon type="info" className="login-error" message="配置中心不再一次性堆叠所有入口" description="请先在顶部选择配置菜单，再在下方编辑对应内容。账号导入/新增只放在账号权限内，Banner 管理只放在全局 Banner 内。" />
           <Card title="配置菜单总览" className="settings-section" loading={loading}>
             <Row gutter={[16, 16]}>
               {settingsMenuItems.filter((item) => item.key !== "overview").map((item) => (
                 <Col xs={24} md={12} xl={6} key={item.key}>
                   <Card size="small" className="settings-entry-card" hoverable onClick={() => setActiveMenu(item.key)}>
                     <Typography.Text strong>{item.label}</Typography.Text>
-                    <Typography.Paragraph className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
-                      点击后只显示该分组下的设置项。
-                    </Typography.Paragraph>
+                    <Typography.Paragraph className="muted" style={{ marginTop: 8, marginBottom: 0 }}>点击后只显示该分组下的设置项。</Typography.Paragraph>
                   </Card>
                 </Col>
               ))}
@@ -790,141 +496,55 @@ export function SettingsPage() {
       ) : null}
 
       {activeMenu === "account" ? (
-        <>
-          <Row gutter={[16, 16]} className="summary-grid">
-            <Col xs={24} xl={14}>
-              <Card
-                id="sales-users"
-                title="销售账号"
-                loading={loading}
-                extra={
-                  <Space wrap>
-                    <Button icon={<FileUp size={16} />} onClick={() => setNotice("账号批量导入将在账号管理内处理；当前可先用新增账号维护单个用户。")}>
-                      导入账号
-                    </Button>
-                    <Button type="primary" icon={<UserPlus size={16} />} onClick={openCreateAccount}>
-                      新增账号
-                    </Button>
-                  </Space>
-                }
-              >
-                <Table<SalesUser>
-                  rowKey="id"
-                  dataSource={overview?.sales_users ?? []}
-                  pagination={false}
-                  columns={[
-                    { title: "姓名", dataIndex: "name" },
-                    { title: "账号", dataIndex: "email" },
-                    { title: "角色", dataIndex: "role", render: (role: string) => roleOptions.find((item) => item.value === role)?.label ?? role },
-                    { title: "负责范围", dataIndex: "data_scope" },
-                    { title: "状态", render: (_, user) => (user.enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>) },
-                    {
-                      title: "操作",
-                      render: (_, user) => (
-                        <Space>
-                          <Button size="small" onClick={() => openEditAccount(user)}>
-                            编辑
-                          </Button>
-                          <Switch
-                            size="small"
-                            checked={user.enabled}
-                            loading={savingAccount}
-                            checkedChildren="启用"
-                            unCheckedChildren="停用"
-                            onChange={(enabled) => void toggleAccount(user, enabled)}
-                          />
-                        </Space>
-                      )
-                    }
-                  ]}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} xl={10}>
-              <Card
-                id="permissions"
-                title="角色权限矩阵"
-                loading={loading}
-                extra={
-                  <Button type="primary" icon={<ShieldCheck size={16} />} loading={savingPermission} onClick={() => void savePermissions()}>
-                    保存权限
-                  </Button>
-                }
-              >
-                <Space direction="vertical" style={{ width: "100%" }}>
-                  <Select value={selectedRole} options={roleOptions} onChange={setSelectedRole} />
-                  <Checkbox.Group
-                    value={permissionValues}
-                    options={permissionOptions}
-                    onChange={(values) => setPermissionValues(values.map(String))}
-                    className="permission-checkbox-group"
-                  />
-                </Space>
-              </Card>
-            </Col>
-          </Row>
-        </>
+        <Row gutter={[16, 16]} className="summary-grid">
+          <Col xs={24} xl={14}>
+            <Card id="sales-users" title="销售账号" loading={loading} extra={<Button type="primary" icon={<UserPlus size={16} />} onClick={openCreateAccount}>新增账号</Button>}>
+              <Table<SalesUser>
+                rowKey="id"
+                dataSource={overview?.sales_users ?? []}
+                pagination={false}
+                columns={[
+                  { title: "姓名", dataIndex: "name" },
+                  { title: "账号", dataIndex: "email" },
+                  { title: "角色", dataIndex: "role", render: (role: string) => roleOptions.find((item) => item.value === role)?.label ?? role },
+                  { title: "负责范围", dataIndex: "data_scope" },
+                  { title: "状态", dataIndex: "enabled", render: (enabled: boolean) => <Tag color={enabled ? "green" : "default"}>{enabled ? "启用" : "停用"}</Tag> },
+                  { title: "操作", render: (_, user) => <Space><Button onClick={() => openEditAccount(user)}>编辑</Button><Switch checked={user.enabled} loading={savingAccount} onChange={(checked) => void toggleAccount(user, checked)} /></Space> }
+                ]}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} xl={10}>
+            <Card id="permissions" title="角色权限矩阵" loading={loading} extra={<Button type="primary" icon={<ShieldCheck size={16} />} loading={savingPermission} onClick={() => void savePermissions()}>保存权限</Button>}>
+              <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                <Select value={selectedRole} options={roleOptions} onChange={setSelectedRole} style={{ width: 220 }} />
+                <Checkbox.Group value={permissionValues} onChange={(values) => setPermissionValues(values as string[])}>
+                  <Space direction="vertical">{permissionOptions.map((item) => <Checkbox value={item.value} key={item.value}>{item.label}</Checkbox>)}</Space>
+                </Checkbox.Group>
+              </Space>
+            </Card>
+          </Col>
+        </Row>
       ) : null}
 
       {activeMenu === "banner" ? (
         <Card id="banner" title="全局 Banner 管理" loading={loading}>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={11}>
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Alert
-                  showIcon
-                  type="info"
-                  message="Banner 图片建议"
-                  description="推荐尺寸 1920×360，支持 PNG/JPG/WebP；建议原图不超过 2MB。上传后会自动裁切压缩为横幅比例，避免发布失败。"
-                />
-                <Upload
-                  accept="image/png,image/jpeg,image/webp"
-                  showUploadList={false}
-                  beforeUpload={(file) => {
-                    void readBannerImage(file as File)
-                      .then(({ url, meta }) => {
-                        setBannerDraft((current) => ({ ...current, imageUrl: url }));
-                        setBannerImageMeta(meta);
-                        setNotice(
-                          `Banner 图片已载入预览：原图 ${meta.width}×${meta.height} / ${formatFileSize(meta.originalSize)}，压缩后约 ${formatFileSize(meta.compressedSize)}`
-                        );
-                      })
-                      .catch((failure) => setError(asTraceableError(failure)));
-                    return false;
-                  }}
-                >
+          <Row gutter={[24, 24]}>
+            <Col xs={24} xl={10}>
+              <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                <Alert type="info" showIcon message="Banner 图片建议" description="推荐尺寸 1920×360，支持 PNG/JPG/WebP；建议原图不超过 2MB。上传后会自动裁切压缩为横幅比例，避免发布失败。" />
+                <Upload accept="image/png,image/jpeg,image/webp" maxCount={1} showUploadList={false} beforeUpload={async (file) => { try { const result = await readBannerImage(file); setBannerDraft((draft) => ({ ...draft, imageUrl: result.url })); setBannerImageMeta(result.meta); message.success("Banner 图片已载入预览，点击发布后同步到全部页面"); } catch (failure) { setError(asError(failure)); } return Upload.LIST_IGNORE; }}>
                   <Button icon={<ImageUp size={16} />}>上传 Banner 图片</Button>
                 </Upload>
-                {bannerImageMeta ? (
-                  <Tag color="purple">
-                    原图 {bannerImageMeta.width}×{bannerImageMeta.height} · {formatFileSize(bannerImageMeta.originalSize)}，发布图 1920×360
-                  </Tag>
-                ) : null}
-                <Input
-                  aria-label="Banner 标题"
-                  value={bannerDraft.title}
-                  onChange={(event) => setBannerDraft((current) => ({ ...current, title: event.target.value }))}
-                />
-                <Input.TextArea
-                  aria-label="Banner 说明"
-                  value={bannerDraft.body}
-                  autoSize={{ minRows: 3, maxRows: 5 }}
-                  onChange={(event) => setBannerDraft((current) => ({ ...current, body: event.target.value }))}
-                />
-                <Button type="primary" icon={<Save size={16} />} loading={savingBanner} onClick={() => void publishBanner()}>
-                  发布到全部页面
-                </Button>
+                {bannerImageMeta ? <Tag color="blue">原图 {bannerImageMeta.width}×{bannerImageMeta.height} · {formatFileSize(bannerImageMeta.originalSize)}，发布图 1920×360 · {formatFileSize(bannerImageMeta.compressedSize)}</Tag> : null}
+                <Input value={bannerDraft.title} onChange={(event) => setBannerDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Banner 标题" />
+                <Input.TextArea value={bannerDraft.body} onChange={(event) => setBannerDraft((draft) => ({ ...draft, body: event.target.value }))} placeholder="Banner 正文" rows={4} />
+                <Button type="primary" icon={<Save size={16} />} loading={savingBanner} onClick={() => void publishBanner()}>发布到全部页面</Button>
               </Space>
             </Col>
-            <Col xs={24} md={13}>
-              <div
-                className="banner-preview"
-                style={{
-                  backgroundImage: `linear-gradient(105deg, rgba(17,24,39,.76), rgba(91,75,219,.72)), url(${bannerDraft.imageUrl})`
-                }}
-              >
-                <strong>{bannerDraft.title}</strong>
-                <span>{bannerDraft.body}</span>
+            <Col xs={24} xl={14}>
+              <div className="banner-preview" style={{ backgroundImage: `linear-gradient(105deg, rgba(17,24,39,.76), rgba(91,75,219,.72)), url(${bannerDraft.imageUrl})` }}>
+                <strong>{bannerDraft.title}</strong><span>{bannerDraft.body}</span>
               </div>
             </Col>
           </Row>
@@ -932,351 +552,122 @@ export function SettingsPage() {
       ) : null}
 
       {activeMenu === "routing" ? (
-        <>
-          <Card title="线索分发入口" className="settings-section" loading={loading}>
-            {entryCards("routing")}
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Card title="国家区域销售映射" extra={<Link to="/admin/settings/country-sales"><Button>进入映射配置</Button></Link>}><Typography.Text className="muted">一个销售可以负责多个国家；客户导入时会按国家自动分配销售，你只需要确认异常结果。</Typography.Text></Card>
+          <Card id="sources" title="客户来源字典" extra={<Space><Button icon={<Plus size={16} />} onClick={() => setSourceRows((rows) => [...rows, { id: null, category: "网站", label: "", enabled: true }])}>新增来源</Button><Button type="primary" loading={savingRouting} onClick={() => void saveRouting("source")}>保存来源</Button></Space>}>
+            <Table<SourceDictionarySetting> rowKey={(record, index) => String(record.id ?? `new-source-${index}`)} dataSource={sourceRows} pagination={false} columns={[
+              { title: "来源类型", render: (_, row, index) => <Input value={row.category} onChange={(event) => updateSourceRow(index, { category: event.target.value })} /> },
+              { title: "来源名称", render: (_, row, index) => <Input value={row.label} onChange={(event) => updateSourceRow(index, { label: event.target.value })} /> },
+              { title: "启用", width: 120, render: (_, row, index) => <Switch checked={row.enabled} onChange={(enabled) => updateSourceRow(index, { enabled })} /> }
+            ]} />
           </Card>
-          <Row gutter={[16, 16]} className="summary-grid">
-            <Col xs={24} md={8}>
-              <Card id="sources" title="客户来源字典">
-                <Typography.Paragraph className="muted">
-                  来源字典决定线索池的来源筛选项，例如官网、邮箱、Facebook、领英和线下展会。已启用来源会参与导入校验。
-                </Typography.Paragraph>
-                <Tag color="purple">当前可用来源 {overview?.summary.sources ?? 0} 个</Tag>
-              </Card>
-            </Col>
-            <Col xs={24} md={8}>
-              <Card id="channels" title="渠道配置">
-                <Typography.Paragraph className="muted">
-                  渠道配置用于维护 Webhook、邮箱同步和展会导入来源；异常会进入配置风险和导入失败提示。
-                </Typography.Paragraph>
-                <Tag color="gold">邮箱同步需重试时会提示</Tag>
-              </Card>
-            </Col>
-            <Col xs={24} md={8}>
-              <Card id="reminders" title="提醒规则">
-                <Typography.Paragraph className="muted">
-                  提醒规则控制 24h/48h 未反馈、待分配和再营销确认的提醒节奏，避免销售遗漏待办。
-                </Typography.Paragraph>
-                <Tag color="green">启用中</Tag>
-              </Card>
+          <Card id="channels" title="渠道配置" extra={<Space><Button icon={<Plus size={16} />} onClick={() => setChannelRows((rows) => [...rows, { key: `channel_${Date.now()}`, name: "", source_category: "网站", access_method: "Webhook", endpoint: "", enabled: true, status: "active" }])}>新增渠道</Button><Button type="primary" loading={savingRouting} onClick={() => void saveRouting("channel")}>保存渠道</Button></Space>}>
+            <Table<ChannelConfig> rowKey="key" dataSource={channelRows} pagination={false} scroll={{ x: 1000 }} columns={[
+              { title: "渠道 Key", width: 180, render: (_, row, index) => <Input value={row.key} onChange={(event) => updateChannelRow(index, { key: event.target.value })} /> },
+              { title: "渠道名称", width: 180, render: (_, row, index) => <Input value={row.name} onChange={(event) => updateChannelRow(index, { name: event.target.value })} /> },
+              { title: "来源类型", width: 160, render: (_, row, index) => <Input value={row.source_category} onChange={(event) => updateChannelRow(index, { source_category: event.target.value })} /> },
+              { title: "接入方式", width: 160, render: (_, row, index) => <Input value={row.access_method} onChange={(event) => updateChannelRow(index, { access_method: event.target.value })} /> },
+              { title: "接口/地址", width: 260, render: (_, row, index) => <Input value={row.endpoint} onChange={(event) => updateChannelRow(index, { endpoint: event.target.value })} /> },
+              { title: "启用", width: 100, render: (_, row, index) => <Switch checked={row.enabled} onChange={(enabled) => updateChannelRow(index, { enabled })} /> }
+            ]} />
+          </Card>
+          <Card id="reminders" title="提醒规则" extra={<Space><Button icon={<Plus size={16} />} onClick={() => setReminderRows((rows) => [...rows, { key: `reminder_${Date.now()}`, name: "", trigger_hours: 24, target: "销售负责人", channel: "邮件", enabled: true }])}>新增规则</Button><Button type="primary" loading={savingRouting} onClick={() => void saveRouting("reminder")}>保存规则</Button></Space>}>
+            <Table<ReminderRule> rowKey="key" dataSource={reminderRows} pagination={false} scroll={{ x: 900 }} columns={[
+              { title: "规则 Key", width: 180, render: (_, row, index) => <Input value={row.key} onChange={(event) => updateReminderRow(index, { key: event.target.value })} /> },
+              { title: "规则名称", width: 220, render: (_, row, index) => <Input value={row.name} onChange={(event) => updateReminderRow(index, { name: event.target.value })} /> },
+              { title: "触发小时", width: 120, render: (_, row, index) => <Input type="number" value={row.trigger_hours} onChange={(event) => updateReminderRow(index, { trigger_hours: Number(event.target.value || 1) })} /> },
+              { title: "提醒对象", width: 180, render: (_, row, index) => <Input value={row.target} onChange={(event) => updateReminderRow(index, { target: event.target.value })} /> },
+              { title: "提醒渠道", width: 160, render: (_, row, index) => <Input value={row.channel} onChange={(event) => updateReminderRow(index, { channel: event.target.value })} /> },
+              { title: "启用", width: 100, render: (_, row, index) => <Switch checked={row.enabled} onChange={(enabled) => updateReminderRow(index, { enabled })} /> }
+            ]} />
+          </Card>
+        </Space>
+      ) : null}
+
+      {activeMenu === "mail" ? (
+        <Card id="mail" title="邮件接口配置" loading={loading}>
+          <Row gutter={[24, 16]}>
+            <Col xs={24} xl={10}><Alert type="info" showIcon message="发信邮箱用途" description="管理员和运营可使用全局主邮箱给潜在客户发邮件；销售也可以在“我的”里配置个人邮箱，用于给自己负责的客户发邮件。" /></Col>
+            <Col xs={24} xl={14}>
+              <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                <Input prefix={<Mail size={16} />} value={mailDraft.senderEmail} onChange={(event) => setMailDraft((draft) => ({ ...draft, senderEmail: event.target.value }))} placeholder="发信邮箱，例如 sales@company.com" />
+                <Input value={mailDraft.senderName} onChange={(event) => setMailDraft((draft) => ({ ...draft, senderName: event.target.value }))} placeholder="发件人名称" />
+                <Input value={mailDraft.smtpHost} onChange={(event) => setMailDraft((draft) => ({ ...draft, smtpHost: event.target.value }))} placeholder="SMTP Host，例如 smtp.office365.com" />
+                <Input type="number" value={mailDraft.smtpPort} onChange={(event) => setMailDraft((draft) => ({ ...draft, smtpPort: Number(event.target.value || 587) }))} placeholder="SMTP Port" />
+                <Input value={mailDraft.username} onChange={(event) => setMailDraft((draft) => ({ ...draft, username: event.target.value }))} placeholder="SMTP 用户名" />
+                <Input.Password value={mailDraft.password} onChange={(event) => setMailDraft((draft) => ({ ...draft, password: event.target.value }))} placeholder="SMTP 密码或应用专用密码（不会明文回显）" />
+                <Input value={mailDraft.testSendTo} onChange={(event) => setMailDraft((draft) => ({ ...draft, testSendTo: event.target.value }))} placeholder="测试收件人邮箱，可选" />
+                <Space><Switch checked={mailDraft.useTls} onChange={(useTls) => setMailDraft((draft) => ({ ...draft, useTls }))} /><Typography.Text>启用 TLS</Typography.Text><Switch checked={mailDraft.enabled} onChange={(enabled) => setMailDraft((draft) => ({ ...draft, enabled }))} /><Typography.Text>启用全局主邮箱</Typography.Text></Space>
+                <Button type="primary" icon={<Save size={16} />} loading={savingMail} onClick={() => void saveMailSettings()}>保存并测试配置</Button>
+              </Space>
             </Col>
           </Row>
-        </>
+        </Card>
       ) : null}
 
       {activeMenu === "ai" ? (
-        <Row gutter={[16, 16]} className="summary-grid">
-          <Col xs={24} xl={9}>
-            <Card
-              id="ai-model"
-              title="选择大模型"
-              loading={loading}
-              extra={
-                <Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>
-                  保存配置
-                </Button>
-              }
-            >
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Select
-                  value={aiModelDraft}
-                  options={aiModelConfig.options.map((item) => ({ value: item.value, label: item.label }))}
-                  onChange={(value) => {
-                    setAIModelDraft(value);
-                    setAIModelBindings((current) => ({ ...current, default: value }));
-                  }}
-                />
-                <Alert
-                  showIcon
-                  type="info"
-                  message={selectedAIModel?.label ?? "请选择模型"}
-                  description={selectedAIModel ? `${selectedAIModel.provider} · ${selectedAIModel.scenario} · ${selectedAIModel.capability}` : "模型配置加载中"}
-                />
-                <Tag color="purple">当前生效：{aiModelConfig.selected_label}</Tag>
-              </Space>
-            </Card>
-          </Col>
-          <Col xs={24} xl={15}>
-            <Card
-              title="模型场景配置"
-              loading={loading}
-              extra={
-                <Space wrap>
-                  <Button icon={<Plus size={16} />} onClick={() => setScenarioModalOpen(true)}>
-                    添加场景
-                  </Button>
-                  <Button icon={<Plus size={16} />} onClick={() => setModelModalOpen(true)}>
-                    添加大模型
-                  </Button>
-                </Space>
-              }
-            >
-              <Row gutter={[12, 12]}>
-                {aiModelUseCases
-                  .map((useCase) => (
-                    <Col xs={24} md={12} key={useCase.key}>
-                      <Card size="small" className="settings-entry-card">
-                        <Space direction="vertical" style={{ width: "100%" }}>
-                          <Typography.Text strong>{useCase.label}</Typography.Text>
-                          <Typography.Text className="muted">{useCase.description}</Typography.Text>
-                          <Select
-                            value={aiModelBindings[useCase.key] ?? aiModelConfig.use_case_bindings[useCase.key] ?? aiModelDraft}
-                            options={aiModelConfig.options.map((item) => ({ value: item.value, label: `${item.label} · ${item.provider}` }))}
-                            onChange={(value) => setAIModelBindings((current) => ({ ...current, [useCase.key]: value }))}
-                          />
-                        </Space>
-                      </Card>
-                    </Col>
-                  ))}
-              </Row>
-            </Card>
-          </Col>
-          <Col xs={24} xl={15}>
-            <Card title="可选大模型" loading={loading}>
-              <Table<AIModelOption>
-                rowKey="value"
-                dataSource={aiModelConfig.options}
-                pagination={false}
-                columns={[
-                  { title: "模型", dataIndex: "label" },
-                  { title: "供应商", dataIndex: "provider" },
-                  { title: "适用场景", dataIndex: "scenario" },
-                  { title: "能力说明", dataIndex: "capability" },
-                  { title: "状态", dataIndex: "status", render: (statusValue: string) => <Tag color={statusValue === "available" ? "green" : "default"}>{statusValue}</Tag> }
-                ]}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} xl={9}>
-            <Card title="产品知识入口" loading={loading}>
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Typography.Paragraph className="muted">
-                  产品知识库仍然放在这里，作为客户背景调查、邮件草稿和 AI 接待的参考资料。
-                </Typography.Paragraph>
-                <Link to="/admin/settings/product-knowledge">
-                  <Button>进入产品知识库</Button>
-                </Link>
-              </Space>
-            </Card>
-          </Col>
-          <Col xs={24}>
-            <Card
-              title="邮件写手角色"
-              loading={loading}
-              extra={
-                <Space wrap>
-                  <Select
-                    style={{ width: 180 }}
-                    value={defaultEmailWriter}
-                    options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))}
-                    onChange={setDefaultEmailWriter}
-                  />
-                  <Button icon={<Plus size={16} />} onClick={openCreateWriter}>
-                    添加写手角色
-                  </Button>
-                </Space>
-              }
-            >
-              <Table<EmailWriterRole>
-                rowKey="key"
-                dataSource={emailWriters}
-                pagination={false}
-                columns={[
-                  {
-                    title: "角色",
-                    render: (_, writer) => (
-                      <Space direction="vertical" size={0}>
-                        <Typography.Text strong>{writer.name}</Typography.Text>
-                        <Typography.Text className="muted">{writer.display_name}</Typography.Text>
-                      </Space>
-                    )
-                  },
-                  { title: "风格", dataIndex: "style" },
-                  {
-                    title: "技能",
-                    dataIndex: "skills",
-                    render: (skills: string[]) => (
-                      <Space wrap>
-                        {skills.map((skill) => <Tag key={skill} color="purple">{skill}</Tag>)}
-                      </Space>
-                    )
-                  },
-                  { title: "适用场景", dataIndex: "best_for" },
-                  { title: "状态", dataIndex: "status", render: (statusValue: string) => <Tag color={statusValue === "enabled" ? "green" : "default"}>{statusValue === "enabled" ? "启用" : "停用"}</Tag> },
-                  {
-                    title: "操作",
-                    render: (_, writer) => (
-                      <Button size="small" onClick={() => openEditWriter(writer)}>
-                        编辑
-                      </Button>
-                    )
-                  }
-                ]}
-              />
-            </Card>
-          </Col>
-        </Row>
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Card title="大模型选择与场景绑定" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={() => setModelOptions((rows) => [...rows, { value: modelValueFrom("provider", `model-${Date.now()}`), label: "", provider: "", scenario: "", capability: "", status: "available" }])}>添加模型选项</Button><Button icon={<Plus size={16} />} onClick={() => setAIModelUseCases((rows) => [...rows, { key: `scene_${Date.now()}`, label: "", description: "" }])}>添加模型场景</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存配置</Button></Space>}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={8}>
+                <Select value={aiModelDraft} options={modelOptions.map((item) => ({ value: item.value, label: `${item.label || item.value} · ${item.provider || "未填供应商"}` }))} onChange={setAIModelDraft} style={{ width: "100%" }} />
+                <Alert type="info" showIcon className="login-error" message={selectedAIModel?.label || "请选择默认模型"} description={`${selectedAIModel?.provider ?? ""} · ${selectedAIModel?.scenario ?? ""} · ${selectedAIModel?.capability ?? ""}`} />
+              </Col>
+              <Col xs={24} md={16}>
+                <Table<AIModelUseCase> rowKey="key" dataSource={aiModelUseCases} pagination={false} columns={[
+                  { title: "场景 Key", width: 160, render: (_, row, index) => <Input value={row.key} onChange={(event) => updateUseCaseRow(index, { key: event.target.value })} /> },
+                  { title: "模型场景", width: 180, render: (_, row, index) => <Input value={row.label} onChange={(event) => updateUseCaseRow(index, { label: event.target.value })} /> },
+                  { title: "说明", render: (_, row, index) => <Input value={row.description} onChange={(event) => updateUseCaseRow(index, { description: event.target.value })} /> },
+                  { title: "绑定模型", width: 260, render: (_, useCase) => <Select value={aiModelBindings[useCase.key] ?? aiModelDraft} options={modelOptions.map((item) => ({ value: item.value, label: `${item.label || item.value} · ${item.provider || "未填供应商"}` }))} onChange={(value) => setAIModelBindings((bindings) => ({ ...bindings, [useCase.key]: value }))} style={{ width: "100%" }} /> }
+                ]} />
+              </Col>
+            </Row>
+          </Card>
+          <Card title="模型库" loading={loading}>
+            <Table<AIModelOption> rowKey={(record, index) => `${record.value}-${index}`} dataSource={modelOptions} pagination={false} scroll={{ x: 1100 }} columns={[
+              { title: "模型 Key", width: 180, render: (_, row, index) => <Input value={row.value} onChange={(event) => updateModelRow(index, { value: event.target.value })} /> },
+              { title: "模型", width: 180, render: (_, row, index) => <Input value={row.label} onChange={(event) => updateModelRow(index, { label: event.target.value })} /> },
+              { title: "供应商", width: 160, render: (_, row, index) => <Input value={row.provider} onChange={(event) => updateModelRow(index, { provider: event.target.value })} /> },
+              { title: "适用场景", width: 260, render: (_, row, index) => <Input value={row.scenario} onChange={(event) => updateModelRow(index, { scenario: event.target.value })} /> },
+              { title: "能力说明", width: 260, render: (_, row, index) => <Input value={row.capability} onChange={(event) => updateModelRow(index, { capability: event.target.value })} /> },
+              { title: "状态", width: 120, render: (_, row, index) => <Select value={row.status} options={[{ value: "available", label: "可用" }, { value: "disabled", label: "停用" }]} onChange={(status) => updateModelRow(index, { status })} /> }
+            ]} />
+          </Card>
+          <Card title="邮件写手角色" loading={loading} extra={<Space wrap><Select value={defaultEmailWriter} options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))} onChange={setDefaultEmailWriter} style={{ width: 240 }} /><Button icon={<Plus size={16} />} onClick={() => setEmailWriters((rows) => [...rows, { key: `writer_${Date.now()}`, name: "", display_name: "", style: "", skills: [], best_for: "", status: "enabled" }])}>新增写手</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存写手配置</Button></Space>}>
+            <Table<EmailWriterRole> rowKey={(record, index) => `${record.key}-${index}`} dataSource={emailWriters} pagination={false} scroll={{ x: 1200 }} columns={[
+              { title: "Key", width: 160, render: (_, row, index) => <Input value={row.key} onChange={(event) => updateWriterRow(index, { key: event.target.value })} /> },
+              { title: "英文角色", width: 160, render: (_, row, index) => <Input value={row.name} onChange={(event) => updateWriterRow(index, { name: event.target.value })} /> },
+              { title: "中文名", width: 160, render: (_, row, index) => <Input value={row.display_name} onChange={(event) => updateWriterRow(index, { display_name: event.target.value })} /> },
+              { title: "风格", width: 240, render: (_, row, index) => <Input value={row.style} onChange={(event) => updateWriterRow(index, { style: event.target.value })} /> },
+              { title: "技能", width: 240, render: (_, row, index) => <Input value={row.skills.join("、")} onChange={(event) => updateWriterRow(index, { skillsText: event.target.value })} /> },
+              { title: "适用", width: 240, render: (_, row, index) => <Input value={row.best_for} onChange={(event) => updateWriterRow(index, { best_for: event.target.value })} /> },
+              { title: "状态", width: 120, render: (_, row, index) => <Select value={row.status} options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} onChange={(status) => updateWriterRow(index, { status })} /> }
+            ]} />
+          </Card>
+          <Card title="产品与 AI 配置入口"><Link to="/admin/settings/product-knowledge"><Button>进入产品知识库</Button></Link></Card>
+        </Space>
       ) : null}
 
       {activeMenu === "audit" ? (
-        <Row gutter={[16, 16]} className="summary-grid">
-          <Col xs={24} xl={9}>
-            <Card title="配置风险" loading={loading}>
-              <List
-                dataSource={overview?.risks ?? []}
-                renderItem={(item) => (
-                  <List.Item>
-                    <Tag color="gold">待处理</Tag>
-                    <Typography.Text>{item}</Typography.Text>
-                  </List.Item>
-                )}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} xl={15}>
-            <Card id="audit" title="配置审计记录" loading={loading}>
-              <Alert
-                showIcon
-                type="info"
-                className="login-error"
-                message="这些不是无用消息"
-                description="配置审计记录用于追踪谁在什么时候改了账号、权限、Banner、大模型、导入和再营销发送，方便回溯误操作。"
-              />
-              <List
-                dataSource={overview?.recent_changes ?? []}
-                renderItem={(item) => (
-                  <List.Item>
-                    <Space direction="vertical" size={2}>
-                      <Typography.Text strong>{item.action}</Typography.Text>
-                      <Typography.Text className="muted">{item.detail}</Typography.Text>
-                    </Space>
-                    <Typography.Text className="muted">{new Date(item.created_at).toLocaleString()}</Typography.Text>
-                  </List.Item>
-                )}
-              />
-            </Card>
-          </Col>
-        </Row>
+        <Card title="最近变更" loading={loading} extra={<Button icon={<RefreshCw size={16} />} onClick={() => void load()}>刷新</Button>}>
+          <Table rowKey="id" dataSource={overview?.recent_changes ?? []} pagination={false} columns={[
+            { title: "动作", dataIndex: "action" },
+            { title: "说明", dataIndex: "detail" },
+            { title: "Trace", dataIndex: "trace_id" },
+            { title: "时间", dataIndex: "created_at", render: (value: string) => new Date(value).toLocaleString() }
+          ]} />
+        </Card>
       ) : null}
 
-      <Modal
-        open={modelModalOpen}
-        title="添加大模型"
-        okText="保存大模型"
-        cancelText="取消"
-        confirmLoading={savingModelOption}
-        onCancel={() => setModelModalOpen(false)}
-        onOk={() => modelForm.submit()}
-      >
-        <Form form={modelForm} layout="vertical" onFinish={(values) => void addAIModelOption(values)}>
-          <Form.Item name="provider" label="模型供应商" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 Anthropic / OpenAI / DeepSeek" />
-          </Form.Item>
-          <Form.Item name="label" label="显示名称" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 Claude Sonnet / Codex / DeepSeek Chat" />
-          </Form.Item>
-          <Form.Item name="value" label="模型标识">
-            <Input placeholder="可留空，系统会按供应商和名称生成" />
-          </Form.Item>
-          <Form.Item name="scenario" label="适用场景" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 邮件草稿 / 客户背景调研 / AI 接待" />
-          </Form.Item>
-          <Form.Item name="capability" label="能力说明" rules={[{ required: true, min: 2 }]}>
-            <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="说明为什么选择这个模型，以及适合哪类任务" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        open={scenarioModalOpen}
-        title="添加模型场景"
-        okText="保存场景"
-        cancelText="取消"
-        confirmLoading={savingScenario}
-        onCancel={() => setScenarioModalOpen(false)}
-        onOk={() => scenarioForm.submit()}
-      >
-        <Form form={scenarioForm} layout="vertical" onFinish={(values) => void addAIModelUseCase(values)}>
-          <Form.Item name="label" label="场景名称" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 客户背景调查 / 邮件草稿写作 / 报价后跟进" />
-          </Form.Item>
-          <Form.Item name="key" label="场景标识">
-            <Input placeholder="可留空，系统按名称生成；例如 pricing_followup" />
-          </Form.Item>
-          <Form.Item name="description" label="场景说明" rules={[{ required: true, min: 2 }]}>
-            <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="说明这个场景会用大模型完成什么任务" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        open={writerModalOpen}
-        title={editingWriter ? "编辑邮件写手角色" : "添加邮件写手角色"}
-        okText="保存写手角色"
-        cancelText="取消"
-        confirmLoading={savingWriterRole}
-        onCancel={() => {
-          setWriterModalOpen(false);
-          setEditingWriter(null);
-        }}
-        onOk={() => writerForm.submit()}
-      >
-        <Form form={writerForm} layout="vertical" onFinish={(values) => void saveEmailWriterRole(values)}>
-          <Form.Item name="name" label="英文角色" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 Doraemon / Mario / Baymax" />
-          </Form.Item>
-          <Form.Item name="displayName" label="中文名" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 哆啦A梦 / 超级马里奥 / 大白" />
-          </Form.Item>
-          <Form.Item name="key" label="角色标识">
-            <Input disabled={Boolean(editingWriter)} placeholder="可留空，系统按英文角色生成" />
-          </Form.Item>
-          <Form.Item name="style" label="风格" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 稳重、专业、可靠" />
-          </Form.Item>
-          <Form.Item name="skills" label="技能" rules={[{ required: true, min: 2 }]}>
-            <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="用顿号、逗号或换行分隔，例如 正式邮件、医疗客户、技术沟通" />
-          </Form.Item>
-          <Form.Item name="bestFor" label="适用场景" rules={[{ required: true, min: 2 }]}>
-            <Input placeholder="例如 正式邮件、医疗客户、技术沟通" />
-          </Form.Item>
-          <Form.Item name="status" label="状态" initialValue="enabled" rules={[{ required: true }]}>
-            <Select options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        open={accountModalOpen}
-        title={editingAccount ? "编辑账号" : "新增账号"}
-        okText="保存账号"
-        cancelText="取消"
-        confirmLoading={savingAccount}
-        onCancel={() => setAccountModalOpen(false)}
-        onOk={() => accountForm.submit()}
-      >
+      <Modal title={editingAccount ? "编辑账号" : "新增账号"} open={accountModalOpen} onCancel={() => setAccountModalOpen(false)} footer={null} destroyOnClose>
         <Form form={accountForm} layout="vertical" onFinish={(values) => void submitAccount(values)}>
-          <Form.Item name="name" label="姓名" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="email" label="邮箱" rules={[{ required: true }, { type: "email" }]}>
-            <Input />
-          </Form.Item>
-          {!editingAccount ? (
-            <Form.Item name="password" label="初始密码" rules={[{ required: true }, { min: 8 }]}>
-              <Input.Password />
-            </Form.Item>
-          ) : null}
-          <Form.Item name="role" label="角色" initialValue="sales" rules={[{ required: true }]}>
-            <Select options={roleOptions} />
-          </Form.Item>
-          <Form.Item name="dataScope" label="负责范围" initialValue="Latam" rules={[{ required: true }]}>
-            <Input placeholder="例如：Latam / Brazil, Peru" />
-          </Form.Item>
-          <Form.Item name="enabled" label="是否启用" valuePropName="checked" initialValue>
-            <Switch checkedChildren="启用" unCheckedChildren="停用" />
-          </Form.Item>
+          <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="email" label="邮箱" rules={[{ required: true }, { type: "email" }]}><Input /></Form.Item>
+          {!editingAccount ? <Form.Item name="password" label="初始密码" rules={[{ required: true, min: 8 }]}><Input.Password /></Form.Item> : null}
+          <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roleOptions} /></Form.Item>
+          <Form.Item name="dataScope" label="负责范围" rules={[{ required: true }]}><Input placeholder="例如 all / Latam / Peru" /></Form.Item>
+          <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>
+          <Button type="primary" htmlType="submit" loading={savingAccount}>保存账号</Button>
         </Form>
       </Modal>
     </section>

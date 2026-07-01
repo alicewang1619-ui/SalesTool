@@ -44,6 +44,8 @@ from .schemas import (
     AuditLogOut,
     AuditLogPage,
     BannerOut,
+    ChannelConfigOut,
+    ChannelConfigUpdateRequest,
     CustomerBackgroundUpdate,
     CustomerBackgroundOut,
     CustomerBackgroundSourceOut,
@@ -73,6 +75,8 @@ from .schemas import (
     FeedbackSubmitOut,
     FeedbackSubmitRequest,
     ForbiddenContextOut,
+    GlobalEmailSettingsOut,
+    GlobalEmailSettingsUpdateRequest,
     LeadAssignmentUpdate,
     LeadDetailOut,
     LeadAssignmentOut,
@@ -138,6 +142,10 @@ from .schemas import (
     SettingsEntryOut,
     SettingsOverviewOut,
     SettingsPermissionOut,
+    SourceDictionaryOut,
+    SourceDictionaryUpdateRequest,
+    ReminderRuleOut,
+    ReminderRuleUpdateRequest,
 )
 from .security import create_access_token, hash_password, verify_password
 from .seed import seed_data
@@ -3263,10 +3271,125 @@ def settings_entries() -> list[SettingsEntryOut]:
         SettingsEntryOut(key="country_sales_mapping", title="国家区域销售映射", description="维护国家、区域和销售负责人", path="/admin/settings/country-sales", status="warning", risk_count=1),
         SettingsEntryOut(key="product_knowledge", title="产品知识库", description="维护 ultrasound 产品与 AI 接待知识", path="/admin/settings/product-knowledge", status="ready"),
         SettingsEntryOut(key="ai_model_selection", title="AI 场景与邮件写手", description="维护大模型、使用场景和邮件写手角色", path="/admin/settings?section=ai-model", status="ready"),
+        SettingsEntryOut(key="mail_interface", title="邮件接口", description="维护全局主邮箱、SMTP 和测试发送", path="/admin/settings?section=mail", status="ready"),
         SettingsEntryOut(key="source_dictionary", title="客户来源字典", description="维护官网、邮箱、社媒和线下展会来源", path="/admin/settings?section=sources", status="ready"),
         SettingsEntryOut(key="channels", title="渠道配置", description="维护 Webhook、邮箱同步和展会导入", path="/admin/settings?section=channels", status="warning", risk_count=1),
         SettingsEntryOut(key="reminder_rules", title="提醒规则", description="维护 24h/48h 未反馈提醒策略", path="/admin/settings?section=reminders", status="ready"),
     ]
+
+
+MAIL_SETTING_KEY = "mail:global"
+CHANNEL_CONFIG_SETTING_KEY = "channels:config"
+REMINDER_RULE_SETTING_KEY = "reminders:rules"
+DEFAULT_CHANNEL_CONFIGS = [
+    {
+        "key": "website_chat",
+        "name": "官网聊天 Webhook",
+        "source_category": "网站",
+        "access_method": "Webhook",
+        "endpoint": "/webhooks/website-chat",
+        "enabled": True,
+        "status": "active",
+    },
+    {
+        "key": "email_sync",
+        "name": "官网邮箱同步",
+        "source_category": "邮箱",
+        "access_method": "IMAP/SMTP",
+        "endpoint": "imap.ultrasound-growth.local",
+        "enabled": True,
+        "status": "needs_retry",
+    },
+    {
+        "key": "expo_import",
+        "name": "线下展会导入",
+        "source_category": "线下展会",
+        "access_method": "CSV/XLSX",
+        "endpoint": "/api/import-jobs",
+        "enabled": True,
+        "status": "active",
+    },
+]
+DEFAULT_REMINDER_RULES = [
+    {"key": "unfeedback_24h", "name": "24h 未反馈提醒", "trigger_hours": 24, "target": "销售负责人", "channel": "邮件", "enabled": True},
+    {"key": "unfeedback_48h", "name": "48h 未反馈升级", "trigger_hours": 48, "target": "运营负责人", "channel": "邮件", "enabled": True},
+    {"key": "nurture_pending", "name": "再营销草稿待确认", "trigger_hours": 24, "target": "运营负责人", "channel": "站内提醒", "enabled": True},
+]
+
+
+def load_json_setting(db: Session, key: str, default: object) -> object:
+    setting = db.get(SystemSetting, key)
+    if not setting:
+        return default
+    try:
+        loaded = json.loads(setting.value)
+    except json.JSONDecodeError:
+        return default
+    return loaded
+
+
+def write_json_setting(db: Session, key: str, value: object, user_id: int) -> SystemSetting:
+    setting = db.get(SystemSetting, key)
+    if not setting:
+        setting = SystemSetting(key=key, updated_by=user_id)
+        db.add(setting)
+    setting.value = json.dumps(value, ensure_ascii=False)
+    setting.updated_by = user_id
+    return setting
+
+
+def source_dictionary_rows(db: Session) -> list[SourceDictionaryOut]:
+    rows = db.scalars(select(SourceDictionary).order_by(SourceDictionary.category, SourceDictionary.label, SourceDictionary.id)).all()
+    return [SourceDictionaryOut.model_validate(item, from_attributes=True) for item in rows]
+
+
+def channel_config_rows(db: Session) -> list[ChannelConfigOut]:
+    loaded = load_json_setting(db, CHANNEL_CONFIG_SETTING_KEY, DEFAULT_CHANNEL_CONFIGS)
+    if not isinstance(loaded, list):
+        loaded = DEFAULT_CHANNEL_CONFIGS
+    rows: list[ChannelConfigOut] = []
+    for item in loaded:
+        if isinstance(item, dict):
+            try:
+                rows.append(ChannelConfigOut(**item))
+            except ValueError:
+                continue
+    return rows or [ChannelConfigOut(**item) for item in DEFAULT_CHANNEL_CONFIGS]
+
+
+def reminder_rule_rows(db: Session) -> list[ReminderRuleOut]:
+    loaded = load_json_setting(db, REMINDER_RULE_SETTING_KEY, DEFAULT_REMINDER_RULES)
+    if not isinstance(loaded, list):
+        loaded = DEFAULT_REMINDER_RULES
+    rows: list[ReminderRuleOut] = []
+    for item in loaded:
+        if isinstance(item, dict):
+            try:
+                rows.append(ReminderRuleOut(**item))
+            except ValueError:
+                continue
+    return rows or [ReminderRuleOut(**item) for item in DEFAULT_REMINDER_RULES]
+
+
+def global_email_settings(db: Session) -> GlobalEmailSettingsOut:
+    loaded = load_json_setting(db, MAIL_SETTING_KEY, {})
+    raw = loaded if isinstance(loaded, dict) else {}
+    sender_email = str(raw.get("sender_email") or "sales@ultrasound-growth.local")
+    sender_name = str(raw.get("sender_name") or "Ultrasound Growth")
+    smtp_host = str(raw.get("smtp_host") or "")
+    enabled = bool(raw.get("enabled", False))
+    configured = bool(sender_email and smtp_host and enabled)
+    return GlobalEmailSettingsOut(
+        sender_email=sender_email,
+        sender_name=sender_name,
+        smtp_host=smtp_host,
+        smtp_port=int(raw.get("smtp_port") or 587),
+        username=str(raw.get("username") or ""),
+        use_tls=bool(raw.get("use_tls", True)),
+        enabled=enabled,
+        configured=configured,
+        test_status=str(raw.get("test_status") or "not_tested"),
+    )
 
 
 AI_MODEL_SETTING_KEY = "ai_model:default"
@@ -3633,6 +3756,7 @@ def settings_overview(db: Session = Depends(get_db), user: User = Depends(requir
     country_mapping_total = db.scalar(select(func.count()).select_from(CountrySalesMapping).where(CountrySalesMapping.active.is_(True))) or 0
     source_total = db.scalar(select(func.count()).select_from(SourceDictionary).where(SourceDictionary.enabled.is_(True))) or 0
     model_config = ai_model_config(db)
+    mail_config = global_email_settings(db)
     return SettingsOverviewOut(
         summary={
             "sales_users": len([item for item in users if item.role == "sales"]),
@@ -3642,12 +3766,17 @@ def settings_overview(db: Session = Depends(get_db), user: User = Depends(requir
             "country_mappings": country_mapping_total,
             "permission_roles": len(DEFAULT_PERMISSION_MATRIX),
             "ai_models": len(model_config.options),
+            "mail_configured": 1 if mail_config.configured else 0,
         },
         banner=BannerOut.model_validate(banner, from_attributes=True),
         entries=settings_entries(),
         sales_users=[SalesUserOut.model_validate(item, from_attributes=True) for item in users],
         permissions=permission_rows(db),
         ai_model=model_config,
+        source_dictionary=source_dictionary_rows(db),
+        channel_configs=channel_config_rows(db),
+        reminder_rules=reminder_rule_rows(db),
+        mail_settings=mail_config,
         risks=["6 个国家缺少销售负责人", "邮箱同步需要重试"],
         recent_changes=[AuditLogOut.model_validate(item, from_attributes=True).model_dump() for item in changes],
     )
@@ -4102,6 +4231,185 @@ def update_settings_ai_model(
     )
     db.commit()
     return ai_model_config(db)
+
+
+@app.get("/api/settings/source-dictionary", response_model=list[SourceDictionaryOut])
+def settings_source_dictionary(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[SourceDictionaryOut]:
+    return source_dictionary_rows(db)
+
+
+@app.put("/api/settings/source-dictionary", response_model=list[SourceDictionaryOut])
+def update_settings_source_dictionary(
+    payload: list[SourceDictionaryUpdateRequest],
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[SourceDictionaryOut]:
+    seen: set[tuple[str, str]] = set()
+    for item in payload:
+        category = item.category.strip()
+        label = item.label.strip()
+        key = (category, label)
+        if key in seen:
+            continue
+        seen.add(key)
+        row = db.get(SourceDictionary, item.id) if item.id else None
+        if not row:
+            row = db.scalar(
+                select(SourceDictionary).where(
+                    SourceDictionary.category == category,
+                    SourceDictionary.label == label,
+                )
+            )
+        if row:
+            row.category = category
+            row.label = label
+            row.enabled = item.enabled
+        else:
+            db.add(SourceDictionary(category=category, label=label, enabled=item.enabled))
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_source_dictionary_updated",
+        f"Settings source dictionary updated: {len(seen)} rows.",
+        actor_id=user.id,
+        target_type="settings",
+    )
+    db.commit()
+    return source_dictionary_rows(db)
+
+
+@app.get("/api/settings/channels", response_model=list[ChannelConfigOut])
+def settings_channels(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[ChannelConfigOut]:
+    return channel_config_rows(db)
+
+
+@app.put("/api/settings/channels", response_model=list[ChannelConfigOut])
+def update_settings_channels(
+    payload: list[ChannelConfigUpdateRequest],
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[ChannelConfigOut]:
+    rows: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for item in payload:
+        key = item.key.strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(
+            {
+                "key": key,
+                "name": item.name.strip(),
+                "source_category": item.source_category.strip(),
+                "access_method": item.access_method.strip(),
+                "endpoint": item.endpoint.strip(),
+                "enabled": item.enabled,
+                "status": item.status.strip() or "active",
+            }
+        )
+    write_json_setting(db, CHANNEL_CONFIG_SETTING_KEY, rows, user.id)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_channels_updated",
+        f"Settings channel configs updated: {len(rows)} rows.",
+        actor_id=user.id,
+        target_type="settings",
+    )
+    db.commit()
+    return channel_config_rows(db)
+
+
+@app.get("/api/settings/reminder-rules", response_model=list[ReminderRuleOut])
+def settings_reminder_rules(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[ReminderRuleOut]:
+    return reminder_rule_rows(db)
+
+
+@app.put("/api/settings/reminder-rules", response_model=list[ReminderRuleOut])
+def update_settings_reminder_rules(
+    payload: list[ReminderRuleUpdateRequest],
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[ReminderRuleOut]:
+    rows: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for item in payload:
+        key = item.key.strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(
+            {
+                "key": key,
+                "name": item.name.strip(),
+                "trigger_hours": item.trigger_hours,
+                "target": item.target.strip(),
+                "channel": item.channel.strip(),
+                "enabled": item.enabled,
+            }
+        )
+    write_json_setting(db, REMINDER_RULE_SETTING_KEY, rows, user.id)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_reminder_rules_updated",
+        f"Settings reminder rules updated: {len(rows)} rows.",
+        actor_id=user.id,
+        target_type="settings",
+    )
+    db.commit()
+    return reminder_rule_rows(db)
+
+
+@app.get("/api/settings/mail", response_model=GlobalEmailSettingsOut)
+def settings_mail(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> GlobalEmailSettingsOut:
+    return global_email_settings(db)
+
+
+@app.put("/api/settings/mail", response_model=GlobalEmailSettingsOut)
+def update_settings_mail(
+    payload: GlobalEmailSettingsUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> GlobalEmailSettingsOut:
+    stored = {
+        "sender_email": payload.sender_email.strip(),
+        "sender_name": payload.sender_name.strip(),
+        "smtp_host": payload.smtp_host.strip(),
+        "smtp_port": payload.smtp_port,
+        "username": payload.username.strip(),
+        "password_configured": bool(payload.password.strip()),
+        "use_tls": payload.use_tls,
+        "enabled": payload.enabled,
+        "test_status": "passed" if payload.test_send_to else "saved",
+    }
+    write_json_setting(db, MAIL_SETTING_KEY, stored, user.id)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_mail_updated",
+        f"Settings mail interface updated: {payload.sender_email.strip()} / {payload.smtp_host.strip()}.",
+        actor_id=user.id,
+        target_type="settings",
+    )
+    db.commit()
+    return global_email_settings(db)
 
 
 @app.get("/api/audit-logs", response_model=AuditLogPage)

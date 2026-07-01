@@ -1,4 +1,4 @@
-import { Alert, Skeleton, Typography } from "antd";
+﻿import { Alert, Skeleton, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { fetchBanner, type Banner } from "../api";
 
@@ -9,21 +9,34 @@ export function GlobalBanner() {
 
   useEffect(() => {
     let alive = true;
-    fetchBanner()
-      .then((result) => {
-        if (!alive) return;
-        setBanner(result);
+    const loadBanner = (event?: Event) => {
+      const detail = event instanceof CustomEvent ? (event.detail as Banner | undefined) : undefined;
+      if (detail) {
+        setBanner(detail);
         setError(null);
-      })
-      .catch((failure: Error) => {
-        if (!alive) return;
-        setError(failure.message);
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      fetchBanner()
+        .then((result) => {
+          if (!alive) return;
+          setBanner(result);
+          setError(null);
+        })
+        .catch((failure: Error) => {
+          if (!alive) return;
+          setError(failure.message);
+        })
+        .finally(() => {
+          if (alive) setLoading(false);
+        });
+    };
+    loadBanner();
+    window.addEventListener("global-banner-updated", loadBanner);
     return () => {
       alive = false;
+      window.removeEventListener("global-banner-updated", loadBanner);
     };
   }, []);
 

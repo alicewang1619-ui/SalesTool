@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Typography, Upload, message } from "antd";
+﻿import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Typography, Upload, message } from "antd";
 import type { UploadProps } from "antd";
 import { Download, FileSpreadsheet, RefreshCw, UploadCloud } from "lucide-react";
 import { useState } from "react";
@@ -31,6 +31,17 @@ function downloadTextFile(filename: string, content: string, type = "text/csv;ch
   window.URL.revokeObjectURL(url);
 }
 
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isSupportedImportFile(filename: string) {
+  const lower = filename.toLowerCase();
+  return lower.endsWith(".csv") || lower.endsWith(".xlsx");
+}
+
 export function LeadImportPage() {
   const [job, setJob] = useState<ImportJob | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -44,9 +55,7 @@ export function LeadImportPage() {
       const latest = await fetchImportJob(taskId);
       setJob(latest);
       if (latest.status === "completed") {
-        message.success(
-          `导入完成：成功 ${latest.success_rows} 行，自动分配 ${latest.auto_assigned_rows} 行，待人工确认 ${latest.pending_assignment_rows} 行`
-        );
+        message.success(`导入完成：成功 ${latest.success_rows} 行，自动分配 ${latest.auto_assigned_rows} 行，待人工确认 ${latest.pending_assignment_rows} 行`);
         return;
       }
       await new Promise((resolve) => window.setTimeout(resolve, 1000));
@@ -58,7 +67,12 @@ export function LeadImportPage() {
     maxCount: 1,
     showUploadList: false,
     beforeUpload: async (file) => {
-      setSelectedFileName(file.name);
+      if (!isSupportedImportFile(file.name)) {
+        setError("请上传 CSV 或 Excel 表格（.csv / .xlsx），不要上传图片、PDF 或压缩包。");
+        setSelectedFileName(null);
+        return Upload.LIST_IGNORE;
+      }
+      setSelectedFileName(`${file.name} · ${formatFileSize(file.size)} · 格式校验通过`);
       setUploading(true);
       setError(null);
       try {
@@ -67,7 +81,7 @@ export function LeadImportPage() {
         message.success("导入任务已创建，正在处理文件");
         await pollImportJob(created.task_id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "导入失败，请检查文件格式和字段");
+        setError(err instanceof Error ? err.message : "导入失败，请检查文件格式、必填字段和来源配置");
       } finally {
         setUploading(false);
       }
@@ -100,8 +114,8 @@ export function LeadImportPage() {
     setDownloadingTemplate(true);
     setError(null);
     try {
-      const csv = await downloadImportTemplate();
-      downloadTextFile("客户线索导入模板.csv", csv);
+      const template = await downloadImportTemplate();
+      downloadTextFile(template.filename, template.content);
       message.success("导入模板已下载");
     } catch (err) {
       setError(err instanceof Error ? err.message : "模板下载失败");
@@ -117,7 +131,7 @@ export function LeadImportPage() {
           <Typography.Text className="eyebrow">阶段 1 (MVP) · 线索池</Typography.Text>
           <Typography.Title level={1}>客户信息导入</Typography.Title>
           <Typography.Paragraph type="secondary">
-            支持 CSV / Excel 文件。导入后系统会按“国家销售映射”自动匹配负责人，用户只需要确认异常与待分配结果。
+            支持 CSV / Excel（.xlsx）文件。导入后系统按“国家销售映射”自动匹配负责人，你只需要确认异常和待分配结果。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -141,9 +155,24 @@ export function LeadImportPage() {
         type="info"
         showIcon
         className="login-error"
-        message={selectedFileName ? `已选择文件：${selectedFileName}` : "请选择 CSV 或 Excel 文件"}
-        description="必填字段：customer_name、country、product、source_category；建议字段：email、organization、raw_inquiry。country 会用于自动分配销售。"
+        message={selectedFileName ? `已选择表格：${selectedFileName}` : "请上传 CSV 或 Excel 表格（.csv / .xlsx）"}
+        description="必填字段：customer_name、country、customer_type、product、source_category、source_label；建议字段：email、organization、raw_inquiry。country 用于自动分配销售，source_category/source_label 会按配置中心的客户来源字典校验。"
       />
+
+      <Card size="small" className="settings-entry-card">
+        <Space direction="vertical" size={8}>
+          <Space>
+            <FileSpreadsheet size={18} />
+            <Typography.Text strong>模板格式参考</Typography.Text>
+          </Space>
+          <Typography.Text className="muted">
+            示例行：GlobalMed Peru / buyer@example.com / GlobalMed Peru / Peru / Clinic / Portable Ultrasound / 网站 / 官网聊天 / Need portable ultrasound for a new clinic.
+          </Typography.Text>
+          <Typography.Text className="muted">
+            如果国家为空、国家没有销售映射，或映射销售已停用，系统不会丢弃该行，会进入“待分配”让运营确认。
+          </Typography.Text>
+        </Space>
+      </Card>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} md={6}>
@@ -224,14 +253,9 @@ export function LeadImportPage() {
             <Space direction="vertical">
               <Space>
                 <FileSpreadsheet size={18} />
-                <Typography.Text strong>导入字段说明</Typography.Text>
+                <Typography.Text strong>还没有导入任务</Typography.Text>
               </Space>
-              <Typography.Text className="muted">
-                模板中的 country 可填写一个国家；系统会根据配置页“国家区域销售映射”自动找到负责人。一个销售可以负责多个国家。
-              </Typography.Text>
-              <Typography.Text className="muted">
-                如果国家为空、没有映射或映射销售已停用，该行不会丢失，会进入“待分配”让运营确认。
-              </Typography.Text>
+              <Typography.Text className="muted">请先下载模板，按字段填写后点击右上角“选择并上传文件”。</Typography.Text>
             </Space>
           </Card>
         )}

@@ -723,6 +723,8 @@ def test_import_template_exposes_required_customer_fields(client: TestClient) ->
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+    assert "lead-import-template.csv" in response.headers["content-disposition"]
     body = response.text
     for field in [
         "customer_name",
@@ -736,6 +738,7 @@ def test_import_template_exposes_required_customer_fields(client: TestClient) ->
         "raw_inquiry",
     ]:
         assert field in body
+    assert "GlobalMed Peru" in body
 
 
 def test_channel_import_auto_assigns_by_country_mapping_and_returns_summary(client: TestClient) -> None:
@@ -1583,6 +1586,7 @@ def test_settings_overview_contains_entries_banner_accounts_and_permissions(clie
         "country_sales_mapping",
         "product_knowledge",
         "ai_model_selection",
+        "mail_interface",
         "source_dictionary",
         "channels",
         "reminder_rules",
@@ -1592,6 +1596,10 @@ def test_settings_overview_contains_entries_banner_accounts_and_permissions(clie
     assert body["ai_model"]["selected_model"]
     assert body["ai_model"]["options"]
     assert any(option["value"] == body["ai_model"]["selected_model"] for option in body["ai_model"]["options"])
+    assert body["mail_settings"]["sender_email"]
+    assert body["source_dictionary"]
+    assert body["channel_configs"]
+    assert body["reminder_rules"]
 
 
 def test_settings_create_sales_user_persists_scope_role_and_audit(client: TestClient) -> None:
@@ -1695,6 +1703,97 @@ def test_settings_save_permission_matrix_records_audit(client: TestClient) -> No
         event["action"] == "settings_permissions_updated" and event["trace_id"] == "settings-permission-test"
         for event in audit
     )
+
+
+def test_settings_mail_interface_can_be_saved_and_audited(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-mail-test"}
+    response = client.put(
+        "/api/settings/mail",
+        json={
+            "sender_email": "ops-mail@ultrasound-growth.local",
+            "sender_name": "Ultrasound Growth Ops",
+            "smtp_host": "smtp.ultrasound-growth.local",
+            "smtp_port": 587,
+            "username": "ops-mail",
+            "password": "Mail123!",
+            "use_tls": True,
+            "enabled": True,
+            "test_send_to": "admin@ultrasound-growth.local",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sender_email"] == "ops-mail@ultrasound-growth.local"
+    assert body["configured"] is True
+    assert body["test_status"] == "passed"
+    overview = client.get("/api/settings/overview", headers=headers).json()
+    assert overview["mail_settings"]["sender_email"] == "ops-mail@ultrasound-growth.local"
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "settings_mail_updated" and event["trace_id"] == "settings-mail-test"
+        for event in audit
+    )
+
+
+def test_settings_source_channels_and_reminders_can_be_saved(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-routing-test"}
+    source_label = f"WhatsApp-{uuid4().hex[:8]}"
+    sources = client.get("/api/settings/source-dictionary", headers=headers).json()
+    source_response = client.put(
+        "/api/settings/source-dictionary",
+        json=[
+            *sources,
+            {"category": "社媒", "label": source_label, "enabled": True},
+        ],
+        headers=headers,
+    )
+    channel_response = client.put(
+        "/api/settings/channels",
+        json=[
+            {
+                "key": "whatsapp_dm",
+                "name": "WhatsApp 私信导入",
+                "source_category": "社媒",
+                "access_method": "Webhook",
+                "endpoint": "/webhooks/whatsapp",
+                "enabled": True,
+                "status": "active",
+            }
+        ],
+        headers=headers,
+    )
+    reminder_response = client.put(
+        "/api/settings/reminder-rules",
+        json=[
+            {
+                "key": "sales_unfeedback_12h",
+                "name": "12h 销售未反馈提醒",
+                "trigger_hours": 12,
+                "target": "销售负责人",
+                "channel": "邮件",
+                "enabled": True,
+            }
+        ],
+        headers=headers,
+    )
+
+    assert source_response.status_code == 200
+    assert any(item["label"] == source_label for item in source_response.json())
+    assert channel_response.status_code == 200
+    assert channel_response.json()[0]["key"] == "whatsapp_dm"
+    assert reminder_response.status_code == 200
+    assert reminder_response.json()[0]["trigger_hours"] == 12
+
+    overview = client.get("/api/settings/overview", headers=headers).json()
+    assert any(item["label"] == source_label for item in overview["source_dictionary"])
+    assert any(item["key"] == "whatsapp_dm" for item in overview["channel_configs"])
+    assert any(item["key"] == "sales_unfeedback_12h" for item in overview["reminder_rules"])
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(event["action"] == "settings_source_dictionary_updated" for event in audit)
+    assert any(event["action"] == "settings_channels_updated" for event in audit)
+    assert any(event["action"] == "settings_reminder_rules_updated" for event in audit)
 
 
 def test_sales_user_cannot_access_settings_management(client: TestClient) -> None:

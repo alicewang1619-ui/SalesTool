@@ -759,6 +759,82 @@ class EmailWriterRolePage(BaseModel):
     items: list[EmailWriterRoleOut]
 
 
+class SourceDictionaryOut(BaseModel):
+    id: int
+    category: str
+    label: str
+    enabled: bool
+
+
+class SourceDictionaryUpdateRequest(BaseModel):
+    id: int | None = None
+    category: str = Field(min_length=1, max_length=40)
+    label: str = Field(min_length=1, max_length=120)
+    enabled: bool = True
+
+
+class ChannelConfigOut(BaseModel):
+    key: str
+    name: str
+    source_category: str
+    access_method: str
+    endpoint: str = ""
+    enabled: bool = True
+    status: str = "active"
+
+
+class ChannelConfigUpdateRequest(BaseModel):
+    key: str = Field(min_length=2, max_length=80)
+    name: str = Field(min_length=2, max_length=120)
+    source_category: str = Field(min_length=1, max_length=40)
+    access_method: str = Field(min_length=2, max_length=120)
+    endpoint: str = Field(default="", max_length=500)
+    enabled: bool = True
+    status: str = Field(default="active", max_length=40)
+
+
+class ReminderRuleOut(BaseModel):
+    key: str
+    name: str
+    trigger_hours: int
+    target: str
+    channel: str
+    enabled: bool = True
+
+
+class ReminderRuleUpdateRequest(BaseModel):
+    key: str = Field(min_length=2, max_length=80)
+    name: str = Field(min_length=2, max_length=120)
+    trigger_hours: int = Field(ge=1, le=720)
+    target: str = Field(min_length=2, max_length=120)
+    channel: str = Field(min_length=2, max_length=80)
+    enabled: bool = True
+
+
+class GlobalEmailSettingsOut(BaseModel):
+    sender_email: str = ""
+    sender_name: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    username: str = ""
+    use_tls: bool = True
+    enabled: bool = False
+    configured: bool = False
+    test_status: str = "not_tested"
+
+
+class GlobalEmailSettingsUpdateRequest(BaseModel):
+    sender_email: str = Field(min_length=5, max_length=255)
+    sender_name: str = Field(min_length=2, max_length=120)
+    smtp_host: str = Field(min_length=2, max_length=255)
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    username: str = Field(default="", max_length=255)
+    password: str = Field(default="", max_length=255)
+    use_tls: bool = True
+    enabled: bool = True
+    test_send_to: str | None = Field(default=None, max_length=255)
+
+
 class SettingsOverviewOut(BaseModel):
     summary: dict[str, int]
     banner: BannerOut
@@ -766,6 +842,10 @@ class SettingsOverviewOut(BaseModel):
     sales_users: list[SalesUserOut]
     permissions: list[SettingsPermissionOut]
     ai_model: AIModelConfigOut
+    source_dictionary: list[SourceDictionaryOut] = Field(default_factory=list)
+    channel_configs: list[ChannelConfigOut] = Field(default_factory=list)
+    reminder_rules: list[ReminderRuleOut] = Field(default_factory=list)
+    mail_settings: GlobalEmailSettingsOut = Field(default_factory=GlobalEmailSettingsOut)
     risks: list[str]
     recent_changes: list[dict[str, object]]
 

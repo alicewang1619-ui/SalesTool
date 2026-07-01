@@ -1,5 +1,5 @@
-import { Alert, Button, Card, Col, Empty, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
-import { Check, Filter, RefreshCw, Upload } from "lucide-react";
+﻿import { Alert, Button, Card, Col, Empty, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Check, RefreshCw, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchDashboard, fetchLead, fetchLeads, fetchSourceDictionary, type Lead, type LeadFilters, type SourceOption } from "../api";
@@ -63,7 +63,6 @@ export function LeadsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const sourceOptions = useMemo(() => uniqueCategories(sources), [sources]);
-
   const currentFilters: LeadFilters = { page, pageSize, sourceCategory: source, timeScope, date, score };
 
   const syncSearchParams = (filters: LeadFilters) => {
@@ -110,7 +109,7 @@ export function LeadsPage() {
       return;
     }
     fetchLead(recordId)
-      .then(setSelectedLead)
+      .then((lead) => setSelectedLead(lead))
       .catch(() => setSelectedLead(null));
   }, [searchParams]);
 
@@ -137,17 +136,9 @@ export function LeadsPage() {
           <Typography.Text className="stage-label">阶段 1 (MVP) · 线索池</Typography.Text>
           <Typography.Title level={2}>线索池列表</Typography.Title>
           <Typography.Paragraph className="muted">
-            展示官网、邮箱、社媒和线下展会导入的线索；支持按来源、时间线和评分筛选。
+            展示官网、邮箱、社媒和线下展会导入的线索；筛选区贴近列表，负责时间范围、来源和评分过滤。
           </Typography.Paragraph>
         </div>
-        <Space wrap>
-          <Button icon={<Filter size={16} />} onClick={() => document.getElementById("lead-filters")?.scrollIntoView()}>
-            筛选
-          </Button>
-          <Button type="primary" icon={<Check size={16} />} onClick={applyFilters}>
-            确认
-          </Button>
-        </Space>
       </div>
 
       {error ? (
@@ -214,9 +205,7 @@ export function LeadsPage() {
             }}
             style={{ width: 140 }}
           />
-          {timeScope === "date" ? (
-            <Input aria-label="指定日期" type="date" value={date} onChange={(event) => setDate(event.target.value)} style={{ width: 160 }} />
-          ) : null}
+          {timeScope === "date" ? <Input aria-label="指定日期" type="date" value={date} onChange={(event) => setDate(event.target.value)} style={{ width: 160 }} /> : null}
           <Select
             allowClear
             aria-label="线索来源"
@@ -227,6 +216,7 @@ export function LeadsPage() {
               setSource(value);
               setPage(1);
             }}
+            style={{ width: 180 }}
           />
           <Select
             allowClear
@@ -238,9 +228,10 @@ export function LeadsPage() {
               setScore(value);
               setPage(1);
             }}
+            style={{ width: 180 }}
           />
           <Button type="primary" icon={<Check size={16} />} onClick={applyFilters}>
-            应用
+            应用筛选
           </Button>
           <Button onClick={clearFilters}>清空</Button>
           <Button type="primary" icon={<Upload size={16} />} onClick={() => navigate("/admin/leads/import")}>

@@ -1,5 +1,5 @@
-import { Alert, Button, Card, Col, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
-import { Check, Filter, RefreshCw, Upload } from "lucide-react";
+﻿import { Alert, Button, Card, Col, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Check, RefreshCw, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -122,17 +122,9 @@ export function DashboardPage() {
           <Typography.Text className="stage-label">阶段 1 (MVP) · 工作台</Typography.Text>
           <Typography.Title level={2}>工作台首页</Typography.Title>
           <Typography.Paragraph className="muted">
-            统一查看总询盘、今日询盘、有效线索和待跟进任务；点击指标可直接进入带筛选条件的明细列表。
+            统一查看总询盘、今日询盘、有效线索和待跟进任务；筛选区会影响下方统计与明细列表。
           </Typography.Paragraph>
         </div>
-        <Space wrap>
-          <Button icon={<Filter size={16} />} onClick={() => document.getElementById("dashboard-filters")?.scrollIntoView()}>
-            筛选
-          </Button>
-          <Button type="primary" icon={<Check size={16} />} onClick={applyFilters}>
-            确认
-          </Button>
-        </Space>
       </div>
 
       {error ? (
@@ -154,12 +146,79 @@ export function DashboardPage() {
         type="info"
         className="login-error"
         message={`当前时间范围：${timeScopeLabel}`}
-        description={
-          timeScope?.start_at
-            ? `${formatDate(timeScope.start_at)} 至 ${formatDate(timeScope.end_at)}`
-            : "展示当前权限范围内的全部历史询盘。"
-        }
+        description={timeScope?.start_at ? `${formatDate(timeScope.start_at)} 至 ${formatDate(timeScope.end_at)}` : "展示当前权限范围内的全部历史询盘。"}
       />
+
+      <Card id="dashboard-filters" className="dashboard-toolbar">
+        <Space wrap size="middle">
+          <Select
+            aria-label="时间范围"
+            value={draftFilters.cycle ?? "all"}
+            options={timeScopeOptions}
+            onChange={(cycle) => updateDraft({ cycle, date: cycle === "date" ? draftFilters.date : undefined })}
+            style={{ width: 140 }}
+          />
+          {draftFilters.cycle === "date" ? (
+            <Input aria-label="指定日期" type="date" value={draftFilters.date} onChange={(event) => updateDraft({ date: event.target.value })} style={{ width: 160 }} />
+          ) : null}
+          <Select
+            allowClear
+            aria-label="来源"
+            placeholder="全部来源"
+            value={draftFilters.sourceCategory}
+            options={sourceCategoryOptions}
+            onChange={(sourceCategory) => updateDraft({ sourceCategory })}
+            style={{ width: 160 }}
+          />
+          <Select
+            allowClear
+            aria-label="国家"
+            placeholder="全部国家"
+            value={draftFilters.country}
+            options={countryOptions.map((country) => ({ value: country, label: country }))}
+            onChange={(country) => updateDraft({ country })}
+            style={{ width: 160 }}
+          />
+          <Select
+            allowClear
+            aria-label="客户类型"
+            placeholder="全部类型"
+            value={draftFilters.customerType}
+            options={customerTypeOptions.map((customerType) => ({ value: customerType, label: customerType }))}
+            onChange={(customerType) => updateDraft({ customerType })}
+            style={{ width: 160 }}
+          />
+          <Select
+            allowClear
+            aria-label="产品"
+            placeholder="全部产品"
+            value={draftFilters.product}
+            options={productOptions.map((product) => ({ value: product, label: product }))}
+            onChange={(product) => updateDraft({ product })}
+            style={{ width: 180 }}
+          />
+          <Select
+            allowClear
+            aria-label="销售"
+            placeholder="全部销售"
+            value={draftFilters.ownerId}
+            options={salesUsers.map((user) => ({ value: user.id, label: user.name }))}
+            onChange={(ownerId) => updateDraft({ ownerId })}
+            style={{ width: 160 }}
+          />
+          <Button type="primary" icon={<Check size={16} />} onClick={applyFilters}>
+            应用筛选
+          </Button>
+          <Button onClick={resetFilters}>清空</Button>
+          <Button icon={<RefreshCw size={16} />} onClick={() => loadDashboard(filters)}>
+            刷新
+          </Button>
+          <Button type="primary" icon={<Upload size={16} />} onClick={() => navigate("/admin/leads/import")}>
+            导入线索
+          </Button>
+        </Space>
+        <Typography.Text className="muted">当前显示：{timeScopeLabel}，共 {dashboard?.total ?? 0} 条线索记录。</Typography.Text>
+      </Card>
 
       <Row gutter={[16, 16]} className="metric-row">
         <Col xs={24} md={12} xl={6}>
@@ -183,84 +242,10 @@ export function DashboardPage() {
         <Col xs={24} md={12} xl={6}>
           <Card loading={loading} hoverable onClick={() => goMetric("unfeedback", "/admin/assignments/pending")}>
             <Statistic title="待跟进" value={metrics?.unfeedback ?? 0} />
-            <div className="metric-chip amber">待分配/待反馈任务</div>
+            <div className="metric-chip amber">待分配 / 待反馈任务</div>
           </Card>
         </Col>
       </Row>
-
-      <Card id="dashboard-filters" className="dashboard-toolbar">
-        <Space wrap size="middle">
-          <Select
-            aria-label="时间范围"
-            value={draftFilters.cycle ?? "all"}
-            options={timeScopeOptions}
-            onChange={(cycle) => updateDraft({ cycle, date: cycle === "date" ? draftFilters.date : undefined })}
-            style={{ width: 140 }}
-          />
-          {draftFilters.cycle === "date" ? (
-            <Input
-              aria-label="指定日期"
-              type="date"
-              value={draftFilters.date}
-              onChange={(event) => updateDraft({ date: event.target.value })}
-              style={{ width: 160 }}
-            />
-          ) : null}
-          <Select
-            allowClear
-            aria-label="来源"
-            placeholder="全部来源"
-            value={draftFilters.sourceCategory}
-            options={sourceCategoryOptions}
-            onChange={(sourceCategory) => updateDraft({ sourceCategory })}
-          />
-          <Select
-            allowClear
-            aria-label="国家"
-            placeholder="全部国家"
-            value={draftFilters.country}
-            options={countryOptions.map((country) => ({ value: country, label: country }))}
-            onChange={(country) => updateDraft({ country })}
-          />
-          <Select
-            allowClear
-            aria-label="客户类型"
-            placeholder="全部类型"
-            value={draftFilters.customerType}
-            options={customerTypeOptions.map((customerType) => ({ value: customerType, label: customerType }))}
-            onChange={(customerType) => updateDraft({ customerType })}
-          />
-          <Select
-            allowClear
-            aria-label="产品"
-            placeholder="全部产品"
-            value={draftFilters.product}
-            options={productOptions.map((product) => ({ value: product, label: product }))}
-            onChange={(product) => updateDraft({ product })}
-          />
-          <Select
-            allowClear
-            aria-label="销售"
-            placeholder="全部销售"
-            value={draftFilters.ownerId}
-            options={salesUsers.map((user) => ({ value: user.id, label: user.name }))}
-            onChange={(ownerId) => updateDraft({ ownerId })}
-          />
-          <Button type="primary" icon={<Check size={16} />} onClick={applyFilters}>
-            应用
-          </Button>
-          <Button onClick={resetFilters}>清空</Button>
-          <Button icon={<RefreshCw size={16} />} onClick={() => loadDashboard(filters)}>
-            刷新
-          </Button>
-          <Button type="primary" icon={<Upload size={16} />} onClick={() => navigate("/admin/leads/import")}>
-            导入线索
-          </Button>
-        </Space>
-        <Typography.Text className="muted">
-          当前显示：{timeScopeLabel}，共 {dashboard?.total ?? 0} 条线索记录。
-        </Typography.Text>
-      </Card>
 
       <Row gutter={[16, 16]} className="summary-grid">
         <Col xs={24} lg={12}>

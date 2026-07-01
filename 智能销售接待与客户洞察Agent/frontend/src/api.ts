@@ -1,4 +1,4 @@
-export type LoginResponse = {
+﻿export type LoginResponse = {
   access_token: string;
   token_type: string;
   role: string;
@@ -600,6 +600,44 @@ export type AIModelConfig = {
   updated_at: string | null;
 };
 
+export type SourceDictionarySetting = {
+  id: number | null;
+  category: string;
+  label: string;
+  enabled: boolean;
+};
+
+export type ChannelConfig = {
+  key: string;
+  name: string;
+  source_category: string;
+  access_method: string;
+  endpoint: string;
+  enabled: boolean;
+  status: string;
+};
+
+export type ReminderRule = {
+  key: string;
+  name: string;
+  trigger_hours: number;
+  target: string;
+  channel: string;
+  enabled: boolean;
+};
+
+export type GlobalMailSettings = {
+  sender_email: string;
+  sender_name: string;
+  smtp_host: string;
+  smtp_port: number;
+  username: string;
+  use_tls: boolean;
+  enabled: boolean;
+  configured: boolean;
+  test_status: string;
+};
+
 export type SettingsOverview = {
   summary: Record<string, number>;
   banner: Banner;
@@ -607,6 +645,10 @@ export type SettingsOverview = {
   sales_users: SalesUser[];
   permissions: SettingsPermission[];
   ai_model: AIModelConfig;
+  source_dictionary: SourceDictionarySetting[];
+  channel_configs: ChannelConfig[];
+  reminder_rules: ReminderRule[];
+  mail_settings: GlobalMailSettings;
   risks: string[];
   recent_changes: Array<{
     id: number;
@@ -942,7 +984,7 @@ export function createImportJob(file: File): Promise<ImportJob> {
   return requestForm<ImportJob>("/api/import-jobs", form);
 }
 
-export async function downloadImportTemplate(): Promise<string> {
+export async function downloadImportTemplate(): Promise<{ filename: string; content: string }> {
   const token = getToken();
   const headers = new Headers();
   if (token) {
@@ -952,7 +994,12 @@ export async function downloadImportTemplate(): Promise<string> {
   if (!response.ok) {
     throw new Error("导入模板下载失败");
   }
-  return response.text();
+  const disposition = response.headers.get("content-disposition") || "";
+  const filenameMatch = /filename="?([^";]+)"?/i.exec(disposition);
+  return {
+    filename: filenameMatch?.[1] || "lead-import-template.csv",
+    content: await response.text()
+  };
 }
 
 export function fetchImportJob(taskId: string): Promise<ImportJob> {
@@ -1138,7 +1185,7 @@ export async function downloadReportExport(taskId: string): Promise<string> {
   }
   const response = await fetch(`${API_BASE}/api/reports/export/${taskId}/download`, { headers });
   if (!response.ok) {
-    throw new Error("报表导出下载失败");
+    throw new Error("鎶ヨ〃瀵煎嚭涓嬭浇澶辫触");
   }
   return response.text();
 }
@@ -1473,6 +1520,54 @@ export function updateSettingsPermissions(payload: { role: string; permissions: 
   return request<SettingsPermission>("/api/settings/permissions", {
     method: "PUT",
     body: JSON.stringify(payload)
+  });
+}
+
+export function updateSettingsMail(payload: {
+  senderEmail: string;
+  senderName: string;
+  smtpHost: string;
+  smtpPort: number;
+  username: string;
+  password: string;
+  useTls: boolean;
+  enabled: boolean;
+  testSendTo?: string;
+}): Promise<GlobalMailSettings> {
+  return request<GlobalMailSettings>("/api/settings/mail", {
+    method: "PUT",
+    body: JSON.stringify({
+      sender_email: payload.senderEmail,
+      sender_name: payload.senderName,
+      smtp_host: payload.smtpHost,
+      smtp_port: payload.smtpPort,
+      username: payload.username,
+      password: payload.password,
+      use_tls: payload.useTls,
+      enabled: payload.enabled,
+      test_send_to: payload.testSendTo || null
+    })
+  });
+}
+
+export function updateSettingsSourceDictionary(items: SourceDictionarySetting[]): Promise<SourceDictionarySetting[]> {
+  return request<SourceDictionarySetting[]>("/api/settings/source-dictionary", {
+    method: "PUT",
+    body: JSON.stringify(items)
+  });
+}
+
+export function updateSettingsChannels(items: ChannelConfig[]): Promise<ChannelConfig[]> {
+  return request<ChannelConfig[]>("/api/settings/channels", {
+    method: "PUT",
+    body: JSON.stringify(items)
+  });
+}
+
+export function updateSettingsReminderRules(items: ReminderRule[]): Promise<ReminderRule[]> {
+  return request<ReminderRule[]>("/api/settings/reminder-rules", {
+    method: "PUT",
+    body: JSON.stringify(items)
   });
 }
 

@@ -44,3 +44,7 @@
 - 后端新增契约：`test_settings_ai_model_scenarios_and_email_writers_can_be_saved` 已通过，覆盖新增场景、场景绑定、邮件写手角色和 `/api/ai/email-writers`。
 - 专项门禁：`py -m pytest .\tests -q -k "settings or nurture"` 为 19 passed、82 deselected。
 - 全量门禁：`py -m pytest .\tests -q` 为 101 passed；前端 `npm.cmd run build` 通过。
+## 2026-07-01 二次统一返修 TDD
+- 设置中心必须提供邮件接口配置，保存后返回主邮箱、发件人、SMTP/服务接口摘要、启用状态和测试结果，并写入审计。
+- 客户来源字典、渠道配置、提醒规则必须可新增、编辑、启停和保存；客户来源字典变化后驱动线索池来源筛选和导入校验。
+- 发布全局 Banner 后，`GET /api/banner` 立即返回新标题/正文/图片，普通页面刷新后显示新 Banner。

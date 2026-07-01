@@ -35,3 +35,6 @@
 - 用户在预览环境打开 `/admin/dashboard` 时曾触发 `Cannot read properties of undefined (reading 'label')`，堆栈指向 `DashboardPage`。
 - 前端必须使用 `dashboard?.time_scope?.label` 等二级空值保护，不允许只判断 `dashboard` 后直接读取 `time_scope.label`。
 - 构建验收之外，需要在浏览器预览中确认 `/admin/dashboard` 不再出现 React Router 的 `Unexpected Application Error` 页面。
+## 2026-07-01 二次统一返修 TDD
+- 打开 `/admin/dashboard` 时，页面标题右上角不得出现重复“筛选/确认”按钮。
+- 筛选面板必须位于指标卡上方，包含“应用筛选/清空/刷新”，筛选后统计卡和明细摘要同步变化。

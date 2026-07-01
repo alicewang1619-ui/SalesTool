@@ -28,3 +28,6 @@
 - 浏览器验收：Playwright 以管理员进入 `/admin/nurture/1`，确认建议下一步动作、客户备注、生成提示词、附件素材、大模型上下文快照可见；已上传 `nurture-browser-brief.txt`、保存提示词、重新生成草稿并人工确认，最终状态显示“已确认”，`/api/nurture-tasks/{id}` 响应 200，控制台 warning/error 为 0。
 - 追加后端验收：`test_nurture_regeneration_uses_selected_email_writer_role` 已通过，确认草稿详情可保存 `writer_role_key`，重新生成后返回角色中文名、风格、技能，并写入 `prompt_context_snapshot.rendered_prompt`。
 - 当前门禁更新：`py -m pytest .\tests -q -k "settings or nurture"` 为 19 passed、82 deselected；`py -m pytest .\tests -q` 为 101 passed；前端 `npm.cmd run build` 通过。
+## 2026-07-01 二次统一返修 TDD
+- 再营销草稿详情页的邮件写手下拉必须读取 `/api/ai/email-writers`，展示英文角色、中文名、风格摘要和技能。
+- 当任务已有 `writer_role_key=baymax` 时，下拉显示“大白 / Baymax / 稳重专业”等友好信息，而不是只显示原始 key。

@@ -473,3 +473,4 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 
 - [07-01-2026 15:58:09] 工作台运行时报错修复｜背景：用户截图反馈访问 /admin/dashboard 时出现 Unexpected Application Error，错误为 Cannot read properties of undefined (reading 'label')，堆栈指向 DashboardPage。｜结论：本回合按文档驱动排查并修复工作台页面运行时错误，确保页面可打开并通过前端构建/必要接口验证后提交推送。｜来源：用户
 - [07-01-2026 16:00:54] 工作台 time_scope 缺省兼容修复完成｜背景：用户截图报错指向 DashboardPage 读取 undefined.label；实测当前本地 /api/dashboard 响应缺少 time_scope 和 metric_links，前端直接读 dashboard.time_scope.label 导致页面崩溃。｜结论：DashboardPage 已改为对 time_scope、metric_links、assignment_timeline 做二级空值保护；缺省时显示‘全部历史’并使用 fallback 跳转；已同步工作台页面文档和 TDD，npm.cmd run build 通过，静态检查确认危险读取已移除。｜来源：AI
+- [07-01-2026 16:01:16] 工作台缺省崩溃修复提交推送完成｜背景：工作台 time_scope 缺省兼容修复、文档回写和前端构建验证已完成，需要同步远端并记录提交结果。｜结论：已创建并推送 commit 8e14d0c7，提交信息为 修复工作台时间范围缺省崩溃；远端 main 已从 0ad0ece2 更新到 8e14d0c7。｜来源：AI

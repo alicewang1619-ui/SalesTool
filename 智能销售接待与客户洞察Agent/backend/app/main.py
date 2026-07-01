@@ -37,6 +37,9 @@ from .models import (
 from .schemas import (
     AssignmentConfirmOut,
     AssignmentConfirmRequest,
+    AIModelConfigOut,
+    AIModelOptionOut,
+    AIModelUpdateRequest,
     AuditLogOut,
     AuditLogPage,
     BannerOut,
@@ -3152,10 +3155,67 @@ def settings_entries() -> list[SettingsEntryOut]:
         SettingsEntryOut(key="global_banner", title="全局 Banner", description="上传并发布全部后台页面顶部 Banner", path="/admin/settings?section=banner", status="ready"),
         SettingsEntryOut(key="country_sales_mapping", title="国家区域销售映射", description="维护国家、区域和销售负责人", path="/admin/settings/country-sales", status="warning", risk_count=1),
         SettingsEntryOut(key="product_knowledge", title="产品知识库", description="维护 ultrasound 产品与 AI 接待知识", path="/admin/settings/product-knowledge", status="ready"),
+        SettingsEntryOut(key="ai_model_selection", title="大模型选择", description="选择 AI 接待、摘要评分和再营销草稿默认模型", path="/admin/settings?section=ai-model", status="ready"),
         SettingsEntryOut(key="source_dictionary", title="客户来源字典", description="维护官网、邮箱、社媒和线下展会来源", path="/admin/settings?section=sources", status="ready"),
         SettingsEntryOut(key="channels", title="渠道配置", description="维护 Webhook、邮箱同步和展会导入", path="/admin/settings?section=channels", status="warning", risk_count=1),
         SettingsEntryOut(key="reminder_rules", title="提醒规则", description="维护 24h/48h 未反馈提醒策略", path="/admin/settings?section=reminders", status="ready"),
     ]
+
+
+AI_MODEL_SETTING_KEY = "ai_model:default"
+AI_MODEL_OPTIONS = [
+    {
+        "value": "ug-fast-v1",
+        "label": "快速模型",
+        "provider": "Ultrasound Growth LLM",
+        "scenario": "线索预处理、短摘要、低延迟接待",
+        "capability": "响应快，适合高频批量任务",
+        "status": "available",
+    },
+    {
+        "value": "ug-balanced-v1",
+        "label": "平衡模型（推荐）",
+        "provider": "Ultrasound Growth LLM",
+        "scenario": "AI 接待、客户摘要、评分和再营销草稿",
+        "capability": "质量与速度平衡，默认推荐",
+        "status": "available",
+    },
+    {
+        "value": "ug-quality-v1",
+        "label": "高质量模型",
+        "provider": "Ultrasound Growth LLM",
+        "scenario": "复杂客户背景调查、长邮件草稿和高价值客户触达",
+        "capability": "推理更强，成本和耗时更高",
+        "status": "available",
+    },
+]
+
+
+def ai_model_options() -> list[AIModelOptionOut]:
+    return [AIModelOptionOut(**item) for item in AI_MODEL_OPTIONS]
+
+
+def ai_model_config(db: Session) -> AIModelConfigOut:
+    setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
+    selected_model = "ug-balanced-v1"
+    if setting:
+        try:
+            raw = json.loads(setting.value)
+            if isinstance(raw, dict) and isinstance(raw.get("selected_model"), str):
+                selected_model = raw["selected_model"]
+        except json.JSONDecodeError:
+            selected_model = "ug-balanced-v1"
+    option_map = {item["value"]: item for item in AI_MODEL_OPTIONS}
+    selected = option_map.get(selected_model, option_map["ug-balanced-v1"])
+    return AIModelConfigOut(
+        selected_model=selected["value"],
+        selected_label=selected["label"],
+        provider=selected["provider"],
+        scenario=selected["scenario"],
+        options=ai_model_options(),
+        updated_by=setting.updated_by if setting else None,
+        updated_at=setting.updated_at if setting else None,
+    )
 
 
 def permission_rows(db: Session) -> list[SettingsPermissionOut]:
@@ -3191,11 +3251,13 @@ def settings_overview(db: Session = Depends(get_db), user: User = Depends(requir
             "active_banners": db.scalar(select(func.count()).select_from(Banner).where(Banner.active.is_(True))) or 0,
             "country_mappings": country_mapping_total,
             "permission_roles": len(DEFAULT_PERMISSION_MATRIX),
+            "ai_models": len(AI_MODEL_OPTIONS),
         },
         banner=BannerOut.model_validate(banner, from_attributes=True),
         entries=settings_entries(),
         sales_users=[SalesUserOut.model_validate(item, from_attributes=True) for item in users],
         permissions=permission_rows(db),
+        ai_model=ai_model_config(db),
         risks=["6 个国家缺少销售负责人", "邮箱同步需要重试"],
         recent_changes=[AuditLogOut.model_validate(item, from_attributes=True).model_dump() for item in changes],
     )
@@ -3586,6 +3648,34 @@ def update_settings_permissions(
     )
     db.commit()
     return SettingsPermissionOut(role=payload.role, permissions=payload.permissions)
+
+
+@app.put("/api/settings/ai-model", response_model=AIModelConfigOut)
+def update_settings_ai_model(
+    payload: AIModelUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> AIModelConfigOut:
+    allowed_models = {item["value"] for item in AI_MODEL_OPTIONS}
+    if payload.selected_model not in allowed_models:
+        raise HTTPException(status_code=422, detail=error_detail("AI_MODEL_UNSUPPORTED", "Selected AI model is not available"))
+    setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
+    if not setting:
+        setting = SystemSetting(key=AI_MODEL_SETTING_KEY, updated_by=user.id)
+        db.add(setting)
+    setting.value = json.dumps({"selected_model": payload.selected_model}, ensure_ascii=False)
+    setting.updated_by = user.id
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_ai_model_updated",
+        f"Settings AI model updated: {payload.selected_model}",
+        actor_id=user.id,
+        target_type="settings",
+    )
+    db.commit()
+    return ai_model_config(db)
 
 
 @app.get("/api/audit-logs", response_model=AuditLogPage)

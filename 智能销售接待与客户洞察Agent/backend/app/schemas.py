@@ -706,12 +706,32 @@ class SettingsPermissionOut(BaseModel):
     permissions: list[str]
 
 
+class AIModelOptionOut(BaseModel):
+    value: str
+    label: str
+    provider: str
+    scenario: str
+    capability: str
+    status: str
+
+
+class AIModelConfigOut(BaseModel):
+    selected_model: str
+    selected_label: str
+    provider: str
+    scenario: str
+    options: list[AIModelOptionOut]
+    updated_by: int | None = None
+    updated_at: datetime | None = None
+
+
 class SettingsOverviewOut(BaseModel):
     summary: dict[str, int]
     banner: BannerOut
     entries: list[SettingsEntryOut]
     sales_users: list[SalesUserOut]
     permissions: list[SettingsPermissionOut]
+    ai_model: AIModelConfigOut
     risks: list[str]
     recent_changes: list[dict[str, object]]
 
@@ -744,6 +764,10 @@ class BannerUpdateRequest(BaseModel):
 class PermissionUpdateRequest(BaseModel):
     role: str = Field(pattern="^(sales|ops|admin)$")
     permissions: list[str] = Field(min_length=1)
+
+
+class AIModelUpdateRequest(BaseModel):
+    selected_model: str = Field(min_length=2, max_length=120)
 
 
 class CountrySalesMappingOut(BaseModel):

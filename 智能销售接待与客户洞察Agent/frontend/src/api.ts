@@ -561,12 +561,32 @@ export type SettingsPermission = {
   permissions: string[];
 };
 
+export type AIModelOption = {
+  value: string;
+  label: string;
+  provider: string;
+  scenario: string;
+  capability: string;
+  status: string;
+};
+
+export type AIModelConfig = {
+  selected_model: string;
+  selected_label: string;
+  provider: string;
+  scenario: string;
+  options: AIModelOption[];
+  updated_by: number | null;
+  updated_at: string | null;
+};
+
 export type SettingsOverview = {
   summary: Record<string, number>;
   banner: Banner;
   entries: SettingsEntry[];
   sales_users: SalesUser[];
   permissions: SettingsPermission[];
+  ai_model: AIModelConfig;
   risks: string[];
   recent_changes: Array<{
     id: number;
@@ -1412,5 +1432,12 @@ export function updateSettingsPermissions(payload: { role: string; permissions: 
   return request<SettingsPermission>("/api/settings/permissions", {
     method: "PUT",
     body: JSON.stringify(payload)
+  });
+}
+
+export function updateSettingsAIModel(payload: { selectedModel: string }): Promise<AIModelConfig> {
+  return request<AIModelConfig>("/api/settings/ai-model", {
+    method: "PUT",
+    body: JSON.stringify({ selected_model: payload.selectedModel })
   });
 }

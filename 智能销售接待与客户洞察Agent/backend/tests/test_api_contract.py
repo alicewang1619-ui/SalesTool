@@ -1578,12 +1578,16 @@ def test_settings_overview_contains_entries_banner_accounts_and_permissions(clie
         "global_banner",
         "country_sales_mapping",
         "product_knowledge",
+        "ai_model_selection",
         "source_dictionary",
         "channels",
         "reminder_rules",
     }.issubset(entry_keys)
     assert any(user["email"] == "maria@ultrasound-growth.local" for user in body["sales_users"])
     assert any(row["role"] == "sales" for row in body["permissions"])
+    assert body["ai_model"]["selected_model"]
+    assert body["ai_model"]["options"]
+    assert any(option["value"] == body["ai_model"]["selected_model"] for option in body["ai_model"]["options"])
 
 
 def test_settings_create_sales_user_persists_scope_role_and_audit(client: TestClient) -> None:
@@ -1689,10 +1693,38 @@ def test_sales_user_cannot_access_settings_management(client: TestClient) -> Non
         json={"title": "Blocked", "body": "Blocked", "image_url": "/assets/default-banner.png"},
         headers=sales_headers,
     )
+    ai_model = client.put(
+        "/api/settings/ai-model",
+        json={"selected_model": "ug-quality-v1"},
+        headers=sales_headers,
+    )
 
     assert overview.status_code == 403
     assert created.status_code == 403
     assert banner.status_code == 403
+    assert ai_model.status_code == 403
+
+
+def test_settings_ai_model_config_can_be_saved_and_audited(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-ai-model-test"}
+
+    response = client.put(
+        "/api/settings/ai-model",
+        json={"selected_model": "ug-quality-v1"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["selected_model"] == "ug-quality-v1"
+    assert body["selected_label"] == "高质量模型"
+    overview = client.get("/api/settings/overview", headers=headers).json()
+    assert overview["ai_model"]["selected_model"] == "ug-quality-v1"
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "settings_ai_model_updated" and event["trace_id"] == "settings-ai-model-test"
+        for event in audit
+    )
 
 
 def test_country_sales_mapping_overview_lists_rules_sales_and_pending(client: TestClient) -> None:

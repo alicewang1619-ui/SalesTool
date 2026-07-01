@@ -9,6 +9,17 @@ function formatDate(value?: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+const fallbackBackground: Customer["background"] = {
+  auto_summary: "暂无背景调查",
+  manual_summary: null,
+  current_summary: "暂无背景调查",
+  evidence: "",
+  sources: [],
+  confidence: "待复核",
+  updated_by: "系统",
+  updated_at: ""
+};
+
 export function CustomerDetailPage() {
   const { message } = App.useApp();
   const { customerId = "1" } = useParams();
@@ -33,7 +44,7 @@ export function CustomerDetailPage() {
     try {
       const updated = await updateCustomerBackground(customerId, values.manualSummary);
       setCustomer(updated);
-      form.setFieldValue("manualSummary", updated.background.current_summary);
+      form.setFieldValue("manualSummary", updated.background?.current_summary ?? values.manualSummary);
       message.success("客户背景调查已保存");
     } finally {
       setSaving(false);
@@ -41,6 +52,13 @@ export function CustomerDetailPage() {
   }
 
   if (!customer) return <Card loading />;
+
+  const background = customer.background ?? fallbackBackground;
+  const leadHistory = customer.lead_history ?? [];
+  const feedbackRecords = customer.feedback_records ?? [];
+  const timeline = customer.timeline ?? [];
+  const signals = customer.signals ?? [];
+  const canEditBackground = Boolean(customer.can_edit_background);
 
   return (
     <section>
@@ -57,8 +75,8 @@ export function CustomerDetailPage() {
             <Button icon={<ArrowLeft size={16} />}>返回客户池</Button>
           </Link>
           <Tag color="purple">{customer.tier}</Tag>
-          <Tag color={customer.can_edit_background ? "purple" : "default"}>
-            {customer.can_edit_background ? "可编辑背景调查" : "只读背景调查"}
+          <Tag color={canEditBackground ? "purple" : "default"}>
+            {canEditBackground ? "可编辑背景调查" : "只读背景调查"}
           </Tag>
         </Space>
       </div>
@@ -80,7 +98,7 @@ export function CustomerDetailPage() {
             <Alert type="info" showIcon message="询盘要求 / 客户需求" description={customer.demand_summary || "暂无需求摘要"} />
           </Col>
           <Col xs={24} lg={12}>
-            <Alert type="success" showIcon message="客户背景调查摘要" description={customer.background.current_summary} />
+            <Alert type="success" showIcon message="客户背景调查摘要" description={background.current_summary} />
           </Col>
         </Row>
       </Card>
@@ -88,22 +106,22 @@ export function CustomerDetailPage() {
       <Row gutter={[16, 16]} className="metric-row">
         <Col xs={24} md={6}>
           <Card title="历史线索">
-            <Typography.Title level={3}>{customer.lead_history.length}</Typography.Title>
+            <Typography.Title level={3}>{leadHistory.length}</Typography.Title>
           </Card>
         </Col>
         <Col xs={24} md={6}>
           <Card title="反馈记录">
-            <Typography.Title level={3}>{customer.feedback_records.length}</Typography.Title>
+            <Typography.Title level={3}>{feedbackRecords.length}</Typography.Title>
           </Card>
         </Col>
         <Col xs={24} md={6}>
           <Card title="态势信号">
-            <Typography.Title level={3}>{customer.signals.length}</Typography.Title>
+            <Typography.Title level={3}>{signals.length}</Typography.Title>
           </Card>
         </Col>
         <Col xs={24} md={6}>
           <Card title="背景可信度">
-            <Typography.Title level={3}>{customer.background.confidence}</Typography.Title>
+            <Typography.Title level={3}>{background.confidence}</Typography.Title>
           </Card>
         </Col>
       </Row>
@@ -118,24 +136,24 @@ export function CustomerDetailPage() {
               </Space>
             }
           >
-            <Typography.Paragraph>{customer.background.auto_summary}</Typography.Paragraph>
+            <Typography.Paragraph>{background.auto_summary}</Typography.Paragraph>
             <Alert
               type="info"
               showIcon
               className="login-error"
-              message={`最近更新：${formatDate(customer.background.updated_at)} · ${customer.background.updated_by}`}
+              message={`最近更新：${formatDate(background.updated_at)} · ${background.updated_by}`}
             />
             <Form
               key={customer.id}
               form={form}
               layout="vertical"
-              initialValues={{ manualSummary: customer.background.current_summary }}
+              initialValues={{ manualSummary: background.current_summary }}
               onFinish={(values) => void saveBackground(values)}
             >
               <Form.Item name="manualSummary" label="人工修订内容" rules={[{ required: true, min: 10 }]}>
-                <Input.TextArea rows={8} disabled={!customer.can_edit_background} />
+                <Input.TextArea rows={8} disabled={!canEditBackground} />
               </Form.Item>
-              <Button type="primary" htmlType="submit" icon={<Save size={16} />} loading={saving} disabled={!customer.can_edit_background}>
+              <Button type="primary" htmlType="submit" icon={<Save size={16} />} loading={saving} disabled={!canEditBackground}>
                 保存人工修订
               </Button>
             </Form>
@@ -147,7 +165,7 @@ export function CustomerDetailPage() {
               rowKey={(record) => `${record.type}-${record.title}`}
               size="small"
               pagination={false}
-              dataSource={customer.background.sources}
+              dataSource={background.sources}
               columns={[
                 { title: "来源", dataIndex: "title" },
                 { title: "类型", dataIndex: "type", render: (value: string) => <Tag>{value}</Tag> },
@@ -162,7 +180,7 @@ export function CustomerDetailPage() {
         <Table
           rowKey="id"
           pagination={false}
-          dataSource={customer.signals}
+          dataSource={signals}
           columns={[
             { title: "观察时间", dataIndex: "observed_at", width: 180, render: formatDate },
             { title: "信号标题", dataIndex: "signal_title", width: 220 },
@@ -182,7 +200,7 @@ export function CustomerDetailPage() {
               rowKey="id"
               size="small"
               pagination={false}
-              dataSource={customer.lead_history}
+              dataSource={leadHistory}
               columns={[
                 { title: "进入时间", dataIndex: "created_at", render: formatDate },
                 { title: "来源", dataIndex: "source" },
@@ -196,7 +214,7 @@ export function CustomerDetailPage() {
         <Col xs={24} lg={10}>
           <Card title="状态时间线">
             <Timeline
-              items={customer.timeline.map((item) => ({
+              items={timeline.map((item) => ({
                 color: item.status === "background_updated" ? "purple" : "blue",
                 children: (
                   <div>
@@ -214,7 +232,7 @@ export function CustomerDetailPage() {
         <Table
           rowKey={(record) => `${record.status}-${record.happened_at}`}
           pagination={false}
-          dataSource={customer.feedback_records}
+          dataSource={feedbackRecords}
           columns={[
             { title: "状态", dataIndex: "status", render: (value: string) => <Tag color="green">{value}</Tag> },
             { title: "判断", dataIndex: "judgement" },

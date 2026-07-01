@@ -476,3 +476,7 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 - [07-01-2026 16:01:16] 工作台缺省崩溃修复提交推送完成｜背景：工作台 time_scope 缺省兼容修复、文档回写和前端构建验证已完成，需要同步远端并记录提交结果。｜结论：已创建并推送 commit 8e14d0c7，提交信息为 修复工作台时间范围缺省崩溃；远端 main 已从 0ad0ece2 更新到 8e14d0c7。｜来源：AI
 
 - [07-01-2026 16:04:56] 提供本地登录账号｜背景：用户要求提供登录链接以及管理员和销售人员账号密码，用于查看刚修复后的后台。｜结论：本回合提供本地 Vite 后台登录链接、管理员种子账号和销售种子账号；不改业务产物。｜来源：用户
+
+- [07-01-2026 16:08:58] 客户详情页运行时报错修复｜背景：用户截图反馈访问 /admin/customers/9 时出现 Unexpected Application Error，错误为 Cannot read properties of undefined (reading 'length')，堆栈指向 CustomerDetailPage。｜结论：本回合按文档驱动排查客户详情页数组字段缺省兼容问题，修复后同步页面文档与 TDD，并通过构建/接口验证后提交推送。｜来源：用户
+
+- [07-01-2026 16:13:23] 客户详情缺省数组崩溃修复完成｜背景：用户反馈 /admin/customers/9 打开后因读取 undefined.length 崩溃，实测当前运行接口缺少 signals 字段。｜结论：已在 CustomerDetailPage 对 background、lead_history、feedback_records、timeline、signals 做运行时缺省保护，并同步客户详情页面文档和 TDD；npm.cmd run build 通过，Vite 页面返回 200，危险直接读取已清除。｜来源：AI

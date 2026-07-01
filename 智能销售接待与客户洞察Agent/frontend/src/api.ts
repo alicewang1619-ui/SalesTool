@@ -570,12 +570,20 @@ export type AIModelOption = {
   status: string;
 };
 
+export type AIModelUseCase = {
+  key: string;
+  label: string;
+  description: string;
+};
+
 export type AIModelConfig = {
   selected_model: string;
   selected_label: string;
   provider: string;
   scenario: string;
   options: AIModelOption[];
+  use_cases: AIModelUseCase[];
+  use_case_bindings: Record<string, string>;
   updated_by: number | null;
   updated_at: string | null;
 };
@@ -813,7 +821,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const detail = await response.json().catch(() => ({ detail: "请求失败" }));
     const rawDetail = detail.detail;
     const message =
-      typeof rawDetail === "string" ? rawDetail : typeof rawDetail?.message === "string" ? rawDetail.message : "请求失败";
+      typeof rawDetail === "string"
+        ? rawDetail
+        : typeof rawDetail?.message === "string"
+          ? rawDetail.message
+          : Array.isArray(rawDetail)
+            ? rawDetail.map((item) => item?.msg).filter(Boolean).join("；") || "请求失败"
+            : "请求失败";
     const error = new Error(message) as Error & { traceId?: string };
     error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
     const traceId = response.headers.get("x-trace-id");
@@ -837,7 +851,13 @@ async function requestForm<T>(path: string, body: FormData): Promise<T> {
     const detail = await response.json().catch(() => ({ detail: "请求失败" }));
     const rawDetail = detail.detail;
     const message =
-      typeof rawDetail === "string" ? rawDetail : typeof rawDetail?.message === "string" ? rawDetail.message : "请求失败";
+      typeof rawDetail === "string"
+        ? rawDetail
+        : typeof rawDetail?.message === "string"
+          ? rawDetail.message
+          : Array.isArray(rawDetail)
+            ? rawDetail.map((item) => item?.msg).filter(Boolean).join("；") || "请求失败"
+            : "请求失败";
     const error = new Error(message) as Error & { traceId?: string };
     error.name = typeof rawDetail?.code === "string" ? rawDetail.code : `HTTP_${response.status}`;
     const traceId = response.headers.get("x-trace-id");
@@ -1435,9 +1455,17 @@ export function updateSettingsPermissions(payload: { role: string; permissions: 
   });
 }
 
-export function updateSettingsAIModel(payload: { selectedModel: string }): Promise<AIModelConfig> {
+export function updateSettingsAIModel(payload: {
+  selectedModel: string;
+  options?: AIModelOption[];
+  useCaseBindings?: Record<string, string>;
+}): Promise<AIModelConfig> {
   return request<AIModelConfig>("/api/settings/ai-model", {
     method: "PUT",
-    body: JSON.stringify({ selected_model: payload.selectedModel })
+    body: JSON.stringify({
+      selected_model: payload.selectedModel,
+      options: payload.options,
+      use_case_bindings: payload.useCaseBindings
+    })
   });
 }

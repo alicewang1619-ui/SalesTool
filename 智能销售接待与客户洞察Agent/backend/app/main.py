@@ -39,6 +39,7 @@ from .schemas import (
     AssignmentConfirmRequest,
     AIModelConfigOut,
     AIModelOptionOut,
+    AIModelUseCaseOut,
     AIModelUpdateRequest,
     AuditLogOut,
     AuditLogPage,
@@ -334,6 +335,89 @@ def ensure_default_product_knowledge(db: Session) -> None:
     db.commit()
 
 
+def ensure_default_leads_and_customers(db: Session) -> None:
+    maria = db.scalar(select(User).where(User.email == "maria@ultrasound-growth.local"))
+    globalmed = db.scalar(select(Lead).where(Lead.customer_name == "GlobalMed Peru"))
+    if not globalmed:
+        db.add(
+            Lead(
+                customer_name="GlobalMed Peru",
+                email="carlos@globalmed.example",
+                organization="GlobalMed Peru",
+                country="Peru",
+                customer_type="代理商",
+                product="Portable Ultrasound",
+                source_category="网站",
+                source_label="官网聊天",
+                score_label="有效",
+                feedback_status="未反馈",
+                raw_inquiry="客户原文：We distribute imaging devices in Peru and need a portable ultrasound portfolio for regional clinics.",
+                conversation_history=json.dumps(
+                    [
+                        "客户询问 portable ultrasound 代理组合与区域诊所应用。",
+                        "AI 追问国家、客户身份和应用场景后确认其为 Peru 代理商。",
+                        "客户表示希望三天内收到产品对比资料。",
+                    ],
+                    ensure_ascii=False,
+                ),
+                owner_id=maria.id if maria else None,
+            )
+        )
+    al_noor = db.scalar(select(Lead).where(Lead.customer_name == "Al Noor Hospital"))
+    if not al_noor:
+        db.add(
+            Lead(
+                customer_name="Al Noor Hospital",
+                email="procurement@alnoor.example",
+                organization="Al Noor Hospital",
+                country="UAE",
+                customer_type="Hospital",
+                product="Trolley Ultrasound",
+                source_category="邮箱",
+                source_label="官网邮箱",
+                score_label="有效",
+                feedback_status="需跟进",
+                raw_inquiry="客户原文：Our hospital is reviewing trolley ultrasound systems for emergency and radiology departments.",
+                conversation_history=json.dumps(
+                    [
+                        "邮箱询盘说明医院正在评估 trolley ultrasound。",
+                        "AI 从邮箱签名和国家字段识别 UAE Hospital。",
+                        "系统标记为需跟进，等待运营分配销售负责人。",
+                    ],
+                    ensure_ascii=False,
+                ),
+                owner_id=None,
+            )
+        )
+    customer = db.scalar(select(Customer).where(Customer.name == "GlobalMed Peru"))
+    if not customer:
+        customer = Customer(
+            name="GlobalMed Peru",
+            email="carlos@globalmed.example",
+            organization="GlobalMed Peru",
+            country="Peru",
+            customer_type="代理商",
+            product="Portable Ultrasound",
+            tier="高意向",
+            demand_summary="客户需要区域诊所使用的 Portable Ultrasound 产品组合与型号对比资料。",
+            source_summary="网站 / 官网聊天",
+            owner_id=maria.id if maria else None,
+        )
+        db.add(customer)
+        db.flush()
+    if not customer.background:
+        db.add(
+            CustomerBackground(
+                customer_id=customer.id,
+                auto_summary="GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。",
+                manual_summary=None,
+                evidence="官网公开产品线；邮箱域名与联系人一致；历史邮件提到区域诊所便携式超声需求。",
+                confidence="高",
+            )
+        )
+    db.commit()
+
+
 def ensure_default_nurture_tasks(db: Session) -> None:
     admin = db.scalar(select(User).where(User.email == "admin@ultrasound-growth.local"))
     customer = db.scalar(select(Customer).where(Customer.name == "GlobalMed Peru"))
@@ -426,6 +510,7 @@ def startup() -> None:
         seed_data(db)
         ensure_default_country_mappings(db)
         ensure_default_product_knowledge(db)
+        ensure_default_leads_and_customers(db)
         ensure_default_nurture_tasks(db)
         ensure_default_customer_signals(db)
 
@@ -2987,8 +3072,9 @@ def regenerate_nurture_draft(
         "Would it be useful if I send the comparison and confirm your priority application?"
     )
     task.prompt_context_snapshot = context.model_dump_json()
-    task.model_provider = "ultrasound_growth_llm"
-    task.model_version = "nurture-draft-v1"
+    email_model = ai_model_for_use_case(db, "email_draft")
+    task.model_provider = email_model.provider
+    task.model_version = email_model.value
     task.approval_status = "pending"
     task.updated_by = user.id
     add_audit(
@@ -3163,7 +3249,7 @@ def settings_entries() -> list[SettingsEntryOut]:
 
 
 AI_MODEL_SETTING_KEY = "ai_model:default"
-AI_MODEL_OPTIONS = [
+AI_MODEL_DEFAULT_OPTIONS = [
     {
         "value": "ug-fast-v1",
         "label": "快速模型",
@@ -3188,34 +3274,152 @@ AI_MODEL_OPTIONS = [
         "capability": "推理更强，成本和耗时更高",
         "status": "available",
     },
+    {
+        "value": "claude-sonnet",
+        "label": "Claude Sonnet",
+        "provider": "Anthropic",
+        "scenario": "邮件草稿和高价值客户触达",
+        "capability": "长文本写作、语气控制和复杂客户沟通",
+        "status": "available",
+    },
+    {
+        "value": "codex",
+        "label": "Codex",
+        "provider": "OpenAI",
+        "scenario": "AI 接待流程、结构化推理和内部工作流辅助",
+        "capability": "适合拆解流程、生成结构化摘要和工具化任务",
+        "status": "available",
+    },
+    {
+        "value": "deepseek-chat",
+        "label": "DeepSeek Chat",
+        "provider": "DeepSeek",
+        "scenario": "客户背景调研、中文资料整理和批量摘要",
+        "capability": "适合低成本批量分析和多语言背景摘要",
+        "status": "available",
+    },
 ]
+AI_MODEL_OPTIONS = AI_MODEL_DEFAULT_OPTIONS
+AI_MODEL_USE_CASES = [
+    {
+        "key": "default",
+        "label": "AI 接待与线索摘要",
+        "description": "用于官网接待、线索摘要、评分和通用 AI 辅助。",
+    },
+    {
+        "key": "email_draft",
+        "label": "邮件草稿",
+        "description": "用于再营销邮件草稿、触达理由和发送前人工确认内容。",
+    },
+    {
+        "key": "customer_research",
+        "label": "客户背景调研",
+        "description": "用于客户背景调查、公开资料摘要和客户画像补全。",
+    },
+]
+AI_MODEL_DEFAULT_BINDINGS = {
+    "default": "ug-balanced-v1",
+    "email_draft": "claude-sonnet",
+    "customer_research": "deepseek-chat",
+}
+
+
+def ai_model_use_cases() -> list[AIModelUseCaseOut]:
+    return [AIModelUseCaseOut(**item) for item in AI_MODEL_USE_CASES]
+
+
+def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[dict[str, str]]:
+    options_by_value: dict[str, dict[str, str]] = {
+        item["value"]: dict(item)
+        for item in AI_MODEL_DEFAULT_OPTIONS
+    }
+    for raw in raw_options or []:
+        if isinstance(raw, AIModelOptionOut):
+            item = raw.model_dump()
+        elif isinstance(raw, dict):
+            item = raw
+        else:
+            continue
+        value = str(item.get("value", "")).strip()
+        label = str(item.get("label", "")).strip()
+        provider = str(item.get("provider", "")).strip()
+        scenario = str(item.get("scenario", "")).strip()
+        capability = str(item.get("capability", "")).strip()
+        status_value = str(item.get("status", "available")).strip() or "available"
+        if not value or not label or not provider or not scenario or not capability:
+            continue
+        options_by_value[value] = {
+            "value": value,
+            "label": label,
+            "provider": provider,
+            "scenario": scenario,
+            "capability": capability,
+            "status": status_value,
+        }
+    return list(options_by_value.values())
+
+
+def normalise_ai_model_bindings(raw_bindings: dict[str, str] | None, selected_model: str, options: list[dict[str, str]]) -> dict[str, str]:
+    option_values = {item["value"] for item in options}
+    bindings = dict(AI_MODEL_DEFAULT_BINDINGS)
+    bindings["default"] = selected_model if selected_model in option_values else AI_MODEL_DEFAULT_BINDINGS["default"]
+    for use_case in AI_MODEL_USE_CASES:
+        key = use_case["key"]
+        candidate = raw_bindings.get(key) if raw_bindings else None
+        if candidate in option_values:
+            bindings[key] = candidate
+    for key, value in list(bindings.items()):
+        if value not in option_values:
+            bindings[key] = selected_model if selected_model in option_values else "ug-balanced-v1"
+    return bindings
+
+
+def stored_ai_model_config(db: Session) -> tuple[str, list[dict[str, str]], dict[str, str], SystemSetting | None]:
+    setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
+    raw: dict[str, object] = {}
+    if setting:
+        try:
+            loaded = json.loads(setting.value)
+            if isinstance(loaded, dict):
+                raw = loaded
+        except json.JSONDecodeError:
+            raw = {}
+    raw_options = raw.get("options") if isinstance(raw.get("options"), list) else None
+    options = normalise_ai_model_options(raw_options)
+    option_values = {item["value"] for item in options}
+    selected_model = raw.get("selected_model") if isinstance(raw.get("selected_model"), str) else "ug-balanced-v1"
+    if selected_model not in option_values:
+        selected_model = "ug-balanced-v1"
+    raw_bindings = raw.get("use_case_bindings") if isinstance(raw.get("use_case_bindings"), dict) else None
+    bindings = normalise_ai_model_bindings(raw_bindings, selected_model, options)
+    return selected_model, options, bindings, setting
 
 
 def ai_model_options() -> list[AIModelOptionOut]:
-    return [AIModelOptionOut(**item) for item in AI_MODEL_OPTIONS]
+    return [AIModelOptionOut(**item) for item in normalise_ai_model_options()]
 
 
 def ai_model_config(db: Session) -> AIModelConfigOut:
-    setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
-    selected_model = "ug-balanced-v1"
-    if setting:
-        try:
-            raw = json.loads(setting.value)
-            if isinstance(raw, dict) and isinstance(raw.get("selected_model"), str):
-                selected_model = raw["selected_model"]
-        except json.JSONDecodeError:
-            selected_model = "ug-balanced-v1"
-    option_map = {item["value"]: item for item in AI_MODEL_OPTIONS}
+    selected_model, options, bindings, setting = stored_ai_model_config(db)
+    option_map = {item["value"]: item for item in options}
     selected = option_map.get(selected_model, option_map["ug-balanced-v1"])
     return AIModelConfigOut(
         selected_model=selected["value"],
         selected_label=selected["label"],
         provider=selected["provider"],
         scenario=selected["scenario"],
-        options=ai_model_options(),
+        options=[AIModelOptionOut(**item) for item in options],
+        use_cases=ai_model_use_cases(),
+        use_case_bindings=bindings,
         updated_by=setting.updated_by if setting else None,
         updated_at=setting.updated_at if setting else None,
     )
+
+
+def ai_model_for_use_case(db: Session, use_case: str) -> AIModelOptionOut:
+    config = ai_model_config(db)
+    model_value = config.use_case_bindings.get(use_case, config.selected_model)
+    return next((item for item in config.options if item.value == model_value), config.options[0])
 
 
 def permission_rows(db: Session) -> list[SettingsPermissionOut]:
@@ -3243,6 +3447,7 @@ def settings_overview(db: Session = Depends(get_db), user: User = Depends(requir
     changes = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(20)).all()
     country_mapping_total = db.scalar(select(func.count()).select_from(CountrySalesMapping).where(CountrySalesMapping.active.is_(True))) or 0
     source_total = db.scalar(select(func.count()).select_from(SourceDictionary).where(SourceDictionary.enabled.is_(True))) or 0
+    model_config = ai_model_config(db)
     return SettingsOverviewOut(
         summary={
             "sales_users": len([item for item in users if item.role == "sales"]),
@@ -3251,13 +3456,13 @@ def settings_overview(db: Session = Depends(get_db), user: User = Depends(requir
             "active_banners": db.scalar(select(func.count()).select_from(Banner).where(Banner.active.is_(True))) or 0,
             "country_mappings": country_mapping_total,
             "permission_roles": len(DEFAULT_PERMISSION_MATRIX),
-            "ai_models": len(AI_MODEL_OPTIONS),
+            "ai_models": len(model_config.options),
         },
         banner=BannerOut.model_validate(banner, from_attributes=True),
         entries=settings_entries(),
         sales_users=[SalesUserOut.model_validate(item, from_attributes=True) for item in users],
         permissions=permission_rows(db),
-        ai_model=ai_model_config(db),
+        ai_model=model_config,
         risks=["6 个国家缺少销售负责人", "邮箱同步需要重试"],
         recent_changes=[AuditLogOut.model_validate(item, from_attributes=True).model_dump() for item in changes],
     )
@@ -3657,20 +3862,39 @@ def update_settings_ai_model(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ops),
 ) -> AIModelConfigOut:
-    allowed_models = {item["value"] for item in AI_MODEL_OPTIONS}
+    current_config = ai_model_config(db)
+    current_options = [item.model_dump() for item in current_config.options]
+    options = normalise_ai_model_options(
+        [item.model_dump() for item in payload.options]
+        if payload.options is not None
+        else current_options
+    )
+    allowed_models = {item["value"] for item in options}
     if payload.selected_model not in allowed_models:
         raise HTTPException(status_code=422, detail=error_detail("AI_MODEL_UNSUPPORTED", "Selected AI model is not available"))
+    bindings = normalise_ai_model_bindings(
+        payload.use_case_bindings if payload.use_case_bindings is not None else current_config.use_case_bindings,
+        payload.selected_model,
+        options,
+    )
     setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
     if not setting:
         setting = SystemSetting(key=AI_MODEL_SETTING_KEY, updated_by=user.id)
         db.add(setting)
-    setting.value = json.dumps({"selected_model": payload.selected_model}, ensure_ascii=False)
+    setting.value = json.dumps(
+        {
+            "selected_model": payload.selected_model,
+            "options": options,
+            "use_case_bindings": bindings,
+        },
+        ensure_ascii=False,
+    )
     setting.updated_by = user.id
     add_audit(
         db,
         request.state.trace_id,
         "settings_ai_model_updated",
-        f"Settings AI model updated: {payload.selected_model}",
+        f"Settings AI model updated: {payload.selected_model}; bindings={bindings}",
         actor_id=user.id,
         target_type="settings",
     )

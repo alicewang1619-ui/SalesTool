@@ -43,7 +43,7 @@ class Banner(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     body: Mapped[str] = mapped_column(String(500), nullable=False)
-    image_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    image_url: Mapped[str] = mapped_column(Text, nullable=False)
     link_url: Mapped[str | None] = mapped_column(String(500))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

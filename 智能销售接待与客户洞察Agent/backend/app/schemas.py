@@ -715,12 +715,20 @@ class AIModelOptionOut(BaseModel):
     status: str
 
 
+class AIModelUseCaseOut(BaseModel):
+    key: str
+    label: str
+    description: str
+
+
 class AIModelConfigOut(BaseModel):
     selected_model: str
     selected_label: str
     provider: str
     scenario: str
     options: list[AIModelOptionOut]
+    use_cases: list[AIModelUseCaseOut]
+    use_case_bindings: dict[str, str]
     updated_by: int | None = None
     updated_at: datetime | None = None
 
@@ -756,7 +764,7 @@ class SalesUserUpdateRequest(BaseModel):
 class BannerUpdateRequest(BaseModel):
     title: str = Field(min_length=2, max_length=120)
     body: str = Field(min_length=2, max_length=500)
-    image_url: str = Field(min_length=1, max_length=200000)
+    image_url: str = Field(min_length=1, max_length=3000000)
     link_url: str | None = Field(default=None, max_length=500)
     active: bool = True
 
@@ -768,6 +776,8 @@ class PermissionUpdateRequest(BaseModel):
 
 class AIModelUpdateRequest(BaseModel):
     selected_model: str = Field(min_length=2, max_length=120)
+    options: list[AIModelOptionOut] | None = None
+    use_case_bindings: dict[str, str] | None = None
 
 
 class CountrySalesMappingOut(BaseModel):

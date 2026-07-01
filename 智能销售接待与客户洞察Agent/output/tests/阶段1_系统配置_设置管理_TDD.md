@@ -30,4 +30,4 @@
 - `PAGE-SETTINGS-07` 映射为 `test_settings_publish_banner_accepts_recommended_large_data_url`，并由前端 `GlobalBanner` 组件检查兜底：普通 Banner 不渲染“全局公告/查看详情”。
 - `PAGE-SETTINGS-08` 映射为 `test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_regeneration`：断言可新增模型选项、保存邮件草稿/客户背景调研绑定，并在再营销重生成时写入绑定模型供应商和版本。
 - `PAGE-SETTINGS-09` 映射到前端构建与页面检查：`ProductKnowledgePage` 头部提供返回设置中心入口。
-- 当前门禁：设置管理专项 `py -m pytest .\tests -q -k settings` 为 5 passed；前端 `npm.cmd run build` 通过；Playwright 验证真实读写和控制台通过。
+- 当前门禁：设置管理专项 `py -m pytest .\tests -q -k settings` 为 12 passed；后端全量 `py -m pytest .\tests -q` 为 99 passed；前端 `npm.cmd run build` 通过；保留既有 deprecation warnings 和 Vite chunk size warning。

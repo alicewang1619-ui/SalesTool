@@ -15,8 +15,9 @@ import {
   Typography
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { BookOpen, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BookOpen, RefreshCw, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   fetchProductKnowledge,
   fetchProductKnowledgeContext,
@@ -48,6 +49,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export function ProductKnowledgePage() {
+  const navigate = useNavigate();
   const [form] = Form.useForm<ProductKnowledgeFormValues>();
   const [data, setData] = useState<ProductKnowledgePageResult | null>(null);
   const [context, setContext] = useState<ProductKnowledgeContext | null>(null);
@@ -187,6 +189,9 @@ export function ProductKnowledgePage() {
           </Typography.Paragraph>
         </div>
         <Space wrap>
+          <Button icon={<ArrowLeft size={16} />} onClick={() => navigate("/admin/settings?section=ai-model")}>
+            返回设置中心
+          </Button>
           <Button icon={<RefreshCw size={16} />} onClick={() => void load()}>
             刷新
           </Button>

@@ -20,7 +20,7 @@ import {
   Typography,
   Upload
 } from "antd";
-import { FileUp, History, ImageUp, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { FileUp, ImageUp, Plus, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -31,6 +31,7 @@ import {
   updateSettingsBanner,
   updateSettingsPermissions,
   type AIModelConfig,
+  type AIModelOption,
   type SalesUser,
   type SettingsOverview
 } from "../api";
@@ -116,13 +117,66 @@ const fallbackAIModelConfig: AIModelConfig = {
       scenario: "复杂客户背景调查、长邮件草稿和高价值客户触达",
       capability: "推理更强，成本和耗时更高",
       status: "available"
+    },
+    {
+      value: "claude-sonnet",
+      label: "Claude Sonnet",
+      provider: "Anthropic",
+      scenario: "邮件草稿和高价值客户触达",
+      capability: "长文本写作、语气控制和复杂客户沟通",
+      status: "available"
+    },
+    {
+      value: "codex",
+      label: "Codex",
+      provider: "OpenAI",
+      scenario: "AI 接待流程、结构化推理和内部工作流辅助",
+      capability: "适合拆解流程、生成结构化摘要和工具化任务",
+      status: "available"
+    },
+    {
+      value: "deepseek-chat",
+      label: "DeepSeek Chat",
+      provider: "DeepSeek",
+      scenario: "客户背景调研、中文资料整理和批量摘要",
+      capability: "适合低成本批量分析和多语言背景摘要",
+      status: "available"
     }
   ],
+  use_cases: [
+    {
+      key: "default",
+      label: "AI 接待与线索摘要",
+      description: "用于官网接待、线索摘要、评分和通用 AI 辅助。"
+    },
+    {
+      key: "email_draft",
+      label: "邮件草稿",
+      description: "用于再营销邮件草稿、触达理由和发送前人工确认内容。"
+    },
+    {
+      key: "customer_research",
+      label: "客户背景调研",
+      description: "用于客户背景调查、公开资料摘要和客户画像补全。"
+    }
+  ],
+  use_case_bindings: {
+    default: "ug-balanced-v1",
+    email_draft: "claude-sonnet",
+    customer_research: "deepseek-chat"
+  },
   updated_by: null,
   updated_at: null
 };
 
 type TraceableError = Error & { traceId?: string };
+
+type BannerImageMeta = {
+  width: number;
+  height: number;
+  originalSize: number;
+  compressedSize: number;
+};
 
 type AccountFormValues = {
   name: string;
@@ -133,42 +187,119 @@ type AccountFormValues = {
   enabled: boolean;
 };
 
+type AIModelFormValues = {
+  provider: string;
+  label: string;
+  value?: string;
+  scenario: string;
+  capability: string;
+};
+
 function asTraceableError(error: unknown): TraceableError {
   if (error instanceof Error) return error as TraceableError;
   return new Error("设置管理加载失败");
 }
 
-function fileToDataUrl(file: File): Promise<string> {
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function normaliseAIModelConfig(config?: Partial<AIModelConfig> | null): AIModelConfig {
+  return {
+    ...fallbackAIModelConfig,
+    ...config,
+    options: config?.options?.length ? config.options : fallbackAIModelConfig.options,
+    use_cases: config?.use_cases?.length ? config.use_cases : fallbackAIModelConfig.use_cases,
+    use_case_bindings: {
+      ...fallbackAIModelConfig.use_case_bindings,
+      ...(config?.use_case_bindings ?? {})
+    }
+  };
+}
+
+function modelValueFrom(provider: string, label: string) {
+  const source = `${provider}-${label}`.toLowerCase();
+  return source
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
+}
+
+function readBannerImage(file: File): Promise<{ url: string; meta: BannerImageMeta }> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("Banner 图片读取失败"));
-    reader.readAsDataURL(file);
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      reject(new Error("Banner 仅支持 PNG、JPG 或 WebP 图片"));
+      return;
+    }
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const targetWidth = 1920;
+      const targetHeight = 360;
+      const canvas = document.createElement("canvas");
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("浏览器无法处理 Banner 图片"));
+        return;
+      }
+      const sourceRatio = image.naturalWidth / image.naturalHeight;
+      const targetRatio = targetWidth / targetHeight;
+      const sourceWidth = sourceRatio > targetRatio ? image.naturalHeight * targetRatio : image.naturalWidth;
+      const sourceHeight = sourceRatio > targetRatio ? image.naturalHeight : image.naturalWidth / targetRatio;
+      const sourceX = (image.naturalWidth - sourceWidth) / 2;
+      const sourceY = (image.naturalHeight - sourceHeight) / 2;
+      context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+      const url = canvas.toDataURL("image/jpeg", 0.86);
+      URL.revokeObjectURL(objectUrl);
+      resolve({
+        url,
+        meta: {
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+          originalSize: file.size,
+          compressedSize: Math.round((url.length * 3) / 4)
+        }
+      });
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Banner 图片读取失败，请换一张 PNG/JPG/WebP"));
+    };
+    image.src = objectUrl;
   });
 }
 
 export function SettingsPage() {
   const [searchParams] = useSearchParams();
   const [accountForm] = Form.useForm<AccountFormValues>();
+  const [modelForm] = Form.useForm<AIModelFormValues>();
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
   const [activeMenu, setActiveMenu] = useState(sectionMenuMap[searchParams.get("section") ?? ""] ?? "overview");
   const [loading, setLoading] = useState(true);
   const [savingBanner, setSavingBanner] = useState(false);
   const [savingPermission, setSavingPermission] = useState(false);
   const [savingAIModel, setSavingAIModel] = useState(false);
+  const [savingModelOption, setSavingModelOption] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [modelModalOpen, setModelModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SalesUser | null>(null);
   const [selectedRole, setSelectedRole] = useState("ops");
   const [permissionValues, setPermissionValues] = useState<string[]>([]);
   const [aiModelDraft, setAIModelDraft] = useState("ug-balanced-v1");
+  const [aiModelBindings, setAIModelBindings] = useState<Record<string, string>>(fallbackAIModelConfig.use_case_bindings);
+  const [bannerImageMeta, setBannerImageMeta] = useState<BannerImageMeta | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<TraceableError | null>(null);
   const [bannerDraft, setBannerDraft] = useState({
     title: "",
     body: "",
     imageUrl: "",
-    linkUrl: "/admin/settings"
+    linkUrl: ""
   });
 
   async function load() {
@@ -181,14 +312,16 @@ export function SettingsPage() {
         title: result.banner.title,
         body: result.banner.body,
         imageUrl: result.banner.image_url,
-        linkUrl: result.banner.link_url ?? "/admin/settings"
+        linkUrl: result.banner.link_url ?? ""
       });
       const currentRole = result.permissions.find((row) => row.role === selectedRole) ?? result.permissions[0];
       if (currentRole) {
         setSelectedRole(currentRole.role);
         setPermissionValues(currentRole.permissions);
       }
-      setAIModelDraft((result.ai_model ?? fallbackAIModelConfig).selected_model);
+      const nextAIModelConfig = normaliseAIModelConfig(result.ai_model);
+      setAIModelDraft(nextAIModelConfig.selected_model);
+      setAIModelBindings(nextAIModelConfig.use_case_bindings);
     } catch (failure) {
       setError(asTraceableError(failure));
     } finally {
@@ -210,7 +343,7 @@ export function SettingsPage() {
   }, [searchParams, overview]);
 
   const currentPermission = useMemo(() => overview?.permissions.find((row) => row.role === selectedRole), [overview, selectedRole]);
-  const aiModelConfig = overview?.ai_model ?? fallbackAIModelConfig;
+  const aiModelConfig = normaliseAIModelConfig(overview?.ai_model);
   const selectedAIModel = useMemo(
     () => aiModelConfig.options.find((item) => item.value === aiModelDraft) ?? aiModelConfig.options[0],
     [aiModelConfig, aiModelDraft]
@@ -224,14 +357,17 @@ export function SettingsPage() {
     setSavingBanner(true);
     setError(null);
     try {
+      if (!bannerDraft.imageUrl) {
+        throw new Error("请先上传 Banner 图片，建议 1920×360，PNG/JPG/WebP，不超过 2MB。");
+      }
       await updateSettingsBanner({
         title: bannerDraft.title,
         body: bannerDraft.body,
         imageUrl: bannerDraft.imageUrl,
-        linkUrl: bannerDraft.linkUrl,
+        linkUrl: null,
         active: true
       });
-      setNotice("Banner 已发布到全部后台页面；普通页面不再显示管理入口。");
+      setNotice("Banner 已发布到全部后台页面；普通页面只显示图片、标题和正文。");
       await load();
     } catch (failure) {
       setError(asTraceableError(failure));
@@ -258,13 +394,44 @@ export function SettingsPage() {
     setSavingAIModel(true);
     setError(null);
     try {
-      const saved = await updateSettingsAIModel({ selectedModel: aiModelDraft });
-      setNotice(`大模型选择已保存：${saved.selected_label}`);
+      const bindings = { ...aiModelBindings, default: aiModelDraft };
+      const saved = await updateSettingsAIModel({ selectedModel: aiModelDraft, useCaseBindings: bindings });
+      setNotice(`大模型配置已保存：默认 ${saved.selected_label}，邮件草稿和客户背景调研按场景绑定执行`);
       await load();
     } catch (failure) {
       setError(asTraceableError(failure));
     } finally {
       setSavingAIModel(false);
+    }
+  }
+
+  async function addAIModelOption(values: AIModelFormValues) {
+    setSavingModelOption(true);
+    setError(null);
+    try {
+      const option: AIModelOption = {
+        value: (values.value?.trim() || modelValueFrom(values.provider, values.label)) || `model-${Date.now()}`,
+        label: values.label.trim(),
+        provider: values.provider.trim(),
+        scenario: values.scenario.trim(),
+        capability: values.capability.trim(),
+        status: "available"
+      };
+      const options = [...aiModelConfig.options.filter((item) => item.value !== option.value), option];
+      const saved = await updateSettingsAIModel({
+        selectedModel: aiModelDraft,
+        options,
+        useCaseBindings: { ...aiModelBindings, default: aiModelDraft }
+      });
+      setNotice(`已添加模型选项：${option.label}`);
+      setModelModalOpen(false);
+      modelForm.resetFields();
+      setAIModelBindings(saved.use_case_bindings);
+      await load();
+    } catch (failure) {
+      setError(asTraceableError(failure));
+    } finally {
+      setSavingModelOption(false);
     }
   }
 
@@ -368,24 +535,6 @@ export function SettingsPage() {
             这里集中维护账号、角色权限、全局 Banner、国家销售映射、产品知识库、来源字典、渠道和提醒规则。
           </Typography.Paragraph>
         </div>
-        <Space wrap>
-          <Button icon={<FileUp size={16} />} onClick={() => setActiveMenu("account")}>
-            导入账号
-          </Button>
-          <Button icon={<History size={16} />} onClick={() => setActiveMenu("audit")}>
-            配置审计
-          </Button>
-          <Button
-            type="primary"
-            icon={<UserPlus size={16} />}
-            onClick={() => {
-              setActiveMenu("account");
-              openCreateAccount();
-            }}
-          >
-            新增账号
-          </Button>
-        </Space>
       </div>
 
       {notice ? <Alert type="success" showIcon message={notice} closable onClose={() => setNotice(null)} /> : null}
@@ -449,7 +598,21 @@ export function SettingsPage() {
 
       {activeMenu === "account" ? (
         <>
-          <Card title="账号权限入口" className="settings-section" loading={loading}>
+          <Card
+            title="账号权限入口"
+            className="settings-section"
+            loading={loading}
+            extra={
+              <Space wrap>
+                <Button icon={<FileUp size={16} />} onClick={() => setNotice("账号批量导入将在账号管理内处理；当前可先用新增账号维护单个用户。")}>
+                  导入账号
+                </Button>
+                <Button type="primary" icon={<UserPlus size={16} />} onClick={openCreateAccount}>
+                  新增账号
+                </Button>
+              </Space>
+            }
+          >
             {entryCards("account")}
           </Card>
           <Row gutter={[16, 16]} className="summary-grid">
@@ -518,19 +681,35 @@ export function SettingsPage() {
           <Row gutter={[16, 16]}>
             <Col xs={24} md={11}>
               <Space direction="vertical" style={{ width: "100%" }}>
+                <Alert
+                  showIcon
+                  type="info"
+                  message="Banner 图片建议"
+                  description="推荐尺寸 1920×360，支持 PNG/JPG/WebP；建议原图不超过 2MB。上传后会自动裁切压缩为横幅比例，避免发布失败。"
+                />
                 <Upload
                   accept="image/png,image/jpeg,image/webp"
                   showUploadList={false}
                   beforeUpload={(file) => {
-                    void fileToDataUrl(file as File).then((url) => {
-                      setBannerDraft((current) => ({ ...current, imageUrl: url }));
-                      setNotice("Banner 图片已载入预览，发布后同步到全部页面");
-                    });
+                    void readBannerImage(file as File)
+                      .then(({ url, meta }) => {
+                        setBannerDraft((current) => ({ ...current, imageUrl: url }));
+                        setBannerImageMeta(meta);
+                        setNotice(
+                          `Banner 图片已载入预览：原图 ${meta.width}×${meta.height} / ${formatFileSize(meta.originalSize)}，压缩后约 ${formatFileSize(meta.compressedSize)}`
+                        );
+                      })
+                      .catch((failure) => setError(asTraceableError(failure)));
                     return false;
                   }}
                 >
                   <Button icon={<ImageUp size={16} />}>上传 Banner 图片</Button>
                 </Upload>
+                {bannerImageMeta ? (
+                  <Tag color="purple">
+                    原图 {bannerImageMeta.width}×{bannerImageMeta.height} · {formatFileSize(bannerImageMeta.originalSize)}，发布图 1920×360
+                  </Tag>
+                ) : null}
                 <Input
                   aria-label="Banner 标题"
                   value={bannerDraft.title}
@@ -541,11 +720,6 @@ export function SettingsPage() {
                   value={bannerDraft.body}
                   autoSize={{ minRows: 3, maxRows: 5 }}
                   onChange={(event) => setBannerDraft((current) => ({ ...current, body: event.target.value }))}
-                />
-                <Input
-                  aria-label="Banner 跳转链接"
-                  value={bannerDraft.linkUrl}
-                  onChange={(event) => setBannerDraft((current) => ({ ...current, linkUrl: event.target.value }))}
                 />
                 <Button type="primary" icon={<Save size={16} />} loading={savingBanner} onClick={() => void publishBanner()}>
                   发布到全部页面
@@ -603,14 +777,14 @@ export function SettingsPage() {
 
       {activeMenu === "ai" ? (
         <Row gutter={[16, 16]} className="summary-grid">
-          <Col xs={24} xl={10}>
+          <Col xs={24} xl={9}>
             <Card
               id="ai-model"
-              title="大模型选择"
+              title="默认大模型"
               loading={loading}
               extra={
                 <Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>
-                  保存模型
+                  保存配置
                 </Button>
               }
             >
@@ -618,7 +792,10 @@ export function SettingsPage() {
                 <Select
                   value={aiModelDraft}
                   options={aiModelConfig.options.map((item) => ({ value: item.value, label: item.label }))}
-                  onChange={setAIModelDraft}
+                  onChange={(value) => {
+                    setAIModelDraft(value);
+                    setAIModelBindings((current) => ({ ...current, default: value }));
+                  }}
                 />
                 <Alert
                   showIcon
@@ -630,7 +807,54 @@ export function SettingsPage() {
               </Space>
             </Card>
           </Col>
-          <Col xs={24} xl={14}>
+          <Col xs={24} xl={15}>
+            <Card
+              title="模型场景绑定"
+              loading={loading}
+              extra={
+                <Button icon={<Plus size={16} />} onClick={() => setModelModalOpen(true)}>
+                  添加模型选项
+                </Button>
+              }
+            >
+              <Row gutter={[12, 12]}>
+                {aiModelConfig.use_cases
+                  .filter((useCase) => useCase.key !== "default")
+                  .map((useCase) => (
+                    <Col xs={24} md={12} key={useCase.key}>
+                      <Card size="small" className="settings-entry-card">
+                        <Space direction="vertical" style={{ width: "100%" }}>
+                          <Typography.Text strong>{useCase.label}</Typography.Text>
+                          <Typography.Text className="muted">{useCase.description}</Typography.Text>
+                          <Select
+                            value={aiModelBindings[useCase.key] ?? aiModelConfig.use_case_bindings[useCase.key] ?? aiModelDraft}
+                            options={aiModelConfig.options.map((item) => ({ value: item.value, label: `${item.label} · ${item.provider}` }))}
+                            onChange={(value) => setAIModelBindings((current) => ({ ...current, [useCase.key]: value }))}
+                          />
+                        </Space>
+                      </Card>
+                    </Col>
+                  ))}
+              </Row>
+            </Card>
+          </Col>
+          <Col xs={24} xl={15}>
+            <Card title="模型库" loading={loading}>
+              <Table<AIModelOption>
+                rowKey="value"
+                dataSource={aiModelConfig.options}
+                pagination={false}
+                columns={[
+                  { title: "模型", dataIndex: "label" },
+                  { title: "供应商", dataIndex: "provider" },
+                  { title: "适用场景", dataIndex: "scenario" },
+                  { title: "能力说明", dataIndex: "capability" },
+                  { title: "状态", dataIndex: "status", render: (statusValue: string) => <Tag color={statusValue === "available" ? "green" : "default"}>{statusValue}</Tag> }
+                ]}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} xl={9}>
             <Card title="产品与 AI 配置入口" loading={loading}>
               {entryCards("ai")}
             </Card>
@@ -678,6 +902,34 @@ export function SettingsPage() {
           </Col>
         </Row>
       ) : null}
+
+      <Modal
+        open={modelModalOpen}
+        title="添加大模型选项"
+        okText="保存模型选项"
+        cancelText="取消"
+        confirmLoading={savingModelOption}
+        onCancel={() => setModelModalOpen(false)}
+        onOk={() => modelForm.submit()}
+      >
+        <Form form={modelForm} layout="vertical" onFinish={(values) => void addAIModelOption(values)}>
+          <Form.Item name="provider" label="模型供应商" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 Anthropic / OpenAI / DeepSeek" />
+          </Form.Item>
+          <Form.Item name="label" label="显示名称" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 Claude Sonnet / Codex / DeepSeek Chat" />
+          </Form.Item>
+          <Form.Item name="value" label="模型标识">
+            <Input placeholder="可留空，系统会按供应商和名称生成" />
+          </Form.Item>
+          <Form.Item name="scenario" label="适用场景" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 邮件草稿 / 客户背景调研 / AI 接待" />
+          </Form.Item>
+          <Form.Item name="capability" label="能力说明" rules={[{ required: true, min: 2 }]}>
+            <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="说明为什么选择这个模型，以及适合哪类任务" />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         open={accountModalOpen}

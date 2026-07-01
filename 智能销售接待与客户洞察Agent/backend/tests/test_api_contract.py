@@ -70,9 +70,12 @@ def client() -> TestClient:
             "Clinica Andes",
             "Customer Empty Probe",
         ]
+        auto_assigned_customer_ids = [
+            item.id for item in db.query(Customer).filter(Customer.name.like("Auto Assigned Peru %")).all()
+        ]
         test_customer_ids = [
             item.id for item in db.query(Customer).filter(Customer.name.in_(test_customer_names)).all()
-        ]
+        ] + auto_assigned_customer_ids
         if test_customer_ids:
             db.query(CustomerBackground).filter(CustomerBackground.customer_id.in_(test_customer_ids)).delete(synchronize_session=False)
             db.query(Customer).filter(Customer.id.in_(test_customer_ids)).delete(synchronize_session=False)
@@ -81,6 +84,7 @@ def client() -> TestClient:
                 ["Clinica Shanghai", "重复客户", "Excel Clinic", "Clinica Browser Check", "Clinica Andes Pending"]
             )
         ).delete(synchronize_session=False)
+        db.query(Lead).filter(Lead.customer_name.like("Auto Assigned Peru %")).delete(synchronize_session=False)
         disabled = db.query(SourceDictionary).filter(SourceDictionary.category == "停用来源", SourceDictionary.label == "旧展会").first()
         if not disabled:
             db.add(SourceDictionary(category="停用来源", label="旧展会", enabled=False))
@@ -1650,6 +1654,27 @@ def test_settings_publish_banner_updates_global_banner_and_audit(client: TestCli
     )
 
 
+def test_settings_publish_banner_accepts_recommended_large_data_url(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-banner-large-test"}
+    image_url = "data:image/jpeg;base64," + ("a" * 260_000)
+
+    response = client.put(
+        "/api/settings/banner",
+        json={
+            "title": "CHISON GEO",
+            "body": "New distributor onboarding policy is available.",
+            "image_url": image_url,
+            "link_url": None,
+            "active": True,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_url"] == image_url
+    assert client.get("/api/banner").json()["image_url"] == image_url
+
+
 def test_settings_save_permission_matrix_records_audit(client: TestClient) -> None:
     headers = {**auth_headers(client), "x-trace-id": "settings-permission-test"}
     response = client.put(
@@ -1723,6 +1748,72 @@ def test_settings_ai_model_config_can_be_saved_and_audited(client: TestClient) -
     audit = client.get("/api/audit-logs", headers=headers).json()["items"]
     assert any(
         event["action"] == "settings_ai_model_updated" and event["trace_id"] == "settings-ai-model-test"
+        for event in audit
+    )
+
+
+def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_regeneration(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-ai-model-library-test"}
+    response = client.put(
+        "/api/settings/ai-model",
+        json={
+            "selected_model": "claude-sonnet",
+            "options": [
+                {
+                    "value": "claude-sonnet",
+                    "label": "Claude Sonnet",
+                    "provider": "Anthropic",
+                    "scenario": "邮件草稿和高价值客户触达",
+                    "capability": "长文本写作和复杂语气控制",
+                    "status": "available",
+                },
+                {
+                    "value": "codex",
+                    "label": "Codex",
+                    "provider": "OpenAI",
+                    "scenario": "结构化推理与内部工作流辅助",
+                    "capability": "适合流程拆解和工具调用",
+                    "status": "available",
+                },
+                {
+                    "value": "deepseek-chat",
+                    "label": "DeepSeek Chat",
+                    "provider": "DeepSeek",
+                    "scenario": "客户背景调研和中文资料整理",
+                    "capability": "适合背景摘要和低成本批量分析",
+                    "status": "available",
+                },
+            ],
+            "use_case_bindings": {
+                "default": "codex",
+                "email_draft": "claude-sonnet",
+                "customer_research": "deepseek-chat",
+            },
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["selected_model"] == "claude-sonnet"
+    assert body["use_case_bindings"]["email_draft"] == "claude-sonnet"
+    assert body["use_case_bindings"]["customer_research"] == "deepseek-chat"
+    assert {option["provider"] for option in body["options"]}.issuperset({"Anthropic", "OpenAI", "DeepSeek"})
+
+    task = client.get("/api/nurture-tasks", headers=headers).json()["items"][0]
+    regenerated = client.post(
+        f"/api/nurture-tasks/{task['id']}/regenerate",
+        json={"generation_prompt": "请用更正式的英文语气"},
+        headers=headers,
+    )
+
+    assert regenerated.status_code == 200
+    task_body = regenerated.json()
+    assert task_body["model_provider"] == "Anthropic"
+    assert task_body["model_version"] == "claude-sonnet"
+    audit = client.get("/api/audit-logs", headers=headers).json()["items"]
+    assert any(
+        event["action"] == "settings_ai_model_updated" and event["trace_id"] == "settings-ai-model-library-test"
         for event in audit
     )
 
@@ -2178,7 +2269,8 @@ def test_nurture_attachment_upload_validates_and_participates_in_regeneration(cl
     result = regenerated.json()
     assert "Portable-US-comparison.pdf" in result["prompt_context_snapshot"]["rendered_prompt"]
     assert "Portable-US-comparison.pdf" in result["draft_content"]
-    assert result["model_provider"] == "ultrasound_growth_llm"
+    assert result["model_provider"] == "Anthropic"
+    assert result["model_version"] == "claude-sonnet"
     assert result["approval_status"] == "pending"
 
 

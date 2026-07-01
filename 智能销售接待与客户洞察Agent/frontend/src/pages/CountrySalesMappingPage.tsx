@@ -16,9 +16,9 @@ import {
   Typography
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { AlertTriangle, RefreshCw, Route, Save } from "lucide-react";
+import { AlertTriangle, ArrowLeft, RefreshCw, Route, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchCountrySalesMappings,
   saveCountrySalesMapping,
@@ -49,6 +49,7 @@ const riskLabel: Record<string, string> = {
 };
 
 export function CountrySalesMappingPage() {
+  const navigate = useNavigate();
   const [form] = Form.useForm<MappingFormValues>();
   const [searchParams] = useSearchParams();
   const pendingCountry = searchParams.get("pending_country") ?? "";
@@ -216,6 +217,9 @@ export function CountrySalesMappingPage() {
           </Typography.Paragraph>
         </div>
         <Space wrap>
+          <Button icon={<ArrowLeft size={16} />} onClick={() => navigate("/admin/settings?section=country-sales")}>
+            返回设置中心
+          </Button>
           <Button icon={<RefreshCw size={16} />} onClick={() => void load()}>
             刷新
           </Button>

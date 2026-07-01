@@ -546,3 +546,4 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 - [07-01-2026 19:21:14] 前端构建验证通过｜背景：完成设置页、导入页、工作台、线索池、Banner 和再营销草稿页面改动后，需要确认 TypeScript 与 Vite 构建。｜结论：frontend 目录执行 npm.cmd run build 通过；仅保留既有 Vite chunk size warning，无类型错误。｜来源：AI
 - [07-01-2026 19:21:57] 后端全量验证通过｜背景：配置接口、导入模板、渠道导入、邮件接口和设置保存契约已改动，需要确认全量 API 无回归。｜结论：backend 目录执行 py -m pytest .\tests -q 通过，结果 103 passed；仅保留既有 datetime.utcnow/on_event deprecation warnings。｜来源：AI
 - [07-01-2026 19:24:08] 本地预览验证完成｜背景：完成本轮统一返修后，用户要求提供可查看链接和管理员/销售账号。｜结论：已重启 127.0.0.1:8000 后端并确认 127.0.0.1:5173 前端返回 200；管理员 admin@ultrasound-growth.local / Admin123! 登录成功，销售 maria@ultrasound-growth.local / Sales123! 登录成功；设置概览、邮件配置字段、来源/渠道/提醒配置和导入模板下载响应均可访问。｜来源：AI
+- [07-01-2026 19:26:49] 本轮统一返修提交推送完成｜背景：设置、导入、Banner、筛选、邮件写手和后端配置接口已完成并通过验证，需要同步远端供后续继续。｜结论：已创建并推送 commit 05b4328f，提交信息为 完成反馈问题统一返修，远端 main 已从 15321afb 更新到 05b4328f。｜来源：AI

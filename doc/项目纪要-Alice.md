@@ -426,3 +426,5 @@
 - [07-01-2026 11:44:46] 客户态势验收文档同步完成｜背景：客户态势浏览器验收通过且客户详情加载态告警已修复，需要把最终事实写回文档真相源。｜结论：已同步客户态势 TDD 文档、技术方案验证表和客户详情页面文档；TDD/技术方案记录 Playwright 管理员访问、人工新增、状态筛选、跳转客户背景调查、API 200/201 和控制台 0 warning/error/pageerror；客户详情文档补充加载态只展示加载卡片、背景调查表单在数据返回后挂载。｜来源：AI
 - [07-01-2026 11:46:13] 客户态势本地门禁通过｜背景：客户态势生产化和文档同步完成后，需要复跑可执行门禁确认可提交。｜结论：客户态势专项 py -m pytest .\\tests -q -k customer_signal 为 4 passed、87 deselected；后端全量 py -m pytest .\\tests -q 为 91 passed；前端 
 pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HTML .html、onclick、	oast( 残留为 0；git diff --check 无空白错误，仅提示 Windows LF/CRLF 转换。｜来源：AI
+- [07-01-2026 11:47:36] 客户态势生产化本地提交完成｜背景：客户态势信号记录已通过本地门禁并完成文档同步，需要阶段性提交以便协作同步。｜结论：已创建本地提交 b20af034，提交信息为「完成客户态势信号记录生产化」，包含 CustomerSignal 后端模型/API、React 客户态势页、客户详情加载态修复、PRD/设计/页面/TDD/技术方案同步和 Playwright 验收截图。｜来源：AI
+- [07-01-2026 11:47:56] 客户态势生产化推送完成｜背景：本地提交 b20af034 已完成，需要按 Git 协作同步规则推送到用户指定 GitHub 仓库。｜结论：git push origin HEAD:main 成功，远端 https://github.com/chenguozeng-png/chisonshpx.git 的 main 分支已从 42df2502 更新到 b20af034；后续将把本条推送结果纪要再提交并推送，保持项目纪要完整。｜来源：AI

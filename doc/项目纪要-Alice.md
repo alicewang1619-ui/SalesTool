@@ -413,3 +413,4 @@
 - [07-01-2026 09:54:09] 配置 GitHub 远端并推送项目｜背景：用户要求“把我这个项目git到这个地址”，并提供 GitHub 仓库 `https://github.com/chenguozeng-png/chisonshpx.git`。｜结论：将当前工作区项目配置到该 GitHub 仓库作为远端并推送当前代码；若仓库没有远端则新增 `origin`，优先把当前 HEAD 推送到远端 `main` 分支，保留本地历史，不使用 force-push。｜来源：用户
 - [07-01-2026 09:56:26] GitHub 首次推送被远端历史拒绝｜背景：已将 `origin` 配置为 `https://github.com/chenguozeng-png/chisonshpx.git` 并执行 `git push -u origin HEAD:main`。｜结论：推送被拒，原因是远端 `main` 已存在本地没有的提交；本轮不使用 force-push，改为先 fetch/合并远端历史，再正常推送。｜来源：AI
 - [07-01-2026 09:57:43] 合并 GitHub 远端初始内容｜背景：fetch 后确认远端 `main` 与本地无共同祖先，远端已有根目录 `p01.html` 至 `p11.html` 和 `方案PPT.pptx`。｜结论：使用 `git merge origin/main --allow-unrelated-histories` 合并远端初始内容，保留远端 PPT 文件且未发生冲突；继续在合并后正常 push，不使用 force-push。｜来源：AI
+- [07-01-2026 09:58:23] GitHub 推送完成｜背景：已合并远端初始内容并再次执行 `git push -u origin HEAD:main`。｜结论：项目已成功推送到 `https://github.com/chenguozeng-png/chisonshpx.git` 的 `main` 分支，本地 `master` 已设置跟踪 `origin/main`；后续仍需把本条推送完成纪要再提交并推送一次，确保远端纪要完整。｜来源：AI

@@ -1,0 +1,79 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>研发项目管理AI · P8</title><style>
+:root{
+  --bg:#0c1622; --bg2:#10202f; --panel:#13283b; --panel2:#173249;
+  --line:#23425c; --ink:#eaf2f8; --ink2:#9fb6c9; --muted:#6f8aa1;
+  --accent:#27c2c7; --accent2:#3b82f6; --danger:#ef5b6e; --warn:#f5b14c; --ok:#34d399;
+  --r:18px; --r2:12px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{margin:0;padding:0;background:var(--bg)}
+.stage{width:1920px;min-height:1080px;transform-origin:top left;background:
+  radial-gradient(1200px 700px at 78% -8%, rgba(39,194,199,.10), transparent 60%),
+  radial-gradient(1000px 600px at 0% 110%, rgba(59,130,246,.10), transparent 55%),
+  linear-gradient(180deg,var(--bg),var(--bg2));
+  color:var(--ink); font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+  position:relative; overflow:hidden; padding:96px 120px 110px;}
+.kicker{font-size:18px;letter-spacing:.32em;color:var(--accent);font-weight:700;text-transform:uppercase}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);margin-right:14px;vertical-align:middle}
+h1{font-size:84px;line-height:1.08;font-weight:800;letter-spacing:-1px}
+h2{font-size:60px;line-height:1.12;font-weight:800;letter-spacing:-.5px}
+.lead{font-size:30px;line-height:1.6;color:var(--ink2);font-weight:400}
+.big{font-size:120px;font-weight:900;line-height:1;letter-spacing:-2px}
+.accent{color:var(--accent)} .a2{color:var(--accent2)} .dg{color:var(--danger)} .wn{color:var(--warn)} .ok{color:var(--ok)}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:var(--r);padding:34px 36px}
+.grid{display:grid;gap:26px}
+.tag{display:inline-block;font-size:17px;color:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:8px 18px;background:rgba(255,255,255,.02)}
+.num{font-size:40px;font-weight:800;color:var(--accent)}
+.ct{font-size:26px;font-weight:800;margin-bottom:10px}
+.cb{font-size:21px;line-height:1.55;color:var(--ink2)}
+.nav{position:absolute;left:120px;right:120px;bottom:42px;display:flex;align-items:center;justify-content:space-between;font-size:18px;color:var(--muted)}
+.nav a{color:var(--ink2);text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:9px 18px;background:rgba(255,255,255,.02)}
+.nav .pg{letter-spacing:.2em}
+.brandline{position:absolute;left:0;top:0;height:6px;width:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.step{display:flex;align-items:center;gap:14px}
+.chip{font-size:20px;font-weight:700;color:var(--ink);background:rgba(39,194,199,.12);border:1px solid var(--line);border-radius:12px;padding:14px 18px;text-align:center}
+.arr{color:var(--accent);font-size:24px}
+table{width:100%;border-collapse:collapse;font-size:22px}
+th,td{text-align:left;padding:16px 18px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-size:17px;letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+td{color:var(--ink2)} td b{color:var(--ink)}
+
+
+</style></head><body>
+<div class="stage">
+<div class="brandline"></div>
+
+<div class="kicker">技术方案 ① · 架构与数据模型</div>
+<h2 style="margin:24px 0 30px">够用、可控、合规优先</h2>
+<div class="grid" style="grid-template-columns:1.05fr 1fr">
+  <div class="card"><div class="ct">架构选型</div>
+    <div class="cb" style="line-height:1.9">
+    · <b>Web 单体（modular monolith）</b>＋ SPA，内网部署<br>
+    · <b>PostgreSQL</b>：强约束 + 事务，扛 DHF 合规正确性<br>
+    · 百人级并发非瓶颈，真问题是 2–3 年长周期数据累积<br>
+    · 模块边界划清，保留未来拆分与产品化期权</div></div>
+  <div class="card"><div class="ct">两个最难的数据结构</div>
+    <div class="cb" style="line-height:1.9">
+    · <b>依赖图</b>（DAG）→ 算关键路径、传播延误<br>
+    · <b>追溯矩阵</b>（多对多 + 版本基线）→ DHF 合规核心<br>
+    · 统一用 <b class="accent">闭包表 + 邻接表</b>：读高效、写直观、DAG 防环<br>
+    · 时间 UTC 存储、留痕 append-only 不可篡改</div></div>
+</div>
+<p class="lead" style="margin-top:34px">核心实体：项目 · 阶段门 · 任务 · 依赖 · 追溯关系 · 评审记录 · 成本 · 物料 · 变更留痕 · 角色权限(RBAC)</p>
+
+<div class="nav">
+  <span class="dot"></span><span>研发项目管理AI · 方案汇报</span>
+  <span style="flex:1"></span>
+  <a href="p07.html">← 上一页</a>
+  <span class="pg">08 / 11</span>
+  <a href="p09.html">下一页 →</a>
+</div>
+</div>
+<script>
+function fit(){var s=innerWidth/1920,st=document.querySelector('.stage');st.style.transform='scale('+s+')';document.body.style.height=(st.offsetHeight*s)+'px';}
+addEventListener('resize',fit);fit();
+addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key==='ArrowDown')location.href='p09.html';if(e.key==='ArrowLeft'||e.key==='ArrowUp')location.href='p07.html';});
+</script>
+</body></html>

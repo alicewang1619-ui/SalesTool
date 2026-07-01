@@ -576,6 +576,16 @@ export type AIModelUseCase = {
   description: string;
 };
 
+export type EmailWriterRole = {
+  key: string;
+  name: string;
+  display_name: string;
+  style: string;
+  skills: string[];
+  best_for: string;
+  status: string;
+};
+
 export type AIModelConfig = {
   selected_model: string;
   selected_label: string;
@@ -584,6 +594,8 @@ export type AIModelConfig = {
   options: AIModelOption[];
   use_cases: AIModelUseCase[];
   use_case_bindings: Record<string, string>;
+  email_writers: EmailWriterRole[];
+  default_email_writer: string;
   updated_by: number | null;
   updated_at: string | null;
 };
@@ -712,6 +724,9 @@ export type NurturePromptContext = {
   customer_note: string;
   sales_feedback: string[];
   recommended_next_action: string;
+  writer_role_name: string;
+  writer_role_style: string;
+  writer_role_skills: string[];
   attachments: NurtureAttachment[];
   rendered_prompt: string;
 };
@@ -735,6 +750,10 @@ export type NurtureTask = {
   attachments: NurtureAttachment[];
   model_provider: string;
   model_version: string;
+  writer_role_key: string;
+  writer_role_name: string;
+  writer_role_style: string;
+  writer_role_skills: string[];
   email_status: string;
   approval_status: "pending" | "confirmed" | "cancelled";
   detail_path: string;
@@ -1219,6 +1238,7 @@ export function updateNurtureTask(
     emailSubject?: string;
     draftContent: string;
     generationPrompt: string;
+    writerRoleKey?: string;
   }
 ): Promise<NurtureTask> {
   return request<NurtureTask>(`/api/nurture-tasks/${taskId}`, {
@@ -1229,7 +1249,8 @@ export function updateNurtureTask(
       nurture_reason: payload.nurtureReason,
       email_subject: payload.emailSubject ?? null,
       draft_content: payload.draftContent,
-      generation_prompt: payload.generationPrompt
+      generation_prompt: payload.generationPrompt,
+      writer_role_key: payload.writerRoleKey ?? null
     })
   });
 }
@@ -1240,10 +1261,10 @@ export function uploadNurtureAttachment(taskId: number, file: File): Promise<Nur
   return requestForm<NurtureTask>(`/api/nurture-tasks/${taskId}/attachments`, body);
 }
 
-export function regenerateNurtureTask(taskId: number, generationPrompt: string): Promise<NurtureTask> {
+export function regenerateNurtureTask(taskId: number, generationPrompt: string, writerRoleKey?: string): Promise<NurtureTask> {
   return request<NurtureTask>(`/api/nurture-tasks/${taskId}/regenerate`, {
     method: "POST",
-    body: JSON.stringify({ generation_prompt: generationPrompt })
+    body: JSON.stringify({ generation_prompt: generationPrompt, writer_role_key: writerRoleKey ?? null })
   });
 }
 
@@ -1458,14 +1479,24 @@ export function updateSettingsPermissions(payload: { role: string; permissions: 
 export function updateSettingsAIModel(payload: {
   selectedModel: string;
   options?: AIModelOption[];
+  useCases?: AIModelUseCase[];
   useCaseBindings?: Record<string, string>;
+  emailWriters?: EmailWriterRole[];
+  defaultEmailWriter?: string;
 }): Promise<AIModelConfig> {
   return request<AIModelConfig>("/api/settings/ai-model", {
     method: "PUT",
     body: JSON.stringify({
       selected_model: payload.selectedModel,
       options: payload.options,
-      use_case_bindings: payload.useCaseBindings
+      use_cases: payload.useCases,
+      use_case_bindings: payload.useCaseBindings,
+      email_writers: payload.emailWriters,
+      default_email_writer: payload.defaultEmailWriter
     })
   });
+}
+
+export function fetchEmailWriterRoles(): Promise<{ default_email_writer: string; items: EmailWriterRole[] }> {
+  return request<{ default_email_writer: string; items: EmailWriterRole[] }>("/api/ai/email-writers");
 }

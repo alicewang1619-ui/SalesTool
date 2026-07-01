@@ -32,6 +32,8 @@ import {
   updateSettingsPermissions,
   type AIModelConfig,
   type AIModelOption,
+  type AIModelUseCase,
+  type EmailWriterRole,
   type SalesUser,
   type SettingsOverview
 } from "../api";
@@ -165,6 +167,63 @@ const fallbackAIModelConfig: AIModelConfig = {
     email_draft: "claude-sonnet",
     customer_research: "deepseek-chat"
   },
+  email_writers: [
+    {
+      key: "doraemon",
+      name: "Doraemon",
+      display_name: "哆啦A梦",
+      style: "温暖、可靠、什么都能帮你",
+      skills: ["万能助手", "日常回复", "客户维护"],
+      best_for: "万能助手、日常回复、客户维护",
+      status: "enabled"
+    },
+    {
+      key: "mario",
+      name: "Mario",
+      display_name: "超级马里奥",
+      style: "积极、行动派、有冲劲",
+      skills: ["销售跟进", "催单", "推动决策"],
+      best_for: "销售跟进、催单、推动决策",
+      status: "enabled"
+    },
+    {
+      key: "pikachu",
+      name: "Pikachu",
+      display_name: "皮卡丘",
+      style: "活泼、可爱、有亲和力",
+      skills: ["社媒互动", "年轻客户", "轻松话题"],
+      best_for: "社媒互动、年轻客户、轻松话题",
+      status: "enabled"
+    },
+    {
+      key: "totoro",
+      name: "Totoro",
+      display_name: "龙猫",
+      style: "温柔、治愈、让人安心",
+      skills: ["客户关怀", "节日问候", "暖心邮件"],
+      best_for: "客户关怀、节日问候、暖心邮件",
+      status: "enabled"
+    },
+    {
+      key: "baymax",
+      name: "Baymax",
+      display_name: "大白",
+      style: "稳重、专业、可靠",
+      skills: ["正式邮件", "医疗客户", "技术沟通"],
+      best_for: "正式邮件、医疗客户、技术沟通",
+      status: "enabled"
+    },
+    {
+      key: "nemo",
+      name: "Nemo",
+      display_name: "海底总动员",
+      style: "好奇、探索、愿意沟通",
+      skills: ["陌生开发", "初次接触", "破冰邮件"],
+      best_for: "陌生开发、初次接触、破冰邮件",
+      status: "enabled"
+    }
+  ],
+  default_email_writer: "baymax",
   updated_by: null,
   updated_at: null
 };
@@ -195,6 +254,22 @@ type AIModelFormValues = {
   capability: string;
 };
 
+type AIModelUseCaseFormValues = {
+  key?: string;
+  label: string;
+  description: string;
+};
+
+type EmailWriterFormValues = {
+  key?: string;
+  name: string;
+  displayName: string;
+  style: string;
+  skills: string;
+  bestFor: string;
+  status: string;
+};
+
 function asTraceableError(error: unknown): TraceableError {
   if (error instanceof Error) return error as TraceableError;
   return new Error("设置管理加载失败");
@@ -214,7 +289,9 @@ function normaliseAIModelConfig(config?: Partial<AIModelConfig> | null): AIModel
     use_case_bindings: {
       ...fallbackAIModelConfig.use_case_bindings,
       ...(config?.use_case_bindings ?? {})
-    }
+    },
+    email_writers: config?.email_writers?.length ? config.email_writers : fallbackAIModelConfig.email_writers,
+    default_email_writer: config?.default_email_writer ?? fallbackAIModelConfig.default_email_writer
   };
 }
 
@@ -277,6 +354,8 @@ export function SettingsPage() {
   const [searchParams] = useSearchParams();
   const [accountForm] = Form.useForm<AccountFormValues>();
   const [modelForm] = Form.useForm<AIModelFormValues>();
+  const [scenarioForm] = Form.useForm<AIModelUseCaseFormValues>();
+  const [writerForm] = Form.useForm<EmailWriterFormValues>();
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
   const [activeMenu, setActiveMenu] = useState(sectionMenuMap[searchParams.get("section") ?? ""] ?? "overview");
   const [loading, setLoading] = useState(true);
@@ -284,14 +363,22 @@ export function SettingsPage() {
   const [savingPermission, setSavingPermission] = useState(false);
   const [savingAIModel, setSavingAIModel] = useState(false);
   const [savingModelOption, setSavingModelOption] = useState(false);
+  const [savingScenario, setSavingScenario] = useState(false);
+  const [savingWriterRole, setSavingWriterRole] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [modelModalOpen, setModelModalOpen] = useState(false);
+  const [scenarioModalOpen, setScenarioModalOpen] = useState(false);
+  const [writerModalOpen, setWriterModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SalesUser | null>(null);
+  const [editingWriter, setEditingWriter] = useState<EmailWriterRole | null>(null);
   const [selectedRole, setSelectedRole] = useState("ops");
   const [permissionValues, setPermissionValues] = useState<string[]>([]);
   const [aiModelDraft, setAIModelDraft] = useState("ug-balanced-v1");
+  const [aiModelUseCases, setAIModelUseCases] = useState<AIModelUseCase[]>(fallbackAIModelConfig.use_cases);
   const [aiModelBindings, setAIModelBindings] = useState<Record<string, string>>(fallbackAIModelConfig.use_case_bindings);
+  const [emailWriters, setEmailWriters] = useState<EmailWriterRole[]>(fallbackAIModelConfig.email_writers);
+  const [defaultEmailWriter, setDefaultEmailWriter] = useState(fallbackAIModelConfig.default_email_writer);
   const [bannerImageMeta, setBannerImageMeta] = useState<BannerImageMeta | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<TraceableError | null>(null);
@@ -321,7 +408,10 @@ export function SettingsPage() {
       }
       const nextAIModelConfig = normaliseAIModelConfig(result.ai_model);
       setAIModelDraft(nextAIModelConfig.selected_model);
+      setAIModelUseCases(nextAIModelConfig.use_cases);
       setAIModelBindings(nextAIModelConfig.use_case_bindings);
+      setEmailWriters(nextAIModelConfig.email_writers);
+      setDefaultEmailWriter(nextAIModelConfig.default_email_writer);
     } catch (failure) {
       setError(asTraceableError(failure));
     } finally {
@@ -347,6 +437,10 @@ export function SettingsPage() {
   const selectedAIModel = useMemo(
     () => aiModelConfig.options.find((item) => item.value === aiModelDraft) ?? aiModelConfig.options[0],
     [aiModelConfig, aiModelDraft]
+  );
+  const enabledEmailWriters = useMemo(
+    () => emailWriters.filter((writer) => writer.status === "enabled"),
+    [emailWriters]
   );
 
   useEffect(() => {
@@ -395,8 +489,14 @@ export function SettingsPage() {
     setError(null);
     try {
       const bindings = { ...aiModelBindings, default: aiModelDraft };
-      const saved = await updateSettingsAIModel({ selectedModel: aiModelDraft, useCaseBindings: bindings });
-      setNotice(`大模型配置已保存：默认 ${saved.selected_label}，邮件草稿和客户背景调研按场景绑定执行`);
+      const saved = await updateSettingsAIModel({
+        selectedModel: aiModelDraft,
+        useCases: aiModelUseCases,
+        useCaseBindings: bindings,
+        emailWriters,
+        defaultEmailWriter
+      });
+      setNotice(`AI 配置已保存：默认模型 ${saved.selected_label}，默认写手 ${saved.email_writers.find((writer) => writer.key === saved.default_email_writer)?.display_name ?? saved.default_email_writer}`);
       await load();
     } catch (failure) {
       setError(asTraceableError(failure));
@@ -421,7 +521,10 @@ export function SettingsPage() {
       const saved = await updateSettingsAIModel({
         selectedModel: aiModelDraft,
         options,
-        useCaseBindings: { ...aiModelBindings, default: aiModelDraft }
+        useCases: aiModelUseCases,
+        useCaseBindings: { ...aiModelBindings, default: aiModelDraft },
+        emailWriters,
+        defaultEmailWriter
       });
       setNotice(`已添加模型选项：${option.label}`);
       setModelModalOpen(false);
@@ -432,6 +535,96 @@ export function SettingsPage() {
       setError(asTraceableError(failure));
     } finally {
       setSavingModelOption(false);
+    }
+  }
+
+  async function addAIModelUseCase(values: AIModelUseCaseFormValues) {
+    setSavingScenario(true);
+    setError(null);
+    try {
+      const key = (values.key?.trim() || modelValueFrom("scenario", values.label)) || `scenario-${Date.now()}`;
+      const useCase: AIModelUseCase = {
+        key,
+        label: values.label.trim(),
+        description: values.description.trim()
+      };
+      const nextUseCases = [...aiModelUseCases.filter((item) => item.key !== useCase.key), useCase];
+      const nextBindings = { ...aiModelBindings, [useCase.key]: aiModelDraft, default: aiModelDraft };
+      const saved = await updateSettingsAIModel({
+        selectedModel: aiModelDraft,
+        useCases: nextUseCases,
+        useCaseBindings: nextBindings,
+        emailWriters,
+        defaultEmailWriter
+      });
+      setAIModelUseCases(saved.use_cases);
+      setAIModelBindings(saved.use_case_bindings);
+      setScenarioModalOpen(false);
+      scenarioForm.resetFields();
+      setNotice(`已添加模型场景：${useCase.label}`);
+      await load();
+    } catch (failure) {
+      setError(asTraceableError(failure));
+    } finally {
+      setSavingScenario(false);
+    }
+  }
+
+  function openCreateWriter() {
+    setEditingWriter(null);
+    writerForm.resetFields();
+    writerForm.setFieldsValue({ status: "enabled" });
+    setWriterModalOpen(true);
+  }
+
+  function openEditWriter(writer: EmailWriterRole) {
+    setEditingWriter(writer);
+    writerForm.setFieldsValue({
+      key: writer.key,
+      name: writer.name,
+      displayName: writer.display_name,
+      style: writer.style,
+      skills: writer.skills.join("、"),
+      bestFor: writer.best_for,
+      status: writer.status
+    });
+    setWriterModalOpen(true);
+  }
+
+  async function saveEmailWriterRole(values: EmailWriterFormValues) {
+    setSavingWriterRole(true);
+    setError(null);
+    try {
+      const key = (values.key?.trim() || editingWriter?.key || modelValueFrom("writer", values.name)) || `writer-${Date.now()}`;
+      const writer: EmailWriterRole = {
+        key,
+        name: values.name.trim(),
+        display_name: values.displayName.trim(),
+        style: values.style.trim(),
+        skills: values.skills.split(/[、,，\n]/).map((skill) => skill.trim()).filter(Boolean),
+        best_for: values.bestFor.trim(),
+        status: values.status
+      };
+      const nextWriters = [...emailWriters.filter((item) => item.key !== writer.key), writer];
+      const nextDefaultWriter = defaultEmailWriter || writer.key;
+      const saved = await updateSettingsAIModel({
+        selectedModel: aiModelDraft,
+        useCases: aiModelUseCases,
+        useCaseBindings: { ...aiModelBindings, default: aiModelDraft },
+        emailWriters: nextWriters,
+        defaultEmailWriter: nextDefaultWriter
+      });
+      setEmailWriters(saved.email_writers);
+      setDefaultEmailWriter(saved.default_email_writer);
+      setWriterModalOpen(false);
+      writerForm.resetFields();
+      setEditingWriter(null);
+      setNotice(`邮件写手角色已保存：${writer.display_name}`);
+      await load();
+    } catch (failure) {
+      setError(asTraceableError(failure));
+    } finally {
+      setSavingWriterRole(false);
     }
   }
 
@@ -598,26 +791,23 @@ export function SettingsPage() {
 
       {activeMenu === "account" ? (
         <>
-          <Card
-            title="账号权限入口"
-            className="settings-section"
-            loading={loading}
-            extra={
-              <Space wrap>
-                <Button icon={<FileUp size={16} />} onClick={() => setNotice("账号批量导入将在账号管理内处理；当前可先用新增账号维护单个用户。")}>
-                  导入账号
-                </Button>
-                <Button type="primary" icon={<UserPlus size={16} />} onClick={openCreateAccount}>
-                  新增账号
-                </Button>
-              </Space>
-            }
-          >
-            {entryCards("account")}
-          </Card>
           <Row gutter={[16, 16]} className="summary-grid">
             <Col xs={24} xl={14}>
-              <Card id="sales-users" title="销售账号" loading={loading}>
+              <Card
+                id="sales-users"
+                title="销售账号"
+                loading={loading}
+                extra={
+                  <Space wrap>
+                    <Button icon={<FileUp size={16} />} onClick={() => setNotice("账号批量导入将在账号管理内处理；当前可先用新增账号维护单个用户。")}>
+                      导入账号
+                    </Button>
+                    <Button type="primary" icon={<UserPlus size={16} />} onClick={openCreateAccount}>
+                      新增账号
+                    </Button>
+                  </Space>
+                }
+              >
                 <Table<SalesUser>
                   rowKey="id"
                   dataSource={overview?.sales_users ?? []}
@@ -780,7 +970,7 @@ export function SettingsPage() {
           <Col xs={24} xl={9}>
             <Card
               id="ai-model"
-              title="默认大模型"
+              title="选择大模型"
               loading={loading}
               extra={
                 <Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>
@@ -809,17 +999,21 @@ export function SettingsPage() {
           </Col>
           <Col xs={24} xl={15}>
             <Card
-              title="模型场景绑定"
+              title="模型场景配置"
               loading={loading}
               extra={
-                <Button icon={<Plus size={16} />} onClick={() => setModelModalOpen(true)}>
-                  添加模型选项
-                </Button>
+                <Space wrap>
+                  <Button icon={<Plus size={16} />} onClick={() => setScenarioModalOpen(true)}>
+                    添加场景
+                  </Button>
+                  <Button icon={<Plus size={16} />} onClick={() => setModelModalOpen(true)}>
+                    添加大模型
+                  </Button>
+                </Space>
               }
             >
               <Row gutter={[12, 12]}>
-                {aiModelConfig.use_cases
-                  .filter((useCase) => useCase.key !== "default")
+                {aiModelUseCases
                   .map((useCase) => (
                     <Col xs={24} md={12} key={useCase.key}>
                       <Card size="small" className="settings-entry-card">
@@ -839,7 +1033,7 @@ export function SettingsPage() {
             </Card>
           </Col>
           <Col xs={24} xl={15}>
-            <Card title="模型库" loading={loading}>
+            <Card title="可选大模型" loading={loading}>
               <Table<AIModelOption>
                 rowKey="value"
                 dataSource={aiModelConfig.options}
@@ -855,8 +1049,71 @@ export function SettingsPage() {
             </Card>
           </Col>
           <Col xs={24} xl={9}>
-            <Card title="产品与 AI 配置入口" loading={loading}>
-              {entryCards("ai")}
+            <Card title="产品知识入口" loading={loading}>
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Typography.Paragraph className="muted">
+                  产品知识库仍然放在这里，作为客户背景调查、邮件草稿和 AI 接待的参考资料。
+                </Typography.Paragraph>
+                <Link to="/admin/settings/product-knowledge">
+                  <Button>进入产品知识库</Button>
+                </Link>
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24}>
+            <Card
+              title="邮件写手角色"
+              loading={loading}
+              extra={
+                <Space wrap>
+                  <Select
+                    style={{ width: 180 }}
+                    value={defaultEmailWriter}
+                    options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))}
+                    onChange={setDefaultEmailWriter}
+                  />
+                  <Button icon={<Plus size={16} />} onClick={openCreateWriter}>
+                    添加写手角色
+                  </Button>
+                </Space>
+              }
+            >
+              <Table<EmailWriterRole>
+                rowKey="key"
+                dataSource={emailWriters}
+                pagination={false}
+                columns={[
+                  {
+                    title: "角色",
+                    render: (_, writer) => (
+                      <Space direction="vertical" size={0}>
+                        <Typography.Text strong>{writer.name}</Typography.Text>
+                        <Typography.Text className="muted">{writer.display_name}</Typography.Text>
+                      </Space>
+                    )
+                  },
+                  { title: "风格", dataIndex: "style" },
+                  {
+                    title: "技能",
+                    dataIndex: "skills",
+                    render: (skills: string[]) => (
+                      <Space wrap>
+                        {skills.map((skill) => <Tag key={skill} color="purple">{skill}</Tag>)}
+                      </Space>
+                    )
+                  },
+                  { title: "适用场景", dataIndex: "best_for" },
+                  { title: "状态", dataIndex: "status", render: (statusValue: string) => <Tag color={statusValue === "enabled" ? "green" : "default"}>{statusValue === "enabled" ? "启用" : "停用"}</Tag> },
+                  {
+                    title: "操作",
+                    render: (_, writer) => (
+                      <Button size="small" onClick={() => openEditWriter(writer)}>
+                        编辑
+                      </Button>
+                    )
+                  }
+                ]}
+              />
             </Card>
           </Col>
         </Row>
@@ -905,8 +1162,8 @@ export function SettingsPage() {
 
       <Modal
         open={modelModalOpen}
-        title="添加大模型选项"
-        okText="保存模型选项"
+        title="添加大模型"
+        okText="保存大模型"
         cancelText="取消"
         confirmLoading={savingModelOption}
         onCancel={() => setModelModalOpen(false)}
@@ -927,6 +1184,65 @@ export function SettingsPage() {
           </Form.Item>
           <Form.Item name="capability" label="能力说明" rules={[{ required: true, min: 2 }]}>
             <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="说明为什么选择这个模型，以及适合哪类任务" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={scenarioModalOpen}
+        title="添加模型场景"
+        okText="保存场景"
+        cancelText="取消"
+        confirmLoading={savingScenario}
+        onCancel={() => setScenarioModalOpen(false)}
+        onOk={() => scenarioForm.submit()}
+      >
+        <Form form={scenarioForm} layout="vertical" onFinish={(values) => void addAIModelUseCase(values)}>
+          <Form.Item name="label" label="场景名称" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 客户背景调查 / 邮件草稿写作 / 报价后跟进" />
+          </Form.Item>
+          <Form.Item name="key" label="场景标识">
+            <Input placeholder="可留空，系统按名称生成；例如 pricing_followup" />
+          </Form.Item>
+          <Form.Item name="description" label="场景说明" rules={[{ required: true, min: 2 }]}>
+            <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="说明这个场景会用大模型完成什么任务" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={writerModalOpen}
+        title={editingWriter ? "编辑邮件写手角色" : "添加邮件写手角色"}
+        okText="保存写手角色"
+        cancelText="取消"
+        confirmLoading={savingWriterRole}
+        onCancel={() => {
+          setWriterModalOpen(false);
+          setEditingWriter(null);
+        }}
+        onOk={() => writerForm.submit()}
+      >
+        <Form form={writerForm} layout="vertical" onFinish={(values) => void saveEmailWriterRole(values)}>
+          <Form.Item name="name" label="英文角色" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 Doraemon / Mario / Baymax" />
+          </Form.Item>
+          <Form.Item name="displayName" label="中文名" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 哆啦A梦 / 超级马里奥 / 大白" />
+          </Form.Item>
+          <Form.Item name="key" label="角色标识">
+            <Input disabled={Boolean(editingWriter)} placeholder="可留空，系统按英文角色生成" />
+          </Form.Item>
+          <Form.Item name="style" label="风格" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 稳重、专业、可靠" />
+          </Form.Item>
+          <Form.Item name="skills" label="技能" rules={[{ required: true, min: 2 }]}>
+            <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="用顿号、逗号或换行分隔，例如 正式邮件、医疗客户、技术沟通" />
+          </Form.Item>
+          <Form.Item name="bestFor" label="适用场景" rules={[{ required: true, min: 2 }]}>
+            <Input placeholder="例如 正式邮件、医疗客户、技术沟通" />
+          </Form.Item>
+          <Form.Item name="status" label="状态" initialValue="enabled" rules={[{ required: true }]}>
+            <Select options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} />
           </Form.Item>
         </Form>
       </Modal>

@@ -220,6 +220,7 @@ class NurtureTask(Base):
     attachment_refs: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     model_provider: Mapped[str] = mapped_column(String(80), nullable=False, default="ultrasound_growth_llm")
     model_version: Mapped[str] = mapped_column(String(80), nullable=False, default="nurture-draft-v1")
+    writer_role_key: Mapped[str] = mapped_column(String(80), nullable=False, default="baymax")
     email_status: Mapped[str] = mapped_column(String(40), nullable=False, default="draft")
     sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     approval_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")

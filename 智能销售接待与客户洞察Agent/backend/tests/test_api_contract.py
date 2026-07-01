@@ -1818,6 +1818,74 @@ def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_reg
     )
 
 
+def test_settings_ai_model_scenarios_and_email_writers_can_be_saved(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "settings-ai-writers-test"}
+
+    response = client.put(
+        "/api/settings/ai-model",
+        json={
+            "selected_model": "claude-sonnet",
+            "use_cases": [
+                {
+                    "key": "customer_research",
+                    "label": "客户背景调查",
+                    "description": "用于客户公开资料、邮箱域名和历史互动摘要。",
+                },
+                {
+                    "key": "email_draft",
+                    "label": "邮件草稿写作",
+                    "description": "用于按客户情况生成再营销邮件草稿。",
+                },
+                {
+                    "key": "pricing_followup",
+                    "label": "报价后跟进",
+                    "description": "用于报价后未回复客户的温和提醒。",
+                },
+            ],
+            "use_case_bindings": {
+                "customer_research": "deepseek-chat",
+                "email_draft": "claude-sonnet",
+                "pricing_followup": "codex",
+            },
+            "email_writers": [
+                {
+                    "key": "doraemon",
+                    "name": "Doraemon",
+                    "display_name": "哆啦A梦",
+                    "style": "温暖、可靠、什么都能帮你",
+                    "skills": ["万能助手", "日常回复", "客户维护"],
+                    "best_for": "万能助手、日常回复、客户维护",
+                    "status": "enabled",
+                },
+                {
+                    "key": "baymax",
+                    "name": "Baymax",
+                    "display_name": "大白",
+                    "style": "稳重、专业、可靠",
+                    "skills": ["正式邮件", "医疗客户", "技术沟通"],
+                    "best_for": "正式邮件、医疗客户、技术沟通",
+                    "status": "enabled",
+                },
+            ],
+            "default_email_writer": "baymax",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["use_case_bindings"]["pricing_followup"] == "codex"
+    assert any(use_case["key"] == "pricing_followup" for use_case in body["use_cases"])
+    baymax = next(writer for writer in body["email_writers"] if writer["key"] == "baymax")
+    assert baymax["style"] == "稳重、专业、可靠"
+    assert baymax["skills"] == ["正式邮件", "医疗客户", "技术沟通"]
+    assert body["default_email_writer"] == "baymax"
+
+    writers = client.get("/api/ai/email-writers", headers=headers)
+    assert writers.status_code == 200
+    assert any(writer["key"] == "doraemon" for writer in writers.json()["items"])
+
+
 def test_country_sales_mapping_overview_lists_rules_sales_and_pending(client: TestClient) -> None:
     response = client.get("/api/settings/country-sales", headers=auth_headers(client))
 
@@ -2272,6 +2340,70 @@ def test_nurture_attachment_upload_validates_and_participates_in_regeneration(cl
     assert result["model_provider"] == "Anthropic"
     assert result["model_version"] == "claude-sonnet"
     assert result["approval_status"] == "pending"
+
+
+def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "nurture-writer-test"}
+    client.put(
+        "/api/settings/ai-model",
+        json={
+            "selected_model": "claude-sonnet",
+            "use_case_bindings": {"email_draft": "claude-sonnet", "customer_research": "deepseek-chat"},
+            "email_writers": [
+                {
+                    "key": "mario",
+                    "name": "Mario",
+                    "display_name": "超级马里奥",
+                    "style": "积极、行动派、有冲劲",
+                    "skills": ["销售跟进", "催单", "推动决策"],
+                    "best_for": "销售跟进、催单、推动决策",
+                    "status": "enabled",
+                },
+                {
+                    "key": "baymax",
+                    "name": "Baymax",
+                    "display_name": "大白",
+                    "style": "稳重、专业、可靠",
+                    "skills": ["正式邮件", "医疗客户", "技术沟通"],
+                    "best_for": "正式邮件、医疗客户、技术沟通",
+                    "status": "enabled",
+                },
+            ],
+            "default_email_writer": "baymax",
+        },
+        headers=headers,
+    )
+    task = first_nurture_task(client, headers)
+
+    saved = client.put(
+        f"/api/nurture-tasks/{task['id']}",
+        json={
+            "recommended_next_action": "3 天内发送 Portable Ultrasound 对比资料并确认代理区域。",
+            "customer_note": "客户关注区域诊所部署，避免承诺价格。",
+            "nurture_reason": "客户已报价未回复且官网显示新增分部，需要温和跟进。",
+            "draft_content": "Hi Carlos, I can share a concise portable ultrasound comparison for your clinic network.",
+            "generation_prompt": "请积极推动客户确认下一步会议。",
+            "writer_role_key": "mario",
+        },
+        headers=headers,
+    )
+
+    assert saved.status_code == 200
+    assert saved.json()["writer_role_key"] == "mario"
+    regenerated = client.post(
+        f"/api/nurture-tasks/{task['id']}/regenerate",
+        json={"generation_prompt": "沿用当前写手角色，语气更积极。", "writer_role_key": "mario"},
+        headers=headers,
+    )
+
+    assert regenerated.status_code == 200
+    body = regenerated.json()
+    assert body["writer_role_key"] == "mario"
+    assert body["writer_role_name"] == "超级马里奥"
+    assert body["writer_role_style"] == "积极、行动派、有冲劲"
+    assert "推动决策" in body["writer_role_skills"]
+    assert "超级马里奥" in body["prompt_context_snapshot"]["rendered_prompt"]
+    assert "推动决策" in body["prompt_context_snapshot"]["rendered_prompt"]
 
 
 def test_nurture_confirm_send_is_manual_idempotent_and_audited(client: TestClient) -> None:

@@ -31,3 +31,16 @@
 - `PAGE-SETTINGS-08` 映射为 `test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_regeneration`：断言可新增模型选项、保存邮件草稿/客户背景调研绑定，并在再营销重生成时写入绑定模型供应商和版本。
 - `PAGE-SETTINGS-09` 映射到前端构建与页面检查：`ProductKnowledgePage` 头部提供返回设置中心入口。
 - 当前门禁：设置管理专项 `py -m pytest .\tests -q -k settings` 为 12 passed；后端全量 `py -m pytest .\tests -q` 为 99 passed；前端 `npm.cmd run build` 通过；保留既有 deprecation warnings 和 Vite chunk size warning。
+
+## 2026-07-01 追加验收：AI 场景与邮件写手
+
+| 编号 | 优先级 | 前置 | 操作 | 期望 |
+|---|---|---|---|---|
+| SETTINGS-AI-ROLE-01 | P0 | 管理员进入设置页 AI 与模型 | 新增大模型、添加“邮件草稿写作”之外的新场景并绑定模型 | 配置保存成功，场景和绑定从接口返回，不依赖前端写死 |
+| SETTINGS-AI-ROLE-02 | P0 | 管理员进入设置页 AI 与模型 | 新增或编辑邮件写手角色的风格和技能 | 保存成功，邮件写手列表返回 Doraemon、Mario、Pikachu、Totoro、Baymax、Nemo 及用户新增/修改项 |
+| SETTINGS-AI-ROLE-03 | P0 | 打开再营销草稿详情 | 选择邮件写手角色并重新生成草稿 | NurtureTask 保存 writer_role_key，prompt_context_snapshot 包含角色风格和技能 |
+
+### 追加验收结果
+- 后端新增契约：`test_settings_ai_model_scenarios_and_email_writers_can_be_saved` 已通过，覆盖新增场景、场景绑定、邮件写手角色和 `/api/ai/email-writers`。
+- 专项门禁：`py -m pytest .\tests -q -k "settings or nurture"` 为 19 passed、82 deselected。
+- 全量门禁：`py -m pytest .\tests -q` 为 101 passed；前端 `npm.cmd run build` 通过。

@@ -64,6 +64,8 @@ from .schemas import (
     DashboardTimelineItem,
     DashboardTodoOut,
     EmptyStateOut,
+    EmailWriterRoleOut,
+    EmailWriterRolePage,
     FeedbackCardOut,
     FeedbackLinkExpiredContextOut,
     FeedbackLinkResendOut,
@@ -268,6 +270,8 @@ def ensure_sqlite_compatibility() -> None:
                 connection.execute(text("ALTER TABLE nurture_tasks ADD COLUMN email_status VARCHAR(40) NOT NULL DEFAULT 'draft'"))
             if "sent_at" not in nurture_columns:
                 connection.execute(text("ALTER TABLE nurture_tasks ADD COLUMN sent_at DATETIME"))
+            if "writer_role_key" not in nurture_columns:
+                connection.execute(text("ALTER TABLE nurture_tasks ADD COLUMN writer_role_key VARCHAR(80) NOT NULL DEFAULT 'baymax'"))
     if "country_sales_mappings" in table_names:
         mapping_columns = {column["name"] for column in inspector.get_columns("country_sales_mappings")}
         if "region" not in mapping_columns:
@@ -2821,6 +2825,7 @@ def build_nurture_context(db: Session, task: NurtureTask) -> NurturePromptContex
     background = customer.background
     background_summary = background.manual_summary or background.auto_summary if background else ""
     attachments = nurture_attachments(task)
+    writer = email_writer_for_key(db, task.writer_role_key)
     sales_feedback = nurture_sales_feedback(db, customer)
     customer_summary = f"{customer.name} / {customer.country} / {customer.customer_type} / {customer.product} / {customer.tier}"
     attachment_lines = "\n".join(f"- {item.filename} ({item.content_type}, {item.size} bytes)" for item in attachments) or "- 无附件"
@@ -2832,6 +2837,9 @@ def build_nurture_context(db: Session, task: NurtureTask) -> NurturePromptContex
             f"Customer background: {background_summary}",
             f"Customer note: {task.customer_note}",
             f"Recommended next action: {task.recommended_next_action}",
+            f"Email writer role: {writer.display_name} ({writer.name})",
+            f"Writer style: {writer.style}",
+            f"Writer skills: {'、'.join(writer.skills)}",
             "Sales feedback:",
             *[f"- {line}" for line in sales_feedback],
             "Attachments:",
@@ -2847,6 +2855,9 @@ def build_nurture_context(db: Session, task: NurtureTask) -> NurturePromptContex
         customer_note=task.customer_note,
         sales_feedback=sales_feedback,
         recommended_next_action=task.recommended_next_action,
+        writer_role_name=writer.display_name,
+        writer_role_style=writer.style,
+        writer_role_skills=writer.skills,
         attachments=attachments,
         rendered_prompt=rendered_prompt,
     )
@@ -2870,6 +2881,7 @@ def nurture_task_out(db: Session, task: NurtureTask, user: User | None = None) -
     hydrate_customer_basics(db, customer)
     owner = db.get(User, customer.owner_id) if customer.owner_id else None
     context = nurture_context_from_snapshot(db, task)
+    writer = email_writer_for_key(db, task.writer_role_key)
     actor = user or owner
     sender = email_settings_for_user(db, actor) if actor else {"sender_email": "noreply@ultrasound-growth.local"}
     subject = task.email_subject or f"Follow-up for {customer.product}"
@@ -2892,6 +2904,10 @@ def nurture_task_out(db: Session, task: NurtureTask, user: User | None = None) -
         attachments=context.attachments,
         model_provider=task.model_provider,
         model_version=task.model_version,
+        writer_role_key=writer.key,
+        writer_role_name=writer.display_name,
+        writer_role_style=writer.style,
+        writer_role_skills=writer.skills,
         email_status=task.email_status,
         approval_status=task.approval_status,
         detail_path=f"/admin/nurture/{task.id}",
@@ -2987,6 +3003,8 @@ def update_nurture_task(
         task.email_subject = payload.email_subject
     task.draft_content = payload.draft_content
     task.generation_prompt = payload.generation_prompt
+    if payload.writer_role_key is not None:
+        task.writer_role_key = validate_email_writer_key(db, payload.writer_role_key)
     task.approval_status = "pending"
     task.updated_by = user.id
     task.prompt_context_snapshot = build_nurture_context(db, task).model_dump_json()
@@ -3064,11 +3082,14 @@ def regenerate_nurture_draft(
     require_nurture_scope(db, request, user, task)
     if payload.generation_prompt:
         task.generation_prompt = payload.generation_prompt
+    if payload.writer_role_key is not None:
+        task.writer_role_key = validate_email_writer_key(db, payload.writer_role_key)
     context = build_nurture_context(db, task)
     attachment_names = ", ".join(item.filename for item in context.attachments) or "no attachment"
     task.draft_content = (
         f"Hi {context.customer_summary.split(' / ')[0]}, based on your {task.recommended_next_action} "
-        f"we prepared a concise follow-up using {attachment_names}. "
+        f"{context.writer_role_name} will use a {context.writer_role_style} style with {', '.join(context.writer_role_skills)} skills, "
+        f"and we prepared a concise follow-up using {attachment_names}. "
         "Would it be useful if I send the comparison and confirm your priority application?"
     )
     task.prompt_context_snapshot = context.model_dump_json()
@@ -3241,7 +3262,7 @@ def settings_entries() -> list[SettingsEntryOut]:
         SettingsEntryOut(key="global_banner", title="全局 Banner", description="上传并发布全部后台页面顶部 Banner", path="/admin/settings?section=banner", status="ready"),
         SettingsEntryOut(key="country_sales_mapping", title="国家区域销售映射", description="维护国家、区域和销售负责人", path="/admin/settings/country-sales", status="warning", risk_count=1),
         SettingsEntryOut(key="product_knowledge", title="产品知识库", description="维护 ultrasound 产品与 AI 接待知识", path="/admin/settings/product-knowledge", status="ready"),
-        SettingsEntryOut(key="ai_model_selection", title="大模型选择", description="选择 AI 接待、摘要评分和再营销草稿默认模型", path="/admin/settings?section=ai-model", status="ready"),
+        SettingsEntryOut(key="ai_model_selection", title="AI 场景与邮件写手", description="维护大模型、使用场景和邮件写手角色", path="/admin/settings?section=ai-model", status="ready"),
         SettingsEntryOut(key="source_dictionary", title="客户来源字典", description="维护官网、邮箱、社媒和线下展会来源", path="/admin/settings?section=sources", status="ready"),
         SettingsEntryOut(key="channels", title="渠道配置", description="维护 Webhook、邮箱同步和展会导入", path="/admin/settings?section=channels", status="warning", risk_count=1),
         SettingsEntryOut(key="reminder_rules", title="提醒规则", description="维护 24h/48h 未反馈提醒策略", path="/admin/settings?section=reminders", status="ready"),
@@ -3322,10 +3343,62 @@ AI_MODEL_DEFAULT_BINDINGS = {
     "email_draft": "claude-sonnet",
     "customer_research": "deepseek-chat",
 }
-
-
-def ai_model_use_cases() -> list[AIModelUseCaseOut]:
-    return [AIModelUseCaseOut(**item) for item in AI_MODEL_USE_CASES]
+EMAIL_WRITER_DEFAULT_ROLES = [
+    {
+        "key": "doraemon",
+        "name": "Doraemon",
+        "display_name": "哆啦A梦",
+        "style": "温暖、可靠、什么都能帮你",
+        "skills": ["万能助手", "日常回复", "客户维护"],
+        "best_for": "万能助手、日常回复、客户维护",
+        "status": "enabled",
+    },
+    {
+        "key": "mario",
+        "name": "Mario",
+        "display_name": "超级马里奥",
+        "style": "积极、行动派、有冲劲",
+        "skills": ["销售跟进", "催单", "推动决策"],
+        "best_for": "销售跟进、催单、推动决策",
+        "status": "enabled",
+    },
+    {
+        "key": "pikachu",
+        "name": "Pikachu",
+        "display_name": "皮卡丘",
+        "style": "活泼、可爱、有亲和力",
+        "skills": ["社媒互动", "年轻客户", "轻松话题"],
+        "best_for": "社媒互动、年轻客户、轻松话题",
+        "status": "enabled",
+    },
+    {
+        "key": "totoro",
+        "name": "Totoro",
+        "display_name": "龙猫",
+        "style": "温柔、治愈、让人安心",
+        "skills": ["客户关怀", "节日问候", "暖心邮件"],
+        "best_for": "客户关怀、节日问候、暖心邮件",
+        "status": "enabled",
+    },
+    {
+        "key": "baymax",
+        "name": "Baymax",
+        "display_name": "大白",
+        "style": "稳重、专业、可靠",
+        "skills": ["正式邮件", "医疗客户", "技术沟通"],
+        "best_for": "正式邮件、医疗客户、技术沟通",
+        "status": "enabled",
+    },
+    {
+        "key": "nemo",
+        "name": "Nemo",
+        "display_name": "海底总动员",
+        "style": "好奇、探索、愿意沟通",
+        "skills": ["陌生开发", "初次接触", "破冰邮件"],
+        "best_for": "陌生开发、初次接触、破冰邮件",
+        "status": "enabled",
+    },
+]
 
 
 def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[dict[str, str]]:
@@ -3359,11 +3432,34 @@ def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[
     return list(options_by_value.values())
 
 
-def normalise_ai_model_bindings(raw_bindings: dict[str, str] | None, selected_model: str, options: list[dict[str, str]]) -> dict[str, str]:
+def normalise_ai_model_use_cases(raw_use_cases: list[object] | None = None) -> list[dict[str, str]]:
+    use_cases_by_key: dict[str, dict[str, str]] = {item["key"]: dict(item) for item in AI_MODEL_USE_CASES}
+    for raw in raw_use_cases or []:
+        if isinstance(raw, AIModelUseCaseOut):
+            item = raw.model_dump()
+        elif isinstance(raw, dict):
+            item = raw
+        else:
+            continue
+        key = str(item.get("key", "")).strip()
+        label = str(item.get("label", "")).strip()
+        description = str(item.get("description", "")).strip()
+        if not key or not label or not description:
+            continue
+        use_cases_by_key[key] = {"key": key, "label": label, "description": description}
+    return list(use_cases_by_key.values())
+
+
+def normalise_ai_model_bindings(
+    raw_bindings: dict[str, str] | None,
+    selected_model: str,
+    options: list[dict[str, str]],
+    use_cases: list[dict[str, str]],
+) -> dict[str, str]:
     option_values = {item["value"] for item in options}
     bindings = dict(AI_MODEL_DEFAULT_BINDINGS)
     bindings["default"] = selected_model if selected_model in option_values else AI_MODEL_DEFAULT_BINDINGS["default"]
-    for use_case in AI_MODEL_USE_CASES:
+    for use_case in use_cases:
         key = use_case["key"]
         candidate = raw_bindings.get(key) if raw_bindings else None
         if candidate in option_values:
@@ -3374,7 +3470,59 @@ def normalise_ai_model_bindings(raw_bindings: dict[str, str] | None, selected_mo
     return bindings
 
 
-def stored_ai_model_config(db: Session) -> tuple[str, list[dict[str, str]], dict[str, str], SystemSetting | None]:
+def normalise_email_writers(raw_writers: list[object] | None = None) -> list[dict[str, object]]:
+    writers_by_key: dict[str, dict[str, object]] = {
+        str(item["key"]): dict(item)
+        for item in EMAIL_WRITER_DEFAULT_ROLES
+    }
+    for raw in raw_writers or []:
+        if isinstance(raw, EmailWriterRoleOut):
+            item = raw.model_dump()
+        elif isinstance(raw, dict):
+            item = raw
+        else:
+            continue
+        key = str(item.get("key", "")).strip()
+        name = str(item.get("name", "")).strip()
+        display_name = str(item.get("display_name", "")).strip()
+        style = str(item.get("style", "")).strip()
+        raw_skills = item.get("skills") if isinstance(item.get("skills"), list) else []
+        skills = [str(skill).strip() for skill in raw_skills if str(skill).strip()]
+        best_for = str(item.get("best_for", "")).strip()
+        status_value = str(item.get("status", "enabled")).strip() or "enabled"
+        if not key or not name or not display_name or not style or not skills:
+            continue
+        writers_by_key[key] = {
+            "key": key,
+            "name": name,
+            "display_name": display_name,
+            "style": style,
+            "skills": skills,
+            "best_for": best_for or "、".join(skills),
+            "status": status_value,
+        }
+    return list(writers_by_key.values())
+
+
+def default_email_writer_key(raw_default: object, writers: list[dict[str, object]]) -> str:
+    enabled_keys = [str(item["key"]) for item in writers if str(item.get("status", "enabled")) == "enabled"]
+    candidate = str(raw_default).strip() if isinstance(raw_default, str) else ""
+    if candidate in enabled_keys:
+        return candidate
+    return "baymax" if "baymax" in enabled_keys else (enabled_keys[0] if enabled_keys else "baymax")
+
+
+def stored_ai_model_config(
+    db: Session,
+) -> tuple[
+    str,
+    list[dict[str, str]],
+    list[dict[str, str]],
+    dict[str, str],
+    list[dict[str, object]],
+    str,
+    SystemSetting | None,
+]:
     setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
     raw: dict[str, object] = {}
     if setting:
@@ -3390,9 +3538,14 @@ def stored_ai_model_config(db: Session) -> tuple[str, list[dict[str, str]], dict
     selected_model = raw.get("selected_model") if isinstance(raw.get("selected_model"), str) else "ug-balanced-v1"
     if selected_model not in option_values:
         selected_model = "ug-balanced-v1"
+    raw_use_cases = raw.get("use_cases") if isinstance(raw.get("use_cases"), list) else None
+    use_cases = normalise_ai_model_use_cases(raw_use_cases)
     raw_bindings = raw.get("use_case_bindings") if isinstance(raw.get("use_case_bindings"), dict) else None
-    bindings = normalise_ai_model_bindings(raw_bindings, selected_model, options)
-    return selected_model, options, bindings, setting
+    bindings = normalise_ai_model_bindings(raw_bindings, selected_model, options, use_cases)
+    raw_writers = raw.get("email_writers") if isinstance(raw.get("email_writers"), list) else None
+    writers = normalise_email_writers(raw_writers)
+    default_writer = default_email_writer_key(raw.get("default_email_writer"), writers)
+    return selected_model, options, use_cases, bindings, writers, default_writer, setting
 
 
 def ai_model_options() -> list[AIModelOptionOut]:
@@ -3400,7 +3553,7 @@ def ai_model_options() -> list[AIModelOptionOut]:
 
 
 def ai_model_config(db: Session) -> AIModelConfigOut:
-    selected_model, options, bindings, setting = stored_ai_model_config(db)
+    selected_model, options, use_cases, bindings, writers, default_writer, setting = stored_ai_model_config(db)
     option_map = {item["value"]: item for item in options}
     selected = option_map.get(selected_model, option_map["ug-balanced-v1"])
     return AIModelConfigOut(
@@ -3409,8 +3562,10 @@ def ai_model_config(db: Session) -> AIModelConfigOut:
         provider=selected["provider"],
         scenario=selected["scenario"],
         options=[AIModelOptionOut(**item) for item in options],
-        use_cases=ai_model_use_cases(),
+        use_cases=[AIModelUseCaseOut(**item) for item in use_cases],
         use_case_bindings=bindings,
+        email_writers=[EmailWriterRoleOut(**item) for item in writers],
+        default_email_writer=default_writer,
         updated_by=setting.updated_by if setting else None,
         updated_at=setting.updated_at if setting else None,
     )
@@ -3420,6 +3575,36 @@ def ai_model_for_use_case(db: Session, use_case: str) -> AIModelOptionOut:
     config = ai_model_config(db)
     model_value = config.use_case_bindings.get(use_case, config.selected_model)
     return next((item for item in config.options if item.value == model_value), config.options[0])
+
+
+def email_writer_roles(db: Session) -> tuple[list[EmailWriterRoleOut], str]:
+    config = ai_model_config(db)
+    return config.email_writers, config.default_email_writer
+
+
+def email_writer_for_key(db: Session, writer_key: str | None) -> EmailWriterRoleOut:
+    writers, default_writer = email_writer_roles(db)
+    key = writer_key or default_writer
+    enabled = [writer for writer in writers if writer.status == "enabled"]
+    return next((writer for writer in enabled if writer.key == key), next((writer for writer in enabled if writer.key == default_writer), enabled[0]))
+
+
+def validate_email_writer_key(db: Session, writer_key: str | None) -> str:
+    if not writer_key:
+        return email_writer_for_key(db, None).key
+    writer = email_writer_for_key(db, writer_key)
+    if writer.key != writer_key:
+        raise HTTPException(status_code=422, detail=error_detail("EMAIL_WRITER_UNSUPPORTED", "Selected email writer role is not available"))
+    return writer.key
+
+
+@app.get("/api/ai/email-writers", response_model=EmailWriterRolePage)
+def list_email_writer_roles(
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> EmailWriterRolePage:
+    writers, default_writer = email_writer_roles(db)
+    return EmailWriterRolePage(default_email_writer=default_writer, items=writers)
 
 
 def permission_rows(db: Session) -> list[SettingsPermissionOut]:
@@ -3864,6 +4049,8 @@ def update_settings_ai_model(
 ) -> AIModelConfigOut:
     current_config = ai_model_config(db)
     current_options = [item.model_dump() for item in current_config.options]
+    current_use_cases = [item.model_dump() for item in current_config.use_cases]
+    current_writers = [item.model_dump() for item in current_config.email_writers]
     options = normalise_ai_model_options(
         [item.model_dump() for item in payload.options]
         if payload.options is not None
@@ -3872,11 +4059,23 @@ def update_settings_ai_model(
     allowed_models = {item["value"] for item in options}
     if payload.selected_model not in allowed_models:
         raise HTTPException(status_code=422, detail=error_detail("AI_MODEL_UNSUPPORTED", "Selected AI model is not available"))
+    use_cases = normalise_ai_model_use_cases(
+        [item.model_dump() for item in payload.use_cases]
+        if payload.use_cases is not None
+        else current_use_cases
+    )
     bindings = normalise_ai_model_bindings(
         payload.use_case_bindings if payload.use_case_bindings is not None else current_config.use_case_bindings,
         payload.selected_model,
         options,
+        use_cases,
     )
+    writers = normalise_email_writers(
+        [item.model_dump() for item in payload.email_writers]
+        if payload.email_writers is not None
+        else current_writers
+    )
+    default_writer = default_email_writer_key(payload.default_email_writer or current_config.default_email_writer, writers)
     setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
     if not setting:
         setting = SystemSetting(key=AI_MODEL_SETTING_KEY, updated_by=user.id)
@@ -3885,7 +4084,10 @@ def update_settings_ai_model(
         {
             "selected_model": payload.selected_model,
             "options": options,
+            "use_cases": use_cases,
             "use_case_bindings": bindings,
+            "email_writers": writers,
+            "default_email_writer": default_writer,
         },
         ensure_ascii=False,
     )
@@ -3894,7 +4096,7 @@ def update_settings_ai_model(
         db,
         request.state.trace_id,
         "settings_ai_model_updated",
-        f"Settings AI model updated: {payload.selected_model}; bindings={bindings}",
+        f"Settings AI model updated: {payload.selected_model}; bindings={bindings}; default_writer={default_writer}",
         actor_id=user.id,
         target_type="settings",
     )

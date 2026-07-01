@@ -96,9 +96,7 @@
           <p class="muted">集中维护销售账号、角色权限、国家区域销售映射、产品知识库、渠道导入和提醒规则。</p>
         </div>
         <div class="actions">
-          <button class="btn" data-prototype-action="visual-only"><i class="ph ph-upload-simple"></i>导入账号</button>
-          <button class="btn" data-prototype-action="visual-only"><i class="ph ph-clock-counter-clockwise"></i>审计日志</button>
-          <button class="btn primary" data-prototype-action="visual-only"><i class="ph ph-user-plus"></i>新增销售</button>
+          <span class="pill accent">顶部菜单切换设置域，账号动作仅在账号权限区展示</span>
         </div>
       </div>
       <div data-toast class="toast"></div>
@@ -121,7 +119,7 @@
             <div>
               <div id="bannerPreview" class="global-banner" style="position:relative;margin:0;min-height:150px;border-radius:8px;overflow:hidden">
                 <div><strong>Ultrasound Growth 管理后台</strong><span>统一展示最新销售政策、渠道活动或系统公告。</span></div>
-                <a class="banner-action" href="/admin/settings">查看详情</a>
+                <span class="pill accent">Banner 预览</span>
               </div>
               <div class="filters" style="margin-top:12px">
                 <button class="btn" data-prototype-action="visual-only"><i class="ph ph-floppy-disk"></i>保存草稿</button>
@@ -156,6 +154,34 @@
           <a class="card link-card" href="/admin/settings/country-sales"><h3><i class="ph ph-map-trifold"></i> 销售分发</h3><p class="muted">国家、区域、销售负责人和待分配规则。</p><span class="pill warn">6 个国家缺负责人</span></a>
           <a class="card link-card" href="/admin/settings/product-knowledge"><h3><i class="ph ph-books"></i> 产品与 AI</h3><p class="muted">产品知识库、接待 Playbook、评分规则。</p><span class="pill ok">知识库已更新</span></a>
           <a class="card link-card" href="/admin/settings"><h3><i class="ph ph-plugs-connected"></i> 渠道与提醒</h3><p class="muted">Webhook、邮箱同步、展会导入和未反馈提醒。</p><span class="pill danger">1 个渠道异常</span></a>
+        </div>
+      </section>
+
+      <section class="section grid grid-3">
+        <div class="card">
+          <div class="section-head">
+            <div><h2>选择大模型</h2><p class="muted">可选择当前默认模型，也可新增 Claude、Codex、DeepSeek 等模型。</p></div>
+            <button class="btn" data-prototype-action="visual-only"><i class="ph ph-plus"></i>添加大模型</button>
+          </div>
+          <select><option>Claude Sonnet · Anthropic</option><option>Codex · OpenAI</option><option>DeepSeek Chat · DeepSeek</option></select>
+          <p><span class="pill ok">当前生效</span> 默认模型用于通用 AI 任务；具体场景可单独绑定。</p>
+        </div>
+        <div class="card">
+          <div class="section-head">
+            <div><h2>模型场景配置</h2><p class="muted">场景可新增，默认包含客户背景调查和邮件草稿写作。</p></div>
+            <button class="btn" data-prototype-action="visual-only"><i class="ph ph-plus"></i>添加场景</button>
+          </div>
+          <p><strong>客户背景调查</strong><br><span class="muted">绑定 DeepSeek Chat，用于公开资料摘要和客户画像补全。</span></p>
+          <p><strong>邮件草稿写作</strong><br><span class="muted">绑定 Claude Sonnet，用于再营销邮件草稿和语气控制。</span></p>
+        </div>
+        <div class="card">
+          <div class="section-head">
+            <div><h2>邮件写手角色</h2><p class="muted">写手风格和技能可配置，草稿详情页可按客户选择。</p></div>
+            <button class="btn" data-prototype-action="visual-only"><i class="ph ph-plus"></i>添加写手</button>
+          </div>
+          <p><span class="pill accent">Baymax · 大白</span> 稳重、专业、可靠；技能：正式邮件、医疗客户、技术沟通。</p>
+          <p><span class="pill accent">Mario · 超级马里奥</span> 积极、行动派、有冲劲；技能：销售跟进、催单、推动决策。</p>
+          <p><span class="pill accent">Doraemon · 哆啦A梦</span> 温暖、可靠、什么都能帮你；技能：万能助手、日常回复、客户维护。</p>
         </div>
       </section>
 

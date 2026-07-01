@@ -1,13 +1,15 @@
-import { Alert, Button, Card, Col, Descriptions, Form, Input, Modal, Row, Space, Tag, Typography, Upload, message } from "antd";
+import { Alert, Button, Card, Col, Descriptions, Form, Input, Modal, Row, Select, Space, Tag, Typography, Upload, message } from "antd";
 import { ArrowLeft, Mail, Paperclip, Save, Send, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   confirmNurtureTask,
+  fetchEmailWriterRoles,
   fetchNurtureTask,
   regenerateNurtureTask,
   updateNurtureTask,
   uploadNurtureAttachment,
+  type EmailWriterRole,
   type NurtureTask
 } from "../api";
 
@@ -18,6 +20,7 @@ type NurtureFormValues = {
   emailSubject: string;
   draftContent: string;
   generationPrompt: string;
+  writerRoleKey: string;
 };
 
 const emailStatusLabels: Record<string, string> = {
@@ -30,8 +33,15 @@ export function NurtureTaskDetailPage() {
   const { taskId = "" } = useParams();
   const [form] = Form.useForm<NurtureFormValues>();
   const [task, setTask] = useState<NurtureTask | null>(null);
+  const [writerRoles, setWriterRoles] = useState<EmailWriterRole[]>([]);
+  const [defaultWriterRole, setDefaultWriterRole] = useState("baymax");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const writerRoleKey = Form.useWatch("writerRoleKey", form);
+  const selectedWriter = useMemo(
+    () => writerRoles.find((writer) => writer.key === writerRoleKey) ?? writerRoles.find((writer) => writer.key === task?.writer_role_key),
+    [task?.writer_role_key, writerRoleKey, writerRoles]
+  );
 
   function fillForm(nextTask: NurtureTask) {
     setTask(nextTask);
@@ -41,7 +51,8 @@ export function NurtureTaskDetailPage() {
       nurtureReason: nextTask.nurture_reason,
       emailSubject: nextTask.email_subject,
       draftContent: nextTask.draft_content,
-      generationPrompt: nextTask.generation_prompt
+      generationPrompt: nextTask.generation_prompt,
+      writerRoleKey: nextTask.writer_role_key || defaultWriterRole
     });
   }
 
@@ -49,7 +60,13 @@ export function NurtureTaskDetailPage() {
     if (!taskId) return;
     setLoading(true);
     try {
-      fillForm(await fetchNurtureTask(taskId));
+      const [nextTask, writers] = await Promise.all([
+        fetchNurtureTask(taskId),
+        fetchEmailWriterRoles().catch(() => ({ default_email_writer: "baymax", items: [] }))
+      ]);
+      setWriterRoles(writers.items);
+      setDefaultWriterRole(writers.default_email_writer);
+      fillForm(nextTask);
     } finally {
       setLoading(false);
     }
@@ -72,10 +89,10 @@ export function NurtureTaskDetailPage() {
 
   async function handleRegenerate() {
     if (!task) return;
-    const values = await form.validateFields(["generationPrompt"]);
+    const values = await form.validateFields(["generationPrompt", "writerRoleKey"]);
     setSaving(true);
     try {
-      fillForm(await regenerateNurtureTask(task.id, values.generationPrompt ?? ""));
+      fillForm(await regenerateNurtureTask(task.id, values.generationPrompt ?? "", values.writerRoleKey));
       message.success("已结合提示词和参考附件重新生成草稿");
     } finally {
       setSaving(false);
@@ -207,6 +224,9 @@ export function NurtureTaskDetailPage() {
                   <Descriptions.Item label="模型">
                     {task.model_provider} / {task.model_version}
                   </Descriptions.Item>
+                  <Descriptions.Item label="写手">
+                    {task.writer_role_name} · {task.writer_role_style}
+                  </Descriptions.Item>
                 </Descriptions>
               ) : null}
               <Form.Item name="nurtureReason" label="触达理由" rules={[{ required: true, min: 5 }]}>
@@ -216,6 +236,24 @@ export function NurtureTaskDetailPage() {
           </Col>
           <Col xs={24} lg={14}>
             <Card title="再营销邮件正文" loading={loading}>
+              <Form.Item name="writerRoleKey" label="邮件写手角色" rules={[{ required: true }]}>
+                <Select
+                  options={writerRoles.map((writer) => ({
+                    value: writer.key,
+                    label: `${writer.name} · ${writer.display_name}`
+                  }))}
+                  placeholder="选择写邮件的人物风格"
+                />
+              </Form.Item>
+              {selectedWriter ? (
+                <Alert
+                  showIcon
+                  type="info"
+                  className="login-error"
+                  message={`${selectedWriter.display_name}：${selectedWriter.style}`}
+                  description={`技能：${selectedWriter.skills.join("、")}；适用：${selectedWriter.best_for}`}
+                />
+              ) : null}
               <Form.Item name="draftContent" label="正文" rules={[{ required: true, min: 10 }]}>
                 <Input.TextArea rows={8} />
               </Form.Item>

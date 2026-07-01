@@ -157,6 +157,14 @@ assigned -> no_feedback -> manager_attention
 | 未反馈提醒和日报 | 定时任务、消息/邮件通知、报表聚合 SQL、缓存表或报表快照 | 后台任务服务和报表模块 |
 | 客户池、客户详情和再营销草稿 | 客户状态机、任务队列、邮件模板、大模型草稿生成、提示词输入、附件素材解析、建议下一步动作生成、人工审批流、退订/合规标记 | 客户池只做客户管理列表；客户详情展示当前客户自己的 recommended_next_action 和邮件草稿入口；再营销待办/草稿详情负责邮件编辑、人工确认和发送，并把提示词、附件和模型版本写入 NurtureTask |
 
+## 2026-07-01 开发补充：AI 场景与邮件写手
+
+- `AIModelConfig` 需要支持 `options`、`use_cases`、`use_case_bindings`、`email_writers`、`default_email_writer`，其中 `use_cases` 和 `email_writers` 均允许管理员新增与编辑。
+- 默认场景至少包含 `customer_research`（客户背景调查）和 `email_draft`（邮件草稿写作）；前端设置页必须提供“添加场景”入口。
+- 邮件写手角色默认初始化 Doraemon、Mario、Pikachu、Totoro、Baymax、Nemo，每个角色保存英文标识、中文名、风格、技能数组、适用场景和启用状态。
+- 再营销任务增加 `writer_role_key`，草稿详情页可选择邮件写手角色；保存和重新生成都要持久化该选择，并把角色风格/技能写入 `prompt_context_snapshot`。
+- 设置页账号权限菜单移除顶部重复入口卡片，仅保留账号表、权限矩阵、导入账号和新增账号等真实操作。
+
 ## 6. 不做
 
 - 完整 CRM。

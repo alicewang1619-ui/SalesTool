@@ -594,6 +594,9 @@ class NurturePromptContextOut(BaseModel):
     customer_note: str
     sales_feedback: list[str]
     recommended_next_action: str
+    writer_role_name: str = ""
+    writer_role_style: str = ""
+    writer_role_skills: list[str] = Field(default_factory=list)
     attachments: list[NurtureAttachmentOut]
     rendered_prompt: str
 
@@ -617,6 +620,10 @@ class NurtureTaskOut(BaseModel):
     attachments: list[NurtureAttachmentOut]
     model_provider: str
     model_version: str
+    writer_role_key: str
+    writer_role_name: str
+    writer_role_style: str
+    writer_role_skills: list[str]
     email_status: str
     approval_status: str
     detail_path: str
@@ -640,10 +647,12 @@ class NurtureTaskUpdateRequest(BaseModel):
     email_subject: str | None = Field(default=None, max_length=255)
     draft_content: str = Field(min_length=10, max_length=8000)
     generation_prompt: str = Field(default="", max_length=4000)
+    writer_role_key: str | None = Field(default=None, min_length=2, max_length=80)
 
 
 class NurtureTaskRegenerateRequest(BaseModel):
     generation_prompt: str = Field(default="", max_length=4000)
+    writer_role_key: str | None = Field(default=None, min_length=2, max_length=80)
 
 
 class NurtureTaskConfirmRequest(BaseModel):
@@ -721,6 +730,16 @@ class AIModelUseCaseOut(BaseModel):
     description: str
 
 
+class EmailWriterRoleOut(BaseModel):
+    key: str
+    name: str
+    display_name: str
+    style: str
+    skills: list[str]
+    best_for: str
+    status: str
+
+
 class AIModelConfigOut(BaseModel):
     selected_model: str
     selected_label: str
@@ -729,8 +748,15 @@ class AIModelConfigOut(BaseModel):
     options: list[AIModelOptionOut]
     use_cases: list[AIModelUseCaseOut]
     use_case_bindings: dict[str, str]
+    email_writers: list[EmailWriterRoleOut]
+    default_email_writer: str
     updated_by: int | None = None
     updated_at: datetime | None = None
+
+
+class EmailWriterRolePage(BaseModel):
+    default_email_writer: str
+    items: list[EmailWriterRoleOut]
 
 
 class SettingsOverviewOut(BaseModel):
@@ -777,7 +803,10 @@ class PermissionUpdateRequest(BaseModel):
 class AIModelUpdateRequest(BaseModel):
     selected_model: str = Field(min_length=2, max_length=120)
     options: list[AIModelOptionOut] | None = None
+    use_cases: list[AIModelUseCaseOut] | None = None
     use_case_bindings: dict[str, str] | None = None
+    email_writers: list[EmailWriterRoleOut] | None = None
+    default_email_writer: str | None = Field(default=None, min_length=2, max_length=80)
 
 
 class CountrySalesMappingOut(BaseModel):

@@ -516,3 +516,5 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 - [07-01-2026 17:37:04] 默认线索客户自愈策略｜背景：全量测试发现本地持久化测试库可能已有用户但缺失 GlobalMed Peru 基础线索，seed_data 因用户已存在会提前返回，导致报表年度明细找不到基础客户。｜结论：新增默认 GlobalMed Peru / Al Noor Hospital 线索与 GlobalMed Peru 客户背景的幂等补齐逻辑，仅在记录缺失时创建，并在 startup 中早于再营销默认任务执行，保证演示数据和测试数据稳定。｜来源：AI
 
 - [07-01-2026 17:39:14] 设置页二次返修实现验证完成｜背景：完成 Banner 展示去噪、账号按钮归位、Banner 上传压缩和大图发布、模型库/场景绑定、配置子页返回、默认数据自愈和测试隔离后，需要跑门禁。｜结论：设置专项 py -m pytest .\tests -q -k settings 结果为 12 passed、87 deselected；后端全量 py -m pytest .\tests -q 结果为 99 passed；前端 npm.cmd run build 在 frontend 目录通过；静态检查确认 GlobalBanner 不再包含‘全局公告/查看详情’，/admin/settings 返回 200。｜来源：AI
+
+- [07-01-2026 17:39:35] 设置页二次返修实现提交推送完成｜背景：Banner 展示去噪、账号按钮归位、Banner 上传提示与压缩、模型库/场景绑定、配置子页返回、后端契约和测试均已完成并验证。｜结论：已创建并推送 commit 6e2daf52，提交信息为 完成设置页二次返修交互，远端 main 已更新；本条纪要随后单独提交保持记录完整。｜来源：AI

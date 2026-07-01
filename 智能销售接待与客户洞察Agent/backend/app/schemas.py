@@ -25,6 +25,8 @@ class BannerOut(BaseModel):
 class LeadOut(BaseModel):
     id: int
     customer_name: str
+    email: str = ""
+    organization: str = ""
     country: str
     customer_type: str
     product: str
@@ -32,6 +34,9 @@ class LeadOut(BaseModel):
     source_label: str
     score_label: str
     feedback_status: str
+    owner_id: int | None = None
+    owner_name: str = "未分配"
+    created_at: datetime | None = None
 
 
 class LeadProfileSummary(BaseModel):
@@ -172,6 +177,8 @@ class ImportJobOut(BaseModel):
     processed_rows: int
     success_rows: int
     failed_rows: int
+    auto_assigned_rows: int
+    pending_assignment_rows: int
     failures: list[ImportFailureOut]
 
 
@@ -196,6 +203,8 @@ class DashboardOut(BaseModel):
     page_size: int
     total: int
     metrics: DashboardMetrics
+    time_scope: dict[str, str | None] = Field(default_factory=dict)
+    metric_links: dict[str, str] = Field(default_factory=dict)
     ai_summary: str
     assignment_timeline: list[DashboardTimelineItem]
     items: list[DashboardTodoOut]
@@ -316,6 +325,8 @@ class ReportPeriodDownstreamOut(BaseModel):
 
 class ReportPeriodOut(BaseModel):
     period: str
+    period_label: str
+    period_granularity: str
     query_window: ReportQueryWindowOut
     filters: ReportPeriodFiltersOut
     limits: ReportLimitsOut
@@ -428,10 +439,15 @@ class CustomerBackgroundOut(BaseModel):
 class CustomerOut(BaseModel):
     id: int
     name: str
+    email: str
+    organization: str
     country: str
     customer_type: str
     product: str
     tier: str
+    demand_summary: str
+    source_summary: str
+    first_inquiry_at: datetime
     background: CustomerBackgroundOut
 
 
@@ -467,15 +483,20 @@ class CustomerDetailOut(CustomerOut):
     lead_history: list[CustomerLeadHistoryOut]
     feedback_records: list[CustomerFeedbackRecordOut]
     timeline: list[CustomerTimelineItemOut]
+    signals: list["CustomerSignalOut"] = Field(default_factory=list)
 
 
 class CustomerListItem(BaseModel):
     id: int
     name: str
+    email: str
+    organization: str
     country: str
     customer_type: str
     product: str
     tier: str
+    first_inquiry_at: datetime
+    source_summary: str
     owner_id: int | None
     owner_name: str
     background_summary: str
@@ -587,12 +608,16 @@ class NurtureTaskOut(BaseModel):
     recommended_next_action: str
     customer_note: str
     nurture_reason: str
+    sender_email: str
+    recipient_email: str
+    email_subject: str
     draft_content: str
     generation_prompt: str
     prompt_context_snapshot: NurturePromptContextOut
     attachments: list[NurtureAttachmentOut]
     model_provider: str
     model_version: str
+    email_status: str
     approval_status: str
     detail_path: str
     customer_detail_path: str
@@ -622,6 +647,39 @@ class NurtureTaskRegenerateRequest(BaseModel):
 
 class NurtureTaskConfirmRequest(BaseModel):
     draft_content: str = Field(min_length=10, max_length=8000)
+    email_subject: str | None = Field(default=None, max_length=255)
+
+
+class EmailSettingsOut(BaseModel):
+    sender_email: str
+    sender_name: str
+    smtp_host: str = ""
+    configured: bool = False
+
+
+class MyProfileOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+    data_scope: str
+    email_settings: EmailSettingsOut
+
+
+class MyProfileUpdateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    sender_email: str = Field(min_length=5, max_length=255)
+    sender_name: str = Field(min_length=2, max_length=120)
+    smtp_host: str = Field(default="", max_length=255)
+
+
+class PasswordUpdateRequest(BaseModel):
+    old_password: str = Field(min_length=1, max_length=120)
+    new_password: str = Field(min_length=8, max_length=120)
+
+
+class PasswordUpdateOut(BaseModel):
+    changed: bool
 
 
 class SalesUserOut(BaseModel):

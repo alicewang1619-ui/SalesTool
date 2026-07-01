@@ -454,3 +454,9 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 - [07-01-2026 14:57:39] 返修实现策略｜背景：终端直接读取部分中文源码时出现乱码，但 Python 编译和 Node UTF-8 读取验证源码本身有效，需要决定后续修改方式。｜结论：本轮不因终端渲染问题重写无关文件，只按 14 组反馈精确修改受影响文档、后端契约和前端页面；涉及中文页面时用 UTF-8 文件读写与构建验证兜底。｜来源：AI
 
 - [07-01-2026 15:04:46] 统一返修文档链路完成｜背景：用户要求从 PRD 到页面设计再到测试全流程统一修改，需要先把 14 组反馈落实到文档真相源。｜结论：已同步 PRD 详细版、开发版、摘要、DESIGN、设计决策蓝图、页面清单、技术方案、页面设计补充、我的账号与邮箱页面文档/HTML、测试蓝图、测试索引、验收门禁和专项 TDD；后续代码实现以这些返修文档为准。｜来源：AI
+
+- [07-01-2026 15:05:09] 统一返修文档阶段提交推送完成｜背景：PRD、设计、页面、测试门禁已完成一轮同步，需要按 Git 协作规则阶段性提交，避免后续代码实现与文档改动混杂。｜结论：已提交并推送 commit 7738620e，提交信息为 同步统一返修文档与测试门禁；后续进入真实前后端实现与验证。｜来源：AI
+
+- [07-01-2026 15:07:40] 统一返修红灯测试结果｜背景：已按返修 TDD 增加后端契约测试，需要先验证失败点是否对应真实缺口。｜结论：py -m pytest .\tests -q -k "REFIT or import_template or auto_assigns or time_scope or basic_info_demand or me_profile or report_period_aggregates or scoped_nurture or customer_signals" 结果为 8 failed、1 passed、87 deselected；失败集中在 /api/import-template、/api/me/profile、时间范围字段、客户详情基础信息、导入自动分配统计、报表 period_label、销售再营销范围和客户详情态势信号访问，符合本轮待实现范围。｜来源：AI
+
+- [07-01-2026 15:13:23] 统一返修后端专项转绿｜背景：完成导入模板、自动分配、时间范围、客户详情基础信息、个人资料邮箱、报表周期、销售再营销范围和客户态势详情范围的后端实现后，需要复跑专项契约。｜结论：py -m pytest .\tests -q -k "REFIT or import_template or auto_assigns or time_scope or basic_info_demand or me_profile or report_period_aggregates or scoped_nurture or customer_signals" 结果为 9 passed、87 deselected；仅保留既有 datetime/on_event deprecation warnings。｜来源：AI

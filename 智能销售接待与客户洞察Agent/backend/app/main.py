@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import case, func, inspect, select, text
+from sqlalchemy import case, func, inspect, or_, select, text
 from sqlalchemy.orm import Session, joinedload
 
 from .config import get_settings
@@ -78,6 +78,8 @@ from .schemas import (
     ImportJobOut,
     LoginRequest,
     LoginResponse,
+    MyProfileOut,
+    MyProfileUpdateRequest,
     NurtureAttachmentOut,
     NurturePromptContextOut,
     NurtureTaskConfirmRequest,
@@ -86,6 +88,8 @@ from .schemas import (
     NurtureTaskRegenerateRequest,
     NurtureTaskUpdateRequest,
     PageResult,
+    PasswordUpdateOut,
+    PasswordUpdateRequest,
     ReportChannelQualityItemOut,
     ReportChannelQualityOut,
     ReportBreakdownItemOut,
@@ -164,6 +168,10 @@ def ensure_sqlite_compatibility() -> None:
     if "leads" in table_names:
         lead_columns = {column["name"] for column in inspector.get_columns("leads")}
         with engine.begin() as connection:
+            if "email" not in lead_columns:
+                connection.execute(text("ALTER TABLE leads ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT ''"))
+            if "organization" not in lead_columns:
+                connection.execute(text("ALTER TABLE leads ADD COLUMN organization VARCHAR(255) NOT NULL DEFAULT ''"))
             if "raw_inquiry" not in lead_columns:
                 connection.execute(text("ALTER TABLE leads ADD COLUMN raw_inquiry TEXT NOT NULL DEFAULT ''"))
             if "conversation_history" not in lead_columns:
@@ -214,9 +222,47 @@ def ensure_sqlite_compatibility() -> None:
             )
     if "import_jobs" in table_names:
         import_job_columns = {column["name"] for column in inspector.get_columns("import_jobs")}
-        if "processed_rows" not in import_job_columns:
-            with engine.begin() as connection:
+        with engine.begin() as connection:
+            if "processed_rows" not in import_job_columns:
                 connection.execute(text("ALTER TABLE import_jobs ADD COLUMN processed_rows INTEGER NOT NULL DEFAULT 0"))
+            if "auto_assigned_rows" not in import_job_columns:
+                connection.execute(text("ALTER TABLE import_jobs ADD COLUMN auto_assigned_rows INTEGER NOT NULL DEFAULT 0"))
+            if "pending_assignment_rows" not in import_job_columns:
+                connection.execute(text("ALTER TABLE import_jobs ADD COLUMN pending_assignment_rows INTEGER NOT NULL DEFAULT 0"))
+    if "customers" in table_names:
+        customer_columns = {column["name"] for column in inspector.get_columns("customers")}
+        with engine.begin() as connection:
+            if "email" not in customer_columns:
+                connection.execute(text("ALTER TABLE customers ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT ''"))
+            if "organization" not in customer_columns:
+                connection.execute(text("ALTER TABLE customers ADD COLUMN organization VARCHAR(255) NOT NULL DEFAULT ''"))
+            if "demand_summary" not in customer_columns:
+                connection.execute(text("ALTER TABLE customers ADD COLUMN demand_summary TEXT NOT NULL DEFAULT ''"))
+            if "source_summary" not in customer_columns:
+                connection.execute(text("ALTER TABLE customers ADD COLUMN source_summary VARCHAR(255) NOT NULL DEFAULT ''"))
+            if "first_inquiry_at" not in customer_columns:
+                connection.execute(text("ALTER TABLE customers ADD COLUMN first_inquiry_at DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00'"))
+            connection.execute(
+                text(
+                    """
+                    UPDATE customers
+                    SET email = COALESCE(NULLIF(email, ''), 'carlos@globalmed.example'),
+                        organization = COALESCE(NULLIF(organization, ''), 'GlobalMed Peru'),
+                        demand_summary = COALESCE(NULLIF(demand_summary, ''), 'Portable ultrasound portfolio for regional clinics.'),
+                        source_summary = COALESCE(NULLIF(source_summary, ''), '网站 / 官网聊天')
+                    WHERE name = 'GlobalMed Peru'
+                    """
+                )
+            )
+    if "nurture_tasks" in table_names:
+        nurture_columns = {column["name"] for column in inspector.get_columns("nurture_tasks")}
+        with engine.begin() as connection:
+            if "email_subject" not in nurture_columns:
+                connection.execute(text("ALTER TABLE nurture_tasks ADD COLUMN email_subject VARCHAR(255) NOT NULL DEFAULT ''"))
+            if "email_status" not in nurture_columns:
+                connection.execute(text("ALTER TABLE nurture_tasks ADD COLUMN email_status VARCHAR(40) NOT NULL DEFAULT 'draft'"))
+            if "sent_at" not in nurture_columns:
+                connection.execute(text("ALTER TABLE nurture_tasks ADD COLUMN sent_at DATETIME"))
     if "country_sales_mappings" in table_names:
         mapping_columns = {column["name"] for column in inspector.get_columns("country_sales_mappings")}
         if "region" not in mapping_columns:
@@ -297,6 +343,7 @@ def ensure_default_nurture_tasks(db: Session) -> None:
         recommended_next_action="3 天内发送 Portable Ultrasound 对比资料，并询问代理区域、年度采购量和预算窗口。",
         customer_note="GlobalMed Peru 已代理 IVD 与影像设备，正在评估 Portable Ultrasound，历史反馈显示具备真实采购需求。",
         nurture_reason="已报价 7 天未回复，客户官网显示新增 Lima 分部，适合温和再营销触达。",
+        email_subject="Portable Ultrasound comparison for regional clinics",
         draft_content=(
             "Hi Carlos, based on your interest in portable ultrasound for regional clinics, "
             "we prepared a short comparison for your team. Would it be useful if I send a "
@@ -409,6 +456,115 @@ def add_audit(
     )
 
 
+def time_scope_window(scope: str | None, date_value: str | None = None) -> tuple[str, datetime | None, datetime | None, str]:
+    resolved = scope or "all"
+    now = datetime.utcnow()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if resolved == "today":
+        return "today", today, today + timedelta(days=1), today.strftime("%Y-%m-%d")
+    if resolved == "yesterday":
+        start = today - timedelta(days=1)
+        return "yesterday", start, today, start.strftime("%Y-%m-%d")
+    if resolved == "date" and date_value:
+        try:
+            start = datetime.strptime(date_value, "%Y-%m-%d")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=error_detail("INVALID_DATE", "date must be YYYY-MM-DD")) from exc
+        return "date", start, start + timedelta(days=1), start.strftime("%Y-%m-%d")
+    return "all", None, None, "全部历史"
+
+
+def time_scope_detail(scope: str, start_at: datetime | None, end_at: datetime | None, label: str) -> dict[str, str | None]:
+    return {
+        "scope": scope,
+        "label": label,
+        "start_at": start_at.isoformat() if start_at else None,
+        "end_at": end_at.isoformat() if end_at else None,
+    }
+
+
+def add_time_conditions(conditions: list[object], column: object, start_at: datetime | None, end_at: datetime | None) -> None:
+    if start_at:
+        conditions.append(column >= start_at)
+    if end_at:
+        conditions.append(column < end_at)
+
+
+def sales_country_names(db: Session, user: User) -> set[str]:
+    if user.role != "sales":
+        return set()
+    rows = db.scalars(
+        select(CountrySalesMapping.country)
+        .where(CountrySalesMapping.sales_user_id == user.id, CountrySalesMapping.active.is_(True))
+    ).all()
+    return {country for country in rows if country}
+
+
+def customer_scope_condition(db: Session, user: User) -> object | None:
+    if user.role != "sales":
+        return None
+    countries = sales_country_names(db, user)
+    conditions = [Customer.owner_id == user.id]
+    if countries:
+        conditions.append(Customer.country.in_(countries))
+    return or_(*conditions)
+
+
+def lead_scope_condition(db: Session, user: User) -> object | None:
+    if user.role != "sales":
+        return None
+    countries = sales_country_names(db, user)
+    conditions = [Lead.owner_id == user.id]
+    if countries:
+        conditions.append(Lead.country.in_(countries))
+    return or_(*conditions)
+
+
+def can_access_customer(db: Session, user: User, customer: Customer) -> bool:
+    if user.role in {"admin", "ops"}:
+        return True
+    if user.role != "sales":
+        return False
+    return customer.owner_id == user.id or customer.country in sales_country_names(db, user)
+
+
+def deny_permission(db: Session, request: Request, user: User, path: str) -> None:
+    add_audit(
+        db,
+        request.state.trace_id,
+        "permission_denied",
+        f"{user.email} denied {request.method} {path}",
+        actor_id=user.id,
+        target_type="permission",
+    )
+    db.commit()
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=error_detail("FORBIDDEN", "No permission"))
+
+
+def email_settings_for_user(db: Session, user: User) -> dict[str, object]:
+    setting = db.get(SystemSetting, f"email_profile:{user.id}")
+    if setting:
+        try:
+            loaded = json.loads(setting.value)
+            if isinstance(loaded, dict):
+                return {
+                    "sender_email": str(loaded.get("sender_email") or user.email),
+                    "sender_name": str(loaded.get("sender_name") or user.name),
+                    "smtp_host": str(loaded.get("smtp_host") or ""),
+                    "configured": bool(loaded.get("configured", True)),
+                }
+        except json.JSONDecodeError:
+            pass
+    return {"sender_email": user.email, "sender_name": user.name, "smtp_host": "", "configured": False}
+
+
+def lead_out(db: Session, lead: Lead) -> LeadOut:
+    owner = db.get(User, lead.owner_id) if lead.owner_id else None
+    data = LeadOut.model_validate(lead, from_attributes=True).model_dump()
+    data["owner_name"] = owner.name if owner else "未分配"
+    return LeadOut(**data)
+
+
 def import_job_out(job: ImportJob) -> ImportJobOut:
     try:
         failures = json.loads(job.failures_json or "[]")
@@ -424,6 +580,8 @@ def import_job_out(job: ImportJob) -> ImportJobOut:
         processed_rows=job.processed_rows,
         success_rows=job.success_rows,
         failed_rows=job.failed_rows,
+        auto_assigned_rows=job.auto_assigned_rows,
+        pending_assignment_rows=job.pending_assignment_rows,
         failures=[ImportFailureOut(**item) for item in failures],
     )
 
@@ -457,12 +615,23 @@ def process_import_job(db: Session, job: ImportJob) -> None:
     job.status = "processing"
     rows = parse_import_rows(job)
     required_fields = ["customer_name", "country", "customer_type", "product", "source_category", "source_label"]
+    optional_fields = ["email", "organization", "raw_inquiry"]
     failures: list[dict[str, object]] = []
     success_rows = 0
+    auto_assigned_rows = 0
+    pending_assignment_rows = 0
     seen_names: set[str] = set()
     enabled_sources = {
         (item.category, item.label)
         for item in db.scalars(select(SourceDictionary).where(SourceDictionary.enabled.is_(True))).all()
+    }
+    mapping_lookup = {
+        mapping.country: owner
+        for mapping, owner in db.execute(
+            select(CountrySalesMapping, User)
+            .join(User, User.id == CountrySalesMapping.sales_user_id)
+            .where(CountrySalesMapping.active.is_(True), User.enabled.is_(True), User.role == "sales")
+        ).all()
     }
 
     job.total_rows = len(rows)
@@ -472,6 +641,7 @@ def process_import_job(db: Session, job: ImportJob) -> None:
     for row_number, row in enumerate(rows, start=1):
         job.processed_rows = row_number
         clean = {field: (row.get(field) or "").strip() for field in required_fields}
+        optional = {field: (row.get(field) or "").strip() for field in optional_fields}
         customer_name = clean["customer_name"]
         reason = ""
         if not customer_name:
@@ -488,24 +658,68 @@ def process_import_job(db: Session, job: ImportJob) -> None:
             continue
 
         seen_names.add(customer_name)
-        db.add(
-            Lead(
-                customer_name=customer_name,
+        owner = mapping_lookup.get(clean["country"])
+        if owner:
+            auto_assigned_rows += 1
+        else:
+            pending_assignment_rows += 1
+        created_at = datetime.utcnow()
+        raw_inquiry = optional["raw_inquiry"] or f"Import source: {clean['source_category']} / {clean['source_label']}"
+        lead = Lead(
+            customer_name=customer_name,
+            email=optional["email"],
+            organization=optional["organization"],
+            country=clean["country"],
+            customer_type=clean["customer_type"] or "pending",
+            product=clean["product"] or "pending",
+            source_category=clean["source_category"],
+            source_label=clean["source_label"],
+            score_label="pending",
+            feedback_status="未反馈" if owner else "unassigned",
+            raw_inquiry=raw_inquiry,
+            conversation_history="[]",
+            owner_id=owner.id if owner else None,
+            created_at=created_at,
+        )
+        db.add(lead)
+        customer = db.scalar(select(Customer).where(Customer.name == customer_name))
+        if not customer:
+            customer = Customer(
+                name=customer_name,
+                email=optional["email"],
+                organization=optional["organization"] or customer_name,
                 country=clean["country"],
                 customer_type=clean["customer_type"] or "pending",
                 product=clean["product"] or "pending",
-                source_category=clean["source_category"],
-                source_label=clean["source_label"],
-                score_label="pending",
-                feedback_status="unassigned",
-                raw_inquiry=f"Import source: {clean['source_category']} / {clean['source_label']}",
-                conversation_history="[]",
+                tier="资料库",
+                demand_summary=raw_inquiry,
+                source_summary=f"{clean['source_category']} / {clean['source_label']}",
+                first_inquiry_at=created_at,
+                owner_id=owner.id if owner else None,
             )
-        )
+            db.add(customer)
+            db.flush()
+            db.add(
+                CustomerBackground(
+                    customer_id=customer.id,
+                    auto_summary=f"{customer_name} 来自 {clean['source_category']} / {clean['source_label']}，需求：{raw_inquiry}",
+                    manual_summary=None,
+                    evidence=f"导入文件：{job.filename}；国家：{clean['country']}；邮箱：{optional['email'] or '未提供'}",
+                    confidence="待复核",
+                )
+            )
+        else:
+            customer.email = customer.email or optional["email"]
+            customer.organization = customer.organization or optional["organization"] or customer_name
+            customer.demand_summary = customer.demand_summary or raw_inquiry
+            customer.source_summary = customer.source_summary or f"{clean['source_category']} / {clean['source_label']}"
+            customer.owner_id = customer.owner_id or (owner.id if owner else None)
         success_rows += 1
 
     job.processed_rows = len(rows)
     job.success_rows = success_rows
+    job.auto_assigned_rows = auto_assigned_rows
+    job.pending_assignment_rows = pending_assignment_rows
     job.failed_rows = len(failures)
     job.failures_json = json.dumps(failures, ensure_ascii=False)
     job.status = "completed"
@@ -574,6 +788,78 @@ def me(user: User = Depends(current_user)) -> User:
     return user
 
 
+@app.get("/api/me/profile", response_model=MyProfileOut)
+def my_profile(db: Session = Depends(get_db), user: User = Depends(current_user)) -> MyProfileOut:
+    return MyProfileOut(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role,
+        data_scope=user.data_scope,
+        email_settings=email_settings_for_user(db, user),
+    )
+
+
+@app.put("/api/me/profile", response_model=MyProfileOut)
+def update_my_profile(
+    payload: MyProfileUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> MyProfileOut:
+    user.name = payload.name.strip()
+    setting_key = f"email_profile:{user.id}"
+    setting = db.get(SystemSetting, setting_key)
+    if not setting:
+        setting = SystemSetting(key=setting_key, updated_by=user.id)
+        db.add(setting)
+    setting.value = json.dumps(
+        {
+            "sender_email": payload.sender_email.strip(),
+            "sender_name": payload.sender_name.strip(),
+            "smtp_host": payload.smtp_host.strip(),
+            "configured": True,
+        },
+        ensure_ascii=False,
+    )
+    setting.updated_by = user.id
+    add_audit(
+        db,
+        request.state.trace_id,
+        "me_profile_updated",
+        f"My profile updated: {user.email}",
+        actor_id=user.id,
+        target_type="user",
+        target_id=user.id,
+    )
+    db.commit()
+    db.refresh(user)
+    return my_profile(db, user)
+
+
+@app.put("/api/me/password", response_model=PasswordUpdateOut)
+def update_my_password(
+    payload: PasswordUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> PasswordUpdateOut:
+    if not verify_password(payload.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail=error_detail("OLD_PASSWORD_INCORRECT", "Old password is incorrect"))
+    user.password_hash = hash_password(payload.new_password)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "me_password_updated",
+        f"My password updated: {user.email}",
+        actor_id=user.id,
+        target_type="user",
+        target_id=user.id,
+    )
+    db.commit()
+    return PasswordUpdateOut(changed=True)
+
+
 def safe_return_path(path: str) -> str:
     if not path.startswith("/") or path.startswith("//"):
         return "/admin/dashboard"
@@ -612,6 +898,43 @@ def active_banner(db: Session = Depends(get_db)) -> Banner:
 def source_dictionary(db: Session = Depends(get_db), user: User = Depends(current_user)) -> list[dict[str, str]]:
     sources = db.scalars(select(SourceDictionary).where(SourceDictionary.enabled.is_(True)).order_by(SourceDictionary.id)).all()
     return [{"category": item.category, "label": item.label} for item in sources]
+
+
+IMPORT_TEMPLATE_FIELDS = [
+    "customer_name",
+    "email",
+    "organization",
+    "country",
+    "customer_type",
+    "product",
+    "source_category",
+    "source_label",
+    "raw_inquiry",
+]
+
+
+@app.get("/api/import-template")
+def import_template(user: User = Depends(require_admin_or_ops)) -> Response:
+    sample = {
+        "customer_name": "GlobalMed Peru",
+        "email": "buyer@example.com",
+        "organization": "Example Clinic",
+        "country": "Peru",
+        "customer_type": "Clinic",
+        "product": "Portable Ultrasound",
+        "source_category": "网站",
+        "source_label": "官网聊天",
+        "raw_inquiry": "Need portable ultrasound for regional clinics.",
+    }
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=IMPORT_TEMPLATE_FIELDS)
+    writer.writeheader()
+    writer.writerow(sample)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="lead-import-template.csv"'},
+    )
 
 
 @app.post("/api/import-jobs", response_model=ImportJobOut, status_code=status.HTTP_201_CREATED)
@@ -698,7 +1021,9 @@ def pending_assignment_out(
     reasons: list[str],
     mapping_lookup: dict[str, tuple[CountrySalesMapping, User]] | None = None,
 ) -> PendingAssignmentOut:
-    base = LeadOut.model_validate(lead, from_attributes=True).model_dump()
+    base = lead_out(db, lead).model_dump()
+    base.pop("owner_id", None)
+    base.pop("owner_name", None)
     owner = db.get(User, lead.owner_id) if lead.owner_id else None
     suggested_mapping = mapping_lookup.get(lead.country) if mapping_lookup else None
     suggested_owner = suggested_mapping[1] if suggested_mapping else None
@@ -809,7 +1134,7 @@ def feedback_card_out(db: Session, feedback_link: SalesFeedbackLink, lead: Lead,
     submitted = db.scalar(select(SalesFeedback.id).where(SalesFeedback.link_id == feedback_link.id)) is not None
     return FeedbackCardOut(
         token=feedback_link.token,
-        lead=LeadOut.model_validate(lead, from_attributes=True),
+        lead=lead_out(db, lead),
         owner=FeedbackOwnerOut(id=owner.id, name=owner.name),
         ai_reason=detail.score_reasons[1] if detail.score_reasons else "",
         background_summary=detail.background_summary,
@@ -965,6 +1290,8 @@ def submit_feedback_card(
 def pending_assignments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    time_scope: str | None = Query(default=None, pattern="^(today|yesterday|date|all)?$"),
+    date: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ops),
 ) -> PendingAssignmentPage:
@@ -975,7 +1302,13 @@ def pending_assignments(
     ).all()
     mapped_countries = {mapping.country for mapping, _ in mapping_rows}
     mapping_lookup = {mapping.country: (mapping, owner) for mapping, owner in mapping_rows}
-    leads = db.scalars(select(Lead).order_by(Lead.created_at.desc(), Lead.id.desc())).all()
+    _, start_at, end_at, _ = time_scope_window(time_scope, date)
+    lead_query = select(Lead).order_by(Lead.created_at.desc(), Lead.id.desc())
+    time_conditions: list[object] = []
+    add_time_conditions(time_conditions, Lead.created_at, start_at, end_at)
+    for condition in time_conditions:
+        lead_query = lead_query.where(condition)
+    leads = db.scalars(lead_query).all()
     pending_items: list[PendingAssignmentOut] = []
     for lead in leads:
         reasons = pending_reasons_for_lead(lead, mapped_countries)
@@ -1055,6 +1388,8 @@ def list_leads(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     source_category: str | None = None,
+    time_scope: str | None = Query(default=None, pattern="^(today|yesterday|date|all)?$"),
+    date: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ) -> PageResult:
@@ -1063,13 +1398,20 @@ def list_leads(
     if source_category:
         query = query.where(Lead.source_category == source_category)
         count_query = count_query.where(Lead.source_category == source_category)
-    if user.role == "sales":
-        query = query.where(Lead.owner_id == user.id)
-        count_query = count_query.where(Lead.owner_id == user.id)
+    scope_condition = lead_scope_condition(db, user)
+    if scope_condition is not None:
+        query = query.where(scope_condition)
+        count_query = count_query.where(scope_condition)
+    _, start_at, end_at, _ = time_scope_window(time_scope, date)
+    time_conditions: list[object] = []
+    add_time_conditions(time_conditions, Lead.created_at, start_at, end_at)
+    for condition in time_conditions:
+        query = query.where(condition)
+        count_query = count_query.where(condition)
 
     total = db.scalar(count_query) or 0
     rows = db.scalars(query.order_by(Lead.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
-    return PageResult(page=page, page_size=page_size, total=total, items=[LeadOut.model_validate(row, from_attributes=True) for row in rows])
+    return PageResult(page=page, page_size=page_size, total=total, items=[lead_out(db, row) for row in rows])
 
 
 @app.get("/api/leads/{lead_id}", response_model=LeadDetailOut)
@@ -1087,7 +1429,7 @@ def build_lead_detail(db: Session, lead: Lead) -> LeadDetailOut:
     owner = db.get(User, lead.owner_id) if lead.owner_id else None
     background = customer.background if customer and customer.background else None
     source = f"{lead.source_category} / {lead.source_label}"
-    base = LeadOut.model_validate(lead, from_attributes=True).model_dump()
+    base = lead_out(db, lead).model_dump()
     background_summary = (
         background.manual_summary or background.auto_summary
         if background
@@ -1177,13 +1519,15 @@ def dashboard(
     customer_type: str | None = None,
     product: str | None = None,
     owner_id: int | None = None,
-    cycle: str | None = Query(None, pattern="^(today|all)?$"),
+    cycle: str | None = Query(None, pattern="^(today|yesterday|date|all)?$"),
+    date: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ) -> DashboardOut:
     base_conditions = []
-    if user.role == "sales":
-        base_conditions.append(Lead.owner_id == user.id)
+    scope_condition = lead_scope_condition(db, user)
+    if scope_condition is not None:
+        base_conditions.append(scope_condition)
     elif owner_id is not None:
         base_conditions.append(Lead.owner_id == owner_id)
     if source_category:
@@ -1196,8 +1540,8 @@ def dashboard(
         base_conditions.append(Lead.product == product)
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    if cycle == "today":
-        base_conditions.append(Lead.created_at >= today_start)
+    resolved_scope, start_at, end_at, scope_label = time_scope_window(cycle, date)
+    add_time_conditions(base_conditions, Lead.created_at, start_at, end_at)
 
     def scoped_count(*conditions) -> int:
         query = select(func.count()).select_from(Lead)
@@ -1226,6 +1570,13 @@ def dashboard(
             unfeedback=scoped_count(Lead.feedback_status.in_(["未反馈", "鏈弽棣?", "unfeedback"])),
             website_kpi=round((website_total / total) * 100) if total else 0,
         ),
+        time_scope=time_scope_detail(resolved_scope, start_at, end_at, scope_label),
+        metric_links={
+            "today_inquiries": "/admin/leads?time_scope=today",
+            "total_inquiries": f"/admin/leads?time_scope={resolved_scope}",
+            "valid_leads": f"/admin/leads?score=valid&time_scope={resolved_scope}",
+            "unfeedback": f"/admin/assignments/pending?time_scope={resolved_scope}",
+        },
         ai_summary="Dashboard aggregates current leads, customers, and feedback by login role.",
         assignment_timeline=[
             DashboardTimelineItem(label="Lead intake", value=f"{total} records to review"),
@@ -1234,7 +1585,7 @@ def dashboard(
         ],
         items=[
             DashboardTodoOut(
-                **LeadOut.model_validate(row, from_attributes=True).model_dump(),
+                **lead_out(db, row).model_dump(),
                 detail_path=f"/admin/leads/{row.id}",
             )
             for row in rows
@@ -1258,6 +1609,17 @@ def report_period_window(period: str) -> tuple[str, datetime, datetime]:
     if period == "year":
         return period, today.replace(month=1, day=1), now
     return "day", today, now
+
+
+def report_period_label(period: str, start_at: datetime, end_at: datetime) -> str:
+    if period == "month":
+        return f"{start_at.year} 年 {start_at.month} 月（{start_at.date()} 至 {end_at.date()}）"
+    if period == "quarter":
+        quarter = ((start_at.month - 1) // 3) + 1
+        return f"{start_at.year} 年 Q{quarter}（{start_at.date()} 至 {end_at.date()}）"
+    if period == "year":
+        return f"{start_at.year} 年（{start_at.date()} 至 {end_at.date()}）"
+    return f"{start_at.date()} 日报（{start_at.date()} 至 {end_at.date()}）"
 
 
 def report_count(db: Session, conditions: list[object], *extra_conditions: object) -> int:
@@ -1509,6 +1871,8 @@ def report_period(
 
     return ReportPeriodOut(
         period=resolved_period,
+        period_label=report_period_label(resolved_period, start_at, end_at),
+        period_granularity=resolved_period,
         query_window=ReportQueryWindowOut(start_at=start_at, end_at=end_at),
         filters=filters,
         limits=ReportLimitsOut(page=page, page_size=page_size),
@@ -1843,10 +2207,11 @@ def download_report_export(
     )
 
 
-def customer_conditions(user: User, country: str | None, product: str | None, tier: str | None) -> list[object]:
+def customer_conditions(db: Session, user: User, country: str | None, product: str | None, tier: str | None) -> list[object]:
     conditions: list[object] = []
-    if user.role == "sales":
-        conditions.append(Customer.owner_id == user.id)
+    scope_condition = customer_scope_condition(db, user)
+    if scope_condition is not None:
+        conditions.append(scope_condition)
     if country:
         conditions.append(Customer.country == country)
     if product:
@@ -1856,6 +2221,30 @@ def customer_conditions(user: User, country: str | None, product: str | None, ti
     return conditions
 
 
+def hydrate_customer_basics(db: Session, customer: Customer) -> None:
+    leads = db.scalars(
+        select(Lead).where(Lead.customer_name == customer.name).order_by(Lead.created_at.asc(), Lead.id.asc())
+    ).all()
+    if not leads:
+        customer.organization = customer.organization or customer.name
+        customer.demand_summary = customer.demand_summary or "暂无询盘需求，请运营补充。"
+        customer.source_summary = customer.source_summary or "暂无来源"
+        return
+    first = leads[0]
+    customer.email = customer.email or first.email or "unknown@example.com"
+    customer.organization = customer.organization or first.organization or customer.name
+    customer.demand_summary = customer.demand_summary or first.raw_inquiry or "暂无询盘需求，请运营补充。"
+    customer.source_summary = customer.source_summary or f"{first.source_category} / {first.source_label}"
+    if not customer.first_inquiry_at or customer.first_inquiry_at.year <= 1970:
+        customer.first_inquiry_at = first.created_at
+
+
+def hydrate_all_customer_basics(db: Session) -> None:
+    for customer in db.scalars(select(Customer)).all():
+        hydrate_customer_basics(db, customer)
+    db.flush()
+
+
 def customer_item_out(customer: Customer, owner_names: dict[int, str]) -> CustomerListItem:
     background_summary = ""
     if customer.background:
@@ -1863,10 +2252,14 @@ def customer_item_out(customer: Customer, owner_names: dict[int, str]) -> Custom
     return CustomerListItem(
         id=customer.id,
         name=customer.name,
+        email=customer.email,
+        organization=customer.organization,
         country=customer.country,
         customer_type=customer.customer_type,
         product=customer.product,
         tier=customer.tier,
+        first_inquiry_at=customer.first_inquiry_at,
+        source_summary=customer.source_summary,
         owner_id=customer.owner_id,
         owner_name=owner_names.get(customer.owner_id or 0, "未分配"),
         background_summary=background_summary,
@@ -1894,6 +2287,7 @@ def background_sources(evidence: str) -> list[CustomerBackgroundSourceOut]:
 
 
 def build_customer_detail(db: Session, customer: Customer, user: User) -> CustomerDetailOut:
+    hydrate_customer_basics(db, customer)
     owner = db.get(User, customer.owner_id) if customer.owner_id else None
     background = customer.background
     if not background:
@@ -1967,14 +2361,21 @@ def build_customer_detail(db: Session, customer: Customer, user: User) -> Custom
         for record in feedback_records
     )
     timeline = sorted(timeline, key=lambda item: item.happened_at, reverse=True)
+    signal_rows = customer_signal_rows(db, customer_signal_conditions(None, None, customer.id), limit=20)
+    signals = [customer_signal_out(signal, row_customer, creator) for signal, row_customer, creator in signal_rows]
 
     return CustomerDetailOut(
         id=customer.id,
         name=customer.name,
+        email=customer.email,
+        organization=customer.organization,
         country=customer.country,
         customer_type=customer.customer_type,
         product=customer.product,
         tier=customer.tier,
+        demand_summary=customer.demand_summary,
+        source_summary=customer.source_summary,
+        first_inquiry_at=customer.first_inquiry_at,
         owner_id=customer.owner_id,
         owner_name=owner.name if owner else "未分配",
         can_edit_background=user.role in {"admin", "ops"},
@@ -1992,6 +2393,7 @@ def build_customer_detail(db: Session, customer: Customer, user: User) -> Custom
         lead_history=lead_history,
         feedback_records=feedback_records,
         timeline=timeline,
+        signals=signals,
     )
 
 
@@ -2002,10 +2404,15 @@ def list_customers(
     country: str | None = None,
     product: str | None = None,
     tier: str | None = None,
+    time_scope: str | None = Query(default=None, pattern="^(today|yesterday|date|all)?$"),
+    date: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ) -> CustomerPage:
-    conditions = customer_conditions(user, country, product, tier)
+    hydrate_all_customer_basics(db)
+    conditions = customer_conditions(db, user, country, product, tier)
+    _, start_at, end_at, _ = time_scope_window(time_scope, date)
+    add_time_conditions(conditions, Customer.first_inquiry_at, start_at, end_at)
     query = select(Customer).options(joinedload(Customer.background))
     count_query = select(func.count()).select_from(Customer)
     for condition in conditions:
@@ -2020,7 +2427,10 @@ def list_customers(
         for owner in db.scalars(select(User).where(User.id.in_(owner_ids))).all()
     } if owner_ids else {}
 
-    metric_conditions = customer_conditions(user, None, None, None)
+    for row in rows:
+        hydrate_customer_basics(db, row)
+
+    metric_conditions = customer_conditions(db, user, None, None, None)
 
     def metric_count(*extra_conditions) -> int:
         metric_query = select(func.count()).select_from(Customer)
@@ -2049,13 +2459,14 @@ def list_customers(
 
 @app.get("/api/customers/{customer_id}", response_model=CustomerDetailOut)
 def get_customer(customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> CustomerDetailOut:
+    hydrate_all_customer_basics(db)
     customer = db.get(Customer, customer_id)
     if not customer:
         raise HTTPException(
             status_code=404,
             detail=error_detail("CUSTOMER_NOT_FOUND", "Customer not found"),
         )
-    if user.role == "sales" and customer.owner_id != user.id:
+    if not can_access_customer(db, user, customer):
         raise HTTPException(
             status_code=403,
             detail=error_detail("CUSTOMER_FORBIDDEN", "No permission to view this customer"),
@@ -2162,15 +2573,22 @@ def customer_signal_summary(db: Session) -> dict[str, int]:
 
 @app.get("/api/customer-signals", response_model=CustomerSignalPage)
 def list_customer_signals(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     source_filter: str | None = Query(default=None, alias="source"),
     status_filter: str | None = Query(default=None, alias="status"),
     customer_id: int | None = None,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ops),
+    user: User = Depends(current_user),
 ) -> CustomerSignalPage:
     ensure_default_customer_signals(db)
+    if user.role == "sales":
+        if customer_id is None:
+            deny_permission(db, request, user, request.url.path)
+        customer = db.get(Customer, customer_id)
+        if not customer or not can_access_customer(db, user, customer):
+            deny_permission(db, request, user, request.url.path)
     conditions = customer_signal_conditions(source_filter, status_filter, customer_id)
     count_query = select(func.count()).select_from(CustomerSignal)
     for condition in conditions:
@@ -2232,11 +2650,18 @@ def create_customer_signal(
 
 @app.get("/api/customer-signals/context", response_model=CustomerSignalContextOut)
 def customer_signals_context(
+    request: Request,
     customer_id: int | None = None,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ops),
+    user: User = Depends(current_user),
 ) -> CustomerSignalContextOut:
     ensure_default_customer_signals(db)
+    if user.role == "sales":
+        if customer_id is None:
+            deny_permission(db, request, user, request.url.path)
+        customer = db.get(Customer, customer_id)
+        if not customer or not can_access_customer(db, user, customer):
+            deny_permission(db, request, user, request.url.path)
     conditions = customer_signal_conditions(None, None, customer_id)
     rows = customer_signal_rows(db, conditions, limit=20)
     signals = [customer_signal_out(signal, customer, creator) for signal, customer, creator in rows]
@@ -2349,12 +2774,16 @@ def nurture_context_from_snapshot(db: Session, task: NurtureTask) -> NurtureProm
     return build_nurture_context(db, task)
 
 
-def nurture_task_out(db: Session, task: NurtureTask) -> NurtureTaskOut:
+def nurture_task_out(db: Session, task: NurtureTask, user: User | None = None) -> NurtureTaskOut:
     customer = db.get(Customer, task.customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail=error_detail("NURTURE_CUSTOMER_NOT_FOUND", "Customer not found"))
+    hydrate_customer_basics(db, customer)
     owner = db.get(User, customer.owner_id) if customer.owner_id else None
     context = nurture_context_from_snapshot(db, task)
+    actor = user or owner
+    sender = email_settings_for_user(db, actor) if actor else {"sender_email": "noreply@ultrasound-growth.local"}
+    subject = task.email_subject or f"Follow-up for {customer.product}"
     return NurtureTaskOut(
         id=task.id,
         customer_id=customer.id,
@@ -2365,12 +2794,16 @@ def nurture_task_out(db: Session, task: NurtureTask) -> NurtureTaskOut:
         recommended_next_action=task.recommended_next_action,
         customer_note=task.customer_note,
         nurture_reason=task.nurture_reason,
+        sender_email=str(sender["sender_email"]),
+        recipient_email=customer.email or "unknown@example.com",
+        email_subject=subject,
         draft_content=task.draft_content,
         generation_prompt=task.generation_prompt,
         prompt_context_snapshot=context,
         attachments=context.attachments,
         model_provider=task.model_provider,
         model_version=task.model_version,
+        email_status=task.email_status,
         approval_status=task.approval_status,
         detail_path=f"/admin/nurture/{task.id}",
         customer_detail_path=f"/admin/customers/{customer.id}",
@@ -2385,17 +2818,28 @@ def get_nurture_task_or_404(db: Session, task_id: int) -> NurtureTask:
     return task
 
 
+def require_nurture_scope(db: Session, request: Request, user: User, task: NurtureTask) -> None:
+    customer = db.get(Customer, task.customer_id)
+    if not customer or not can_access_customer(db, user, customer):
+        deny_permission(db, request, user, request.url.path)
+
+
 @app.get("/api/nurture-tasks", response_model=NurtureTaskPage)
 def list_nurture_tasks(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status_filter: str | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ops),
+    user: User = Depends(current_user),
 ) -> NurtureTaskPage:
     ensure_default_nurture_tasks(db)
-    query = select(NurtureTask)
-    count_query = select(func.count()).select_from(NurtureTask)
+    query = select(NurtureTask).join(Customer, Customer.id == NurtureTask.customer_id)
+    count_query = select(func.count()).select_from(NurtureTask).join(Customer, Customer.id == NurtureTask.customer_id)
+    scope_condition = customer_scope_condition(db, user)
+    if scope_condition is not None:
+        query = query.where(scope_condition)
+        count_query = count_query.where(scope_condition)
     if status_filter:
         query = query.where(NurtureTask.approval_status == status_filter)
         count_query = count_query.where(NurtureTask.approval_status == status_filter)
@@ -2403,7 +2847,7 @@ def list_nurture_tasks(
     rows = db.scalars(
         query.order_by(NurtureTask.updated_at.desc(), NurtureTask.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
-    all_tasks = db.scalars(select(NurtureTask)).all()
+    all_tasks = db.scalars(query).all()
     empty_state = None
     if total == 0:
         empty_state = EmptyStateOut(title="暂无再营销任务", action_label="返回客户池", action_path="/admin/customers")
@@ -2416,14 +2860,21 @@ def list_nurture_tasks(
             "confirmed": sum(1 for item in all_tasks if item.approval_status == "confirmed"),
             "with_attachments": sum(1 for item in all_tasks if nurture_attachments(item)),
         },
-        items=[nurture_task_out(db, row) for row in rows],
+        items=[nurture_task_out(db, row, user) for row in rows],
         empty_state=empty_state,
     )
 
 
 @app.get("/api/nurture-tasks/{task_id}", response_model=NurtureTaskOut)
-def get_nurture_task(task_id: int, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ops)) -> NurtureTaskOut:
-    return nurture_task_out(db, get_nurture_task_or_404(db, task_id))
+def get_nurture_task(
+    task_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> NurtureTaskOut:
+    task = get_nurture_task_or_404(db, task_id)
+    require_nurture_scope(db, request, user, task)
+    return nurture_task_out(db, task, user)
 
 
 @app.put("/api/nurture-tasks/{task_id}", response_model=NurtureTaskOut)
@@ -2432,9 +2883,10 @@ def update_nurture_task(
     payload: NurtureTaskUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ops),
+    user: User = Depends(current_user),
 ) -> NurtureTaskOut:
     task = get_nurture_task_or_404(db, task_id)
+    require_nurture_scope(db, request, user, task)
     task.recommended_next_action = payload.recommended_next_action
     task.customer_note = payload.customer_note
     task.nurture_reason = payload.nurture_reason
@@ -2454,7 +2906,7 @@ def update_nurture_task(
     )
     db.commit()
     db.refresh(task)
-    return nurture_task_out(db, task)
+    return nurture_task_out(db, task, user)
 
 
 @app.post("/api/nurture-tasks/{task_id}/attachments", response_model=NurtureTaskOut)
@@ -2463,9 +2915,10 @@ async def upload_nurture_attachment(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ops),
+    user: User = Depends(current_user),
 ) -> NurtureTaskOut:
     task = get_nurture_task_or_404(db, task_id)
+    require_nurture_scope(db, request, user, task)
     filename = file.filename or "attachment"
     suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if suffix not in {"pdf", "doc", "docx", "txt", "png", "jpg", "jpeg"}:
@@ -2501,7 +2954,7 @@ async def upload_nurture_attachment(
     )
     db.commit()
     db.refresh(task)
-    return nurture_task_out(db, task)
+    return nurture_task_out(db, task, user)
 
 
 @app.post("/api/nurture-tasks/{task_id}/regenerate", response_model=NurtureTaskOut)
@@ -2510,9 +2963,10 @@ def regenerate_nurture_draft(
     payload: NurtureTaskRegenerateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ops),
+    user: User = Depends(current_user),
 ) -> NurtureTaskOut:
     task = get_nurture_task_or_404(db, task_id)
+    require_nurture_scope(db, request, user, task)
     if payload.generation_prompt:
         task.generation_prompt = payload.generation_prompt
     context = build_nurture_context(db, task)
@@ -2538,7 +2992,7 @@ def regenerate_nurture_draft(
     )
     db.commit()
     db.refresh(task)
-    return nurture_task_out(db, task)
+    return nurture_task_out(db, task, user)
 
 
 @app.post("/api/nurture-tasks/{task_id}/confirm", response_model=NurtureTaskOut)
@@ -2547,14 +3001,19 @@ def confirm_nurture_task(
     payload: NurtureTaskConfirmRequest,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ops),
+    user: User = Depends(current_user),
 ) -> NurtureTaskOut:
     task = get_nurture_task_or_404(db, task_id)
+    require_nurture_scope(db, request, user, task)
     task.draft_content = payload.draft_content
+    if payload.email_subject:
+        task.email_subject = payload.email_subject
     if task.approval_status != "confirmed":
         task.approval_status = "confirmed"
+        task.email_status = "sent"
         task.confirmed_by = user.id
         task.confirmed_at = datetime.utcnow()
+        task.sent_at = task.confirmed_at
         task.updated_by = user.id
         add_audit(
             db,
@@ -2567,7 +3026,7 @@ def confirm_nurture_task(
         )
     db.commit()
     db.refresh(task)
-    return nurture_task_out(db, task)
+    return nurture_task_out(db, task, user)
 
 
 @app.get("/api/settings/summary")

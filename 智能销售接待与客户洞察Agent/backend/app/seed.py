@@ -86,6 +86,8 @@ def seed_data(db: Session) -> None:
         [
             Lead(
                 customer_name="GlobalMed Peru",
+                email="carlos@globalmed.example",
+                organization="GlobalMed Peru",
                 country="Peru",
                 customer_type="代理商",
                 product="Portable Ultrasound",
@@ -106,6 +108,8 @@ def seed_data(db: Session) -> None:
             ),
             Lead(
                 customer_name="Al Noor Hospital",
+                email="procurement@alnoor.example",
+                organization="Al Noor Hospital",
                 country="UAE",
                 customer_type="Hospital",
                 product="Trolley Ultrasound",
@@ -128,10 +132,14 @@ def seed_data(db: Session) -> None:
     )
     customer = Customer(
         name="GlobalMed Peru",
+        email="carlos@globalmed.example",
+        organization="GlobalMed Peru",
         country="Peru",
         customer_type="代理商",
         product="Portable Ultrasound",
         tier="高意向",
+        demand_summary="客户需要区域诊所使用的 Portable Ultrasound 产品组合与型号对比资料。",
+        source_summary="网站 / 官网聊天",
         owner_id=sales.id,
     )
     db.add(customer)

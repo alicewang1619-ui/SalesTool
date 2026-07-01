@@ -132,6 +132,48 @@ def test_login_returns_role_and_token(client: TestClient) -> None:
     assert me.json()["email"] == "admin@ultrasound-growth.local"
 
 
+def test_me_profile_updates_only_current_user_email_settings_and_password(client: TestClient) -> None:
+    headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+
+    profile = client.get("/api/me/profile", headers=headers)
+    assert profile.status_code == 200
+    assert profile.json()["email"] == "maria@ultrasound-growth.local"
+    assert profile.json()["email_settings"]["sender_email"]
+
+    updated = client.put(
+        "/api/me/profile",
+        json={
+            "name": "Maria Chen",
+            "sender_email": "maria.sender@ultrasound-growth.local",
+            "sender_name": "Maria Chen · Ultrasound Growth",
+            "smtp_host": "smtp.ultrasound-growth.local",
+        },
+        headers={**headers, "x-trace-id": "me-profile-update-test"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["email_settings"]["sender_email"] == "maria.sender@ultrasound-growth.local"
+    assert updated.json()["email_settings"]["configured"] is True
+
+    wrong_password = client.put(
+        "/api/me/password",
+        json={"old_password": "Wrong123!", "new_password": "NewSales123!"},
+        headers=headers,
+    )
+    assert wrong_password.status_code == 400
+
+    changed = client.put(
+        "/api/me/password",
+        json={"old_password": "Sales123!", "new_password": "Sales123!"},
+        headers={**headers, "x-trace-id": "me-password-test"},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["changed"] is True
+
+    audit = client.get("/api/audit-logs", headers=auth_headers(client)).json()["items"]
+    assert any(event["action"] == "me_profile_updated" and event["trace_id"] == "me-profile-update-test" for event in audit)
+    assert any(event["action"] == "me_password_updated" and event["trace_id"] == "me-password-test" for event in audit)
+
+
 def test_login_locks_after_repeated_wrong_passwords_and_audits_trace(client: TestClient) -> None:
     headers = auth_headers(client)
     payload = {"email": "unknown@ultrasound-growth.local", "password": "wrong-password"}
@@ -315,6 +357,25 @@ def test_dashboard_filters_and_pagination_are_backend_driven(client: TestClient)
     assert first_page.status_code == 200
     assert second_page.status_code == 200
     assert first_page.json()["items"][0]["id"] != second_page.json()["items"][0]["id"]
+
+
+def test_dashboard_leads_pending_and_customers_support_time_scope(client: TestClient) -> None:
+    headers = auth_headers(client)
+
+    dashboard = client.get("/api/dashboard", params={"cycle": "today", "page_size": 5}, headers=headers)
+    leads = client.get("/api/leads", params={"time_scope": "today", "page_size": 5}, headers=headers)
+    pending = client.get("/api/assignments/pending", params={"time_scope": "today", "page_size": 5}, headers=headers)
+    customers = client.get("/api/customers", params={"time_scope": "today", "page_size": 5}, headers=headers)
+
+    assert dashboard.status_code == 200
+    assert dashboard.json()["time_scope"]["scope"] == "today"
+    assert dashboard.json()["metric_links"]["today_inquiries"].startswith("/admin/leads?time_scope=today")
+    assert leads.status_code == 200
+    assert all("created_at" in item for item in leads.json()["items"])
+    assert pending.status_code == 200
+    assert all("created_at" in item for item in pending.json()["items"])
+    assert customers.status_code == 200
+    assert all("first_inquiry_at" in item for item in customers.json()["items"])
 
 
 def test_dashboard_respects_sales_data_scope(client: TestClient) -> None:
@@ -513,6 +574,21 @@ def test_customer_detail_returns_background_sources_history_and_timeline(client:
     assert {"status", "summary", "happened_at"} <= set(body["timeline"][0])
 
 
+def test_customer_detail_returns_basic_info_demand_and_signals(client: TestClient) -> None:
+    response = client.get("/api/customers/1", headers=auth_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["email"]
+    assert body["organization"]
+    assert body["demand_summary"]
+    assert body["source_summary"]
+    assert body["first_inquiry_at"]
+    assert body["background"]["current_summary"]
+    assert body["signals"]
+    assert body["signals"][0]["customer_detail_path"] == "/admin/customers/1"
+
+
 def test_customer_detail_background_manual_update_preserves_auto_version_and_audits(client: TestClient) -> None:
     headers = auth_headers(client)
     original = client.get("/api/customers/1", headers=headers).json()["background"]["auto_summary"]
@@ -636,6 +712,56 @@ def test_channel_import_accepts_xlsx_and_exposes_progress(client: TestClient) ->
     assert body["success_rows"] == 1
     leads = client.get("/api/leads", params={"page_size": 100}, headers=headers).json()["items"]
     assert any(item["customer_name"] == "Excel Clinic" for item in leads)
+
+
+def test_import_template_exposes_required_customer_fields(client: TestClient) -> None:
+    response = client.get("/api/import-template", headers=auth_headers(client))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    body = response.text
+    for field in [
+        "customer_name",
+        "email",
+        "organization",
+        "country",
+        "customer_type",
+        "product",
+        "source_category",
+        "source_label",
+        "raw_inquiry",
+    ]:
+        assert field in body
+
+
+def test_channel_import_auto_assigns_by_country_mapping_and_returns_summary(client: TestClient) -> None:
+    headers = auth_headers(client)
+    customer_name = f"Auto Assigned Peru {uuid4().hex[:8]}"
+    workbook = make_xlsx(
+        [
+            ["customer_name", "email", "organization", "country", "customer_type", "product", "source_category", "source_label", "raw_inquiry"],
+            [customer_name, "buyer@auto-peru.example", "Auto Peru Clinic", "Peru", "Clinic", "Portable Ultrasound", "网站", "官网聊天", "Need portable ultrasound for a new clinic."],
+        ]
+    )
+
+    created = client.post(
+        "/api/import-jobs",
+        files={"file": ("auto-assigned.xlsx", workbook, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+    job = client.get(f"/api/import-jobs/{created.json()['task_id']}", headers=headers)
+    body = job.json()
+    assert body["success_rows"] == 1
+    assert body["auto_assigned_rows"] == 1
+    assert body["pending_assignment_rows"] == 0
+
+    leads = client.get("/api/leads", params={"page_size": 100}, headers=headers).json()["items"]
+    imported = next(item for item in leads if item["customer_name"] == customer_name)
+    assert imported["owner_id"] == 2
+    assert imported["owner_name"] == "Maria Chen"
+    assert imported["email"] == "buyer@auto-peru.example"
 
 
 def test_channel_import_rejects_oversized_or_invalid_files_before_worker(client: TestClient) -> None:
@@ -1167,6 +1293,8 @@ def test_report_period_aggregates_by_dimensions_and_excludes_money(client: TestC
     assert response.status_code == 200
     body = response.json()
     assert body["period"] == "year"
+    assert body["period_granularity"] == "year"
+    assert str(datetime.utcnow().year) in body["period_label"]
     assert_no_money_fields(body)
     assert body["metrics"]["inquiries"] >= 2
     assert body["metrics"]["valid_leads"] >= 2
@@ -1928,6 +2056,10 @@ def test_nurture_tasks_list_uses_persistent_prompt_context_and_pagination(client
     assert task["recommended_next_action"]
     assert task["customer_note"] is not None
     assert task["generation_prompt"] is not None
+    assert task["sender_email"]
+    assert task["recipient_email"]
+    assert task["email_subject"]
+    assert task["email_status"] in {"draft", "sent"}
     assert task["prompt_context_snapshot"]["safety_boundary"] == "NURTURE_CONTEXT_DATA_ONLY"
     assert "<customer_context>" in task["prompt_context_snapshot"]["rendered_prompt"]
     assert task["model_provider"]
@@ -2033,13 +2165,20 @@ def test_nurture_confirm_send_is_manual_idempotent_and_audited(client: TestClien
     assert confirm_events[0]["trace_id"] == trace_id
 
 
-def test_sales_user_cannot_access_nurture_tasks(client: TestClient) -> None:
+def test_sales_user_can_access_only_scoped_nurture_tasks(client: TestClient) -> None:
     sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
 
     response = client.get("/api/nurture-tasks", headers=sales_headers)
 
-    assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "FORBIDDEN"
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] >= 1
+    assert {item["customer_name"] for item in body["items"]} == {"GlobalMed Peru"}
+    task_id = body["items"][0]["id"]
+    detail = client.get(f"/api/nurture-tasks/{task_id}", headers=sales_headers)
+    assert detail.status_code == 200
+    assert detail.json()["sender_email"]
+    assert detail.json()["recipient_email"]
 
 
 def first_customer_for_signal(client: TestClient, headers: dict[str, str]) -> dict:
@@ -2162,13 +2301,17 @@ def test_customer_signal_context_is_data_only_and_excludes_unauthorized_social_s
     assert "facebook_scrape" not in body["rendered_prompt"]
 
 
-def test_sales_user_cannot_access_customer_signals(client: TestClient) -> None:
+def test_sales_user_can_read_owned_customer_signals_but_not_global_or_foreign(client: TestClient) -> None:
     sales_headers = {**auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"), "x-trace-id": "customer-signal-sales-denied"}
 
-    response = client.get("/api/customer-signals", headers=sales_headers)
+    scoped = client.get("/api/customer-signals", params={"customer_id": 1}, headers=sales_headers)
+    global_list = client.get("/api/customer-signals", headers=sales_headers)
 
-    assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "FORBIDDEN"
+    assert scoped.status_code == 200
+    assert scoped.json()["items"]
+    assert all(item["customer_id"] == 1 for item in scoped.json()["items"])
+    assert global_list.status_code == 403
+    assert global_list.json()["detail"]["code"] == "FORBIDDEN"
     audit = client.get("/api/audit-logs", headers=auth_headers(client))
     assert any(
         event["action"] == "permission_denied"

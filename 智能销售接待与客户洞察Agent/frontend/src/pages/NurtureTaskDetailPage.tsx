@@ -44,6 +44,18 @@ const emailPurposeOptions = [
   { value: "Reactivation", label: "Reactivation" }
 ];
 
+function writerTooltipTitle(writer: EmailWriterRole) {
+  return `Goal: ${writer.role_goal || writer.best_for || "Not configured"}; Capabilities: ${writer.capabilities || writer.style || "Not configured"}; Skills: ${writer.skills.join(", ") || "Not configured"}; Background: ${writer.background || "Not configured"}; Tags: ${(writer.tags ?? []).join(", ") || "None"}`;
+}
+
+function writerNameLabel(writer: EmailWriterRole) {
+  return (
+    <Tooltip placement="right" title={writerTooltipTitle(writer)}>
+      <span>{writer.name}</span>
+    </Tooltip>
+  );
+}
+
 export function NurtureTaskDetailPage() {
   const { taskId = "" } = useParams();
   const [form] = Form.useForm<NurtureFormValues>();
@@ -212,7 +224,11 @@ export function NurtureTaskDetailPage() {
                   <Descriptions.Item label="产品">{task.product}</Descriptions.Item>
                   <Descriptions.Item label="模型">{task.model_provider} / {task.model_version}</Descriptions.Item>
                   <Descriptions.Item label="邮件目的"><Tag color="purple">Purpose: {task.email_purpose}</Tag></Descriptions.Item>
-                  <Descriptions.Item label="写手">{task.writer_role_name} · {task.writer_role_style}</Descriptions.Item>
+                  <Descriptions.Item label="写手">
+                    <Tooltip title={selectedWriter ? writerTooltipTitle(selectedWriter) : task.writer_role_style}>
+                      <span>{task.writer_role_name}</span>
+                    </Tooltip>
+                  </Descriptions.Item>
                 </Descriptions>
               ) : null}
               <Form.Item name="nurtureReason" label="触达理由" rules={[{ required: true, min: 5 }]}><Input.TextArea rows={5} /></Form.Item>
@@ -230,14 +246,14 @@ export function NurtureTaskDetailPage() {
               </Form.Item>
               <Form.Item name="writerRoleKey" label="邮件写手角色" rules={[{ required: true }]}>
                 <Select
-                  options={writerRoles.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.style}` }))}
+                  options={writerRoles.map((writer) => ({ value: writer.key, label: writerNameLabel(writer) }))}
                   placeholder="选择写邮件角色"
                   onChange={(value) => void handleRegenerate({ writerRoleKey: value })}
                 />
               </Form.Item>
               {selectedWriter ? (
-                <Tooltip title={`Goal: ${selectedWriter.role_goal || selectedWriter.best_for}; Capabilities: ${selectedWriter.capabilities || "Not configured"}; Skills: ${selectedWriter.skills.join(", ")}; Tags: ${(selectedWriter.tags ?? []).join(", ") || "None"}`}>
-                  <Button style={{ marginBottom: 12 }}>{selectedWriter.name}: {selectedWriter.style}</Button>
+                <Tooltip title={writerTooltipTitle(selectedWriter)}>
+                  <Button style={{ marginBottom: 12 }}>{selectedWriter.name}</Button>
                 </Tooltip>
               ) : null}
               <Form.Item name="draftContent" label="正文" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={8} /></Form.Item>

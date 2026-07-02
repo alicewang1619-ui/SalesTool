@@ -16,6 +16,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message
@@ -138,6 +139,27 @@ function asError(error: unknown): Error {
 function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function writerTooltipTitle(writer: EmailWriterRole) {
+  return (
+    <div style={{ maxWidth: 340 }}>
+      <strong>{writer.name}</strong>
+      <div>Goal: {writer.role_goal || writer.best_for || "Not configured"}</div>
+      <div>Capabilities: {writer.capabilities || writer.style || "Not configured"}</div>
+      <div>Skills: {writer.skills?.join(", ") || "Not configured"}</div>
+      <div>Background: {writer.background || "Not configured"}</div>
+      <div>Tags: {(writer.tags ?? []).join(", ") || "None"}</div>
+    </div>
+  );
+}
+
+function writerNameLabel(writer: EmailWriterRole) {
+  return (
+    <Tooltip placement="right" title={writerTooltipTitle(writer)}>
+      <span>{writer.name}</span>
+    </Tooltip>
+  );
 }
 
 function normaliseAIModelConfig(config?: Partial<AIModelConfig> | null): AIModelConfig {
@@ -282,6 +304,15 @@ export function SettingsPage() {
   const selectedBindingModel = modelOptions.find((item) => item.value === selectedBindingValue) ?? selectedAIModel;
   const selectedModelForDetails = modelOptions.find((item) => item.value === selectedModelValue) ?? modelOptions[0];
   const selectedWriterForDetails = emailWriters.find((writer) => writer.key === selectedWriterKey) ?? enabledEmailWriters[0] ?? emailWriters[0];
+  const selectedWriterIndex = emailWriters.findIndex((writer) => writer.key === selectedWriterKey);
+  const enabledWriterSelectOptions = useMemo(
+    () => enabledEmailWriters.map((writer) => ({ value: writer.key, label: writerNameLabel(writer) })),
+    [enabledEmailWriters]
+  );
+  const writerSelectOptions = useMemo(
+    () => emailWriters.map((writer) => ({ value: writer.key, label: writerNameLabel(writer) })),
+    [emailWriters]
+  );
 
   async function load() {
     setLoading(true);
@@ -993,15 +1024,15 @@ export function SettingsPage() {
               </Col>
             </Row>
           </Card>
-          <Card title="邮件写手角色" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateWriter}>新增写手</Button><Button onClick={() => { const index = emailWriters.findIndex((writer) => writer.key === selectedWriterKey); if (index >= 0) openEditWriter(index); }}>编辑所选角色</Button><Button danger icon={<Trash2 size={16} />} onClick={deleteSelectedWriter}>删除所选角色</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存写手配置</Button></Space>}>
+          <Card title="邮件写手角色" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateWriter}>新增写手</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存写手配置</Button></Space>}>
             <Row gutter={[16, 16]}>
               <Col xs={24} md={8}>
                 <Typography.Text className="field-label">默认邮件写手</Typography.Text>
-                <Select value={defaultEmailWriter} options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.style}` }))} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
+                <Select value={defaultEmailWriter} options={enabledWriterSelectOptions} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
               </Col>
               <Col xs={24} md={8}>
                 <Typography.Text className="field-label">角色下拉菜单</Typography.Text>
-                <Select value={selectedWriterKey} options={emailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.style}` }))} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
+                <Select value={selectedWriterKey} options={writerSelectOptions} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
               </Col>
               <Col xs={24} md={8}>
                 <div className="config-detail-card compact">
@@ -1010,6 +1041,10 @@ export function SettingsPage() {
                   <Typography.Paragraph className="muted">{selectedWriterForDetails?.capabilities || selectedWriterForDetails?.style}</Typography.Paragraph>
                   <Space wrap>{selectedWriterForDetails?.skills.map((skill) => <Tag key={skill}>{skill}</Tag>)}</Space>
                   <Space wrap style={{ marginTop: 8 }}>{(selectedWriterForDetails?.tags ?? []).map((tag) => <Tag color="purple" key={tag}>{tag}</Tag>)}</Space>
+                  <Space wrap style={{ marginTop: 12 }}>
+                    <Button size="small" disabled={selectedWriterIndex < 0} onClick={() => selectedWriterIndex >= 0 && openEditWriter(selectedWriterIndex)}>编辑</Button>
+                    <Button size="small" danger disabled={selectedWriterIndex < 0} onClick={deleteSelectedWriter}>删除</Button>
+                  </Space>
                 </div>
               </Col>
             </Row>

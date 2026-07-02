@@ -87,6 +87,18 @@ function initialBulkValues(searchParams: URLSearchParams): BulkEmailFormValues {
   };
 }
 
+function writerTooltipTitle(writer: EmailWriterRole) {
+  return `Goal: ${writer.role_goal || writer.best_for || "Not configured"}; Capabilities: ${writer.capabilities || writer.style || "Not configured"}; Skills: ${writer.skills?.join(", ") || "Not configured"}; Background: ${writer.background || "Not configured"}; Tags: ${(writer.tags ?? []).join(", ") || "None"}`;
+}
+
+function writerNameLabel(writer: EmailWriterRole) {
+  return (
+    <Tooltip placement="right" title={writerTooltipTitle(writer)}>
+      <span>{writer.name}</span>
+    </Tooltip>
+  );
+}
+
 export function NurtureTasksPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<NurtureTaskPageResult | null>(null);
@@ -342,7 +354,7 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
               <Select
                 allowClear
                 placeholder="选择邮件写手"
-                options={writerRoles.map((role) => ({ value: role.key, label: `${role.name} · ${role.style}` }))}
+                options={writerRoles.map((role) => ({ value: role.key, label: writerNameLabel(role) }))}
               />
             </Form.Item>
           </Col>

@@ -788,6 +788,104 @@ def lead_out(db: Session, lead: Lead) -> LeadOut:
     return LeadOut(**data)
 
 
+CUSTOMER_TIER_BY_FEEDBACK_STATUS = {
+    "无效": "无效客户",
+    "跟进中": "有效跟进",
+    "已报价": "已报价未回复",
+    "已签单": "已成交客户",
+    "已付款": "已成交客户",
+    "价格流失": "撤单/流失",
+    "撤单": "撤单/流失",
+}
+
+
+def ensure_customer_for_lead(db: Session, lead: Lead) -> Customer:
+    customer = db.scalar(select(Customer).where(Customer.name == lead.customer_name))
+    if customer is None and lead.email:
+        customer = db.scalar(select(Customer).where(Customer.email == lead.email))
+
+    source_summary = f"{lead.source_category} / {lead.source_label}"
+    first_inquiry_at = lead.created_at or datetime.utcnow()
+    if customer is None:
+        customer = Customer(
+            name=lead.customer_name,
+            email=lead.email or "",
+            organization=lead.organization or lead.customer_name,
+            country=lead.country or "待确认",
+            customer_type=lead.customer_type or "待确认",
+            product=lead.product or "待确认",
+            tier="资料库",
+            demand_summary=lead.raw_inquiry or "暂无询盘需求，请运营补充。",
+            source_summary=source_summary,
+            first_inquiry_at=first_inquiry_at,
+            owner_id=lead.owner_id,
+        )
+        db.add(customer)
+        db.flush()
+    else:
+        customer.email = customer.email or lead.email or ""
+        customer.organization = customer.organization or lead.organization or lead.customer_name
+        if customer.country == "待确认" and lead.country:
+            customer.country = lead.country
+        if customer.customer_type == "待确认" and lead.customer_type:
+            customer.customer_type = lead.customer_type
+        if customer.product == "待确认" and lead.product:
+            customer.product = lead.product
+        customer.demand_summary = customer.demand_summary or lead.raw_inquiry or "暂无询盘需求，请运营补充。"
+        customer.source_summary = customer.source_summary or source_summary
+        if not customer.first_inquiry_at or customer.first_inquiry_at > first_inquiry_at:
+            customer.first_inquiry_at = first_inquiry_at
+
+    if not customer.background:
+        background = CustomerBackground(
+            customer_id=customer.id,
+            auto_summary=f"{lead.customer_name} 来自 {source_summary}，需求：{lead.raw_inquiry or '待补充'}",
+            manual_summary=None,
+            evidence=f"线索：{lead.id or '未入库'}；来源：{source_summary}；国家：{lead.country or '待确认'}；邮箱：{lead.email or '未提供'}",
+            confidence="待复核",
+        )
+        db.add(background)
+        db.flush()
+        customer.background = background
+    return customer
+
+
+def sync_customer_assignment_from_lead(db: Session, lead: Lead) -> Customer:
+    customer = ensure_customer_for_lead(db, lead)
+    if lead.owner_id is not None:
+        customer.owner_id = lead.owner_id
+    return customer
+
+
+def sync_customer_feedback_from_lead(db: Session, lead: Lead, feedback: SalesFeedback) -> Customer:
+    customer = ensure_customer_for_lead(db, lead)
+    customer.owner_id = feedback.owner_id
+    mapped_tier = CUSTOMER_TIER_BY_FEEDBACK_STATUS.get(feedback.feedback_status)
+    if mapped_tier:
+        customer.tier = mapped_tier
+    if feedback.remark and not customer.demand_summary:
+        customer.demand_summary = feedback.remark
+    return customer
+
+
+def create_active_feedback_link(db: Session, lead: Lead, owner: User) -> tuple[SalesFeedbackLink, datetime]:
+    db.query(SalesFeedbackLink).filter(
+        SalesFeedbackLink.lead_id == lead.id,
+        SalesFeedbackLink.active.is_(True),
+    ).update({"active": False}, synchronize_session=False)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    feedback_link = SalesFeedbackLink(
+        token=uuid4().hex,
+        lead_id=lead.id,
+        owner_id=owner.id,
+        expires_at=expires_at.replace(tzinfo=None),
+        active=True,
+    )
+    db.add(feedback_link)
+    db.flush()
+    return feedback_link, expires_at
+
+
 def import_job_out(job: ImportJob) -> ImportJobOut:
     try:
         failures = json.loads(job.failures_json or "[]")
@@ -979,6 +1077,7 @@ def process_import_job(db: Session, job: ImportJob) -> None:
             created_at=created_at,
         )
         db.add(lead)
+        db.flush()
         customer = db.scalar(select(Customer).where(Customer.name == customer_name))
         if not customer:
             customer = Customer(
@@ -1011,6 +1110,8 @@ def process_import_job(db: Session, job: ImportJob) -> None:
             customer.demand_summary = customer.demand_summary or raw_inquiry
             customer.source_summary = customer.source_summary or f"{clean['source_category']} / {clean['source_label']}"
             customer.owner_id = customer.owner_id or (owner.id if owner else None)
+        if owner:
+            create_active_feedback_link(db, lead, owner)
         success_rows += 1
 
     job.processed_rows = len(rows)
@@ -1581,6 +1682,8 @@ def submit_feedback_card(
 
     existing = db.scalar(select(SalesFeedback).where(SalesFeedback.link_id == feedback_link.id))
     if existing:
+        sync_customer_feedback_from_lead(db, lead, existing)
+        db.commit()
         return feedback_submit_out(existing)
 
     feedback = SalesFeedback(
@@ -1594,6 +1697,7 @@ def submit_feedback_card(
     lead.feedback_status = payload.feedback_status
     db.add(feedback)
     db.flush()
+    sync_customer_feedback_from_lead(db, lead, feedback)
     add_audit(
         db,
         request.state.trace_id,
@@ -1671,20 +1775,8 @@ def confirm_pending_assignment(
 
     lead.owner_id = owner.id
     lead.feedback_status = PENDING_SALES_FEEDBACK_STATUS
-    db.query(SalesFeedbackLink).filter(
-        SalesFeedbackLink.lead_id == lead.id,
-        SalesFeedbackLink.active.is_(True),
-    ).update({"active": False}, synchronize_session=False)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    feedback_link = SalesFeedbackLink(
-        token=uuid4().hex,
-        lead_id=lead.id,
-        owner_id=owner.id,
-        expires_at=expires_at.replace(tzinfo=None),
-        active=True,
-    )
-    db.add(feedback_link)
-    db.flush()
+    sync_customer_assignment_from_lead(db, lead)
+    feedback_link, expires_at = create_active_feedback_link(db, lead, owner)
     add_audit(
         db,
         request.state.trace_id,
@@ -1811,16 +1903,32 @@ def update_lead_assignment(
     lead = db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
+    previous_owner_id = lead.owner_id
+    assigned_owner: User | None = None
     if payload.owner_id is not None:
         owner = db.get(User, payload.owner_id)
         if not owner or owner.role != "sales" or not owner.enabled:
             raise HTTPException(status_code=400, detail="Assignee must be an enabled sales user")
         lead.owner_id = owner.id
+        assigned_owner = owner
     else:
         lead.owner_id = None
     lead.feedback_status = normalise_feedback_status(payload.feedback_status, lead.owner_id is not None)
     if lead.owner_id is not None and lead.feedback_status not in [*FEEDBACK_STATUS_OPTIONS, PENDING_SALES_FEEDBACK_STATUS]:
         raise HTTPException(status_code=422, detail=error_detail("INVALID_FEEDBACK_STATUS", "Feedback status is not supported."))
+    sync_customer_assignment_from_lead(db, lead)
+    active_link = db.scalar(
+        select(SalesFeedbackLink).where(
+            SalesFeedbackLink.lead_id == lead.id,
+            SalesFeedbackLink.active.is_(True),
+        )
+    )
+    if assigned_owner and (
+        previous_owner_id != assigned_owner.id
+        or active_link is None
+        or active_link.owner_id != assigned_owner.id
+    ):
+        create_active_feedback_link(db, lead, assigned_owner)
     add_audit(
         db,
         request.state.trace_id,

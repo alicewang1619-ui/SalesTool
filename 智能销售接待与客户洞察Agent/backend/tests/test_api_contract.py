@@ -101,6 +101,8 @@ def client() -> TestClient:
             globalmed.feedback_status = "跟进中"
         globalmed_customer = db.query(Customer).filter(Customer.name == "GlobalMed Peru").first()
         if globalmed_customer and globalmed_customer.background:
+            globalmed_customer.owner_id = 2
+            globalmed_customer.tier = "高意向"
             globalmed_customer.background.manual_summary = None
             globalmed_customer.background.updated_by = "system"
         al_noor = db.query(Lead).filter(Lead.customer_name == "Al Noor Hospital").first()
@@ -299,6 +301,13 @@ def test_lead_assignment_update_persists_and_writes_audit(client: TestClient) ->
     refreshed = client.get(f"/api/leads/{target['id']}", headers=headers)
     assert refreshed.status_code == 200
     assert refreshed.json()["assignment"]["owner_id"] == 2
+    with SessionLocal() as db:
+        link = db.query(SalesFeedbackLink).filter(
+            SalesFeedbackLink.lead_id == target["id"],
+            SalesFeedbackLink.owner_id == 2,
+            SalesFeedbackLink.active.is_(True),
+        ).first()
+        assert link is not None
 
     audit = client.get("/api/audit-logs", headers=headers)
     assert audit.status_code == 200
@@ -780,6 +789,14 @@ def test_channel_import_auto_assigns_by_country_mapping_and_returns_summary(clie
     assert imported["owner_id"] == 2
     assert imported["owner_name"] == "Maria Chen"
     assert imported["email"] == "buyer@auto-peru.example"
+    with SessionLocal() as db:
+        link = db.query(SalesFeedbackLink).filter(
+            SalesFeedbackLink.lead_id == imported["id"],
+            SalesFeedbackLink.owner_id == 2,
+            SalesFeedbackLink.active.is_(True),
+        ).first()
+        assert link is not None
+        assert link.expires_at > datetime.utcnow()
 
 
 def test_channel_import_rejects_oversized_or_invalid_files_before_worker(client: TestClient) -> None:
@@ -1065,6 +1082,67 @@ def test_feedback_submit_writes_feedback_updates_lead_and_audit(client: TestClie
         and event["trace_id"] == "feedback-submit-test"
         for event in audit.json()["items"]
     )
+
+
+def test_feedback_submit_syncs_customer_pool_owner_and_tier(client: TestClient) -> None:
+    headers = auth_headers(client)
+    suffix = uuid4().hex[:8]
+    customer_name = f"Manual Feedback Sync {suffix}"
+    with SessionLocal() as db:
+        lead = Lead(
+            customer_name=customer_name,
+            email=f"sync-customer-{suffix}@example.com",
+            organization="Sync Customer Clinic",
+            country="待确认",
+            customer_type="Clinic",
+            product="Portable Ultrasound",
+            source_category="网站",
+            source_label="官网聊天",
+            score_label="待补充",
+            feedback_status="未分配",
+            raw_inquiry="Need portable ultrasound comparison before budget review.",
+            conversation_history="[]",
+            owner_id=None,
+        )
+        db.add(lead)
+        db.commit()
+        lead_id = lead.id
+
+    assigned = client.post(
+        f"/api/assignments/{lead_id}/assign",
+        json={"owner_id": 2, "expected_owner_id": None},
+        headers=headers,
+    )
+    assert assigned.status_code == 200
+    with SessionLocal() as db:
+        customer = db.query(Customer).filter(Customer.name == customer_name).first()
+        assert customer is not None
+        assert customer.owner_id == 2
+        assert customer.background is not None
+
+    submitted = client.post(
+        f"/api/feedback-links/{assigned.json()['feedback_link_token']}/submit",
+        json={
+            "feedback_status": "已报价",
+            "customer_judgement": "真实需求，继续推进",
+            "remark": "客户要求收到报价后的型号对比资料。",
+        },
+    )
+    assert submitted.status_code == 200
+
+    customers = client.get("/api/customers", params={"country": "待确认", "page_size": 100}, headers=headers)
+    assert customers.status_code == 200
+    imported_customer = next(item for item in customers.json()["items"] if item["name"] == customer_name)
+    assert imported_customer["owner_id"] == 2
+    assert imported_customer["owner_name"] == "Maria Chen"
+    assert imported_customer["tier"] == "已报价未回复"
+
+    sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+    detail = client.get(f"/api/customers/{imported_customer['id']}", headers=sales_headers)
+    assert detail.status_code == 200
+    assert detail.json()["tier"] == "已报价未回复"
+    assert detail.json()["owner_id"] == 2
+    assert detail.json()["feedback_records"][0]["status"] == "已报价"
 
 
 def test_feedback_link_rejects_expired_or_non_owner_link(client: TestClient) -> None:

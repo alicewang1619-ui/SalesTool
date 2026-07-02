@@ -22,7 +22,7 @@ export function AppLayout() {
   return (
     <div className="layout">
       <aside className="sidebar">
-        <div className="brand"><span className="dot" /><span>项目知识库</span></div>
+        <div className="brand"><span className="dot" /><span>知渊</span></div>
         {NAV.map((n) => (
           <NavLink
             key={n.to}

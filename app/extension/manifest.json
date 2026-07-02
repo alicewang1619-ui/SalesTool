@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "项目知识库 · 一键剪藏",
+  "name": "知渊 · 一键剪藏",
   "version": "1.0.0",
   "description": "把当前网页 / 微信公众号文章一键剪藏到本地知识库（用浏览器已渲染页面，绕过反爬）。",
   "permissions": ["activeTab", "scripting", "storage"],

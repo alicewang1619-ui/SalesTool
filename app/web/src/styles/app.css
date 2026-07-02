@@ -222,7 +222,20 @@ button { font-family: inherit; }
 .cards .card > div .tag { margin-right: var(--sp-2); }
 
 /* ===== 问答页 ===== */
-.ask-main { display: flex; flex-direction: column; height: 100vh; }
+/* 问答：左侧多会话列表 + 右侧对话 */
+.ask-layout { display: flex; height: 100vh; }
+.ask-sessions { width: 220px; flex-shrink: 0; border-right: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; padding: var(--sp-3); gap: var(--sp-2); overflow: hidden; }
+.ask-sessions .new-conv { width: 100%; }
+.conv-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin-top: var(--sp-2); }
+.conv-item { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-md); cursor: pointer; color: var(--text-body); }
+.conv-item:hover { background: var(--bg-subtle); }
+.conv-item.active { background: var(--accent-soft); color: var(--accent); }
+.conv-title { flex: 1; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv-actions { display: none; gap: 2px; }
+.conv-item:hover .conv-actions { display: flex; }
+.conv-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px; opacity: 0.7; }
+.conv-btn:hover { opacity: 1; }
+.ask-main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
 .ask-topbar { gap: var(--sp-3); }
 .ask-topbar .model { margin-left: auto; font-size: var(--fs-xs); color: var(--text-muted); background: var(--bg-subtle); padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-full); }
 .chat { flex: 1; overflow-y: auto; padding: var(--sp-6); }

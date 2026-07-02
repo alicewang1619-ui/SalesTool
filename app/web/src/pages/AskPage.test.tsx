@@ -46,7 +46,8 @@ describe('C-QA-01 思考中状态', () => {
     renderPage();
     await userEvent.type(screen.getByLabelText('提问'), '缓存相关方案');
     await userEvent.click(screen.getByRole('button', { name: '发送' }));
-    expect(screen.getByText('缓存相关方案')).toBeInTheDocument();
+    // 用户气泡（标题栏也会出现同名会话标题，故限定到气泡）
+    expect(document.querySelector('.msg.user .bubble')?.textContent).toBe('缓存相关方案');
     expect(await screen.findByTestId('thinking')).toBeInTheDocument();
     resolve(answer());
     await screen.findByTestId('answer');
@@ -114,7 +115,7 @@ describe('C-QA-08 多轮历史（issue #10）', () => {
 });
 
 describe('C-QA-09 对话持久化（issue #10：刷新后保留历史问答）', () => {
-  it('问答后重新挂载页面，历史对话仍在；点「新对话」清空', async () => {
+  it('问答后重新挂载页面，历史对话仍在', async () => {
     m.ask.mockResolvedValue(answer());
     const { unmount } = renderPage();
     await userEvent.type(screen.getByLabelText('提问'), '缓存穿透是什么');
@@ -123,13 +124,30 @@ describe('C-QA-09 对话持久化（issue #10：刷新后保留历史问答）',
     // 模拟刷新/离开再回来：卸载后重新渲染
     unmount();
     renderPage();
-    // 历史问答仍在（用户问题气泡 + 答案）
-    expect(await screen.findByText('缓存穿透是什么')).toBeInTheDocument();
+    expect(document.querySelector('.msg.user .bubble')?.textContent).toBe('缓存穿透是什么');
     expect(screen.getByTestId('answer')).toBeInTheDocument();
-    // 新对话清空并持久化清除
+  });
+});
+
+describe('C-QA-10 多会话（新建/切换/删除，本地持久化）', () => {
+  it('新对话开一个空会话；切回旧会话历史仍在；删除后从列表移除', async () => {
+    m.ask.mockResolvedValue(answer());
+    renderPage();
+    // 第一个会话问一句
+    await userEvent.type(screen.getByLabelText('提问'), '第一会话问题');
+    await userEvent.click(screen.getByRole('button', { name: '发送' }));
+    await screen.findByTestId('answer');
+    // 新对话 → 空会话
     await userEvent.click(screen.getByTestId('new-chat'));
     expect(screen.getByTestId('ask-empty')).toBeInTheDocument();
-    expect(localStorage.getItem('zkb-ask-conversation')).toBeNull();
+    expect(screen.getAllByTestId('conv-item').length).toBe(2);
+    // 切回第一个会话（列表里标题为问题前缀）
+    const firstItem = screen.getAllByTestId('conv-item').find((el) => el.textContent?.includes('第一会话问题'))!;
+    await userEvent.click(firstItem);
+    expect(document.querySelector('.msg.user .bubble')?.textContent).toBe('第一会话问题');
+    // 删除该会话 → 列表移除
+    await userEvent.click(within(firstItem).getByTestId('conv-delete'));
+    expect(screen.queryByText('第一会话问题', { selector: '.conv-title' })).toBeNull();
   });
 });
 

@@ -2846,6 +2846,62 @@ def test_nurture_attachment_upload_validates_and_participates_in_regeneration(cl
     assert result["approval_status"] == "pending"
 
 
+def test_nurture_attachment_text_and_email_purpose_drive_generation(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "nurture-attachment-purpose-test"}
+    monkeypatch.setattr(main_module, "call_nurture_email_model", lambda model, context: "")
+    task = first_nurture_task(client, headers)
+
+    uploaded = client.post(
+        f"/api/nurture-tasks/{task['id']}/attachments",
+        files={
+            "file": (
+                "LATAM-workshop-invitation.txt",
+                b"Invitation: LATAM Ultrasound Growth Workshop on July 20. Focus: portable ultrasound demo and distributor enablement.",
+                "text/plain",
+            )
+        },
+        headers=headers,
+    )
+    assert uploaded.status_code == 200
+    attachment = uploaded.json()["attachments"][0]
+    assert "LATAM Ultrasound Growth Workshop" in attachment["extracted_text"]
+
+    event = client.post(
+        f"/api/nurture-tasks/{task['id']}/regenerate",
+        json={
+            "generation_prompt": "Use the uploaded invitation details and write a customer-facing English draft.",
+            "email_purpose": "Event invitation",
+            "writer_role_key": "baymax",
+        },
+        headers=headers,
+    )
+    assert event.status_code == 200
+    event_body = event.json()
+    assert "Email purpose: Event invitation" in event_body["prompt_context_snapshot"]["rendered_prompt"]
+    assert "LATAM Ultrasound Growth Workshop" in event_body["prompt_context_snapshot"]["rendered_prompt"]
+    assert "LATAM Ultrasound Growth Workshop" in event_body["draft_content"]
+    assert "invite" in event_body["draft_content"].lower() or "invitation" in event_body["draft_content"].lower()
+    assert_english_email_body(event_body["draft_content"])
+
+    comparison = client.post(
+        f"/api/nurture-tasks/{task['id']}/regenerate",
+        json={
+            "generation_prompt": "Use the uploaded product material and write a customer-facing English draft.",
+            "email_purpose": "Product comparison",
+            "writer_role_key": "baymax",
+        },
+        headers=headers,
+    )
+    assert comparison.status_code == 200
+    comparison_body = comparison.json()
+    assert comparison_body["draft_content"] != event_body["draft_content"]
+    assert "compare" in comparison_body["draft_content"].lower() or "comparison" in comparison_body["draft_content"].lower()
+    assert_english_email_body(comparison_body["draft_content"])
+
+
 def test_nurture_regeneration_uses_selected_email_writer_role(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,

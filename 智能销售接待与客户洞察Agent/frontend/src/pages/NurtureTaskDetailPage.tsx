@@ -40,6 +40,7 @@ const emailPurposeOptions = [
   { value: "Customer reply follow-up", label: "Customer reply follow-up" },
   { value: "Post-quote follow-up", label: "Post-quote follow-up" },
   { value: "Product comparison", label: "Product comparison" },
+  { value: "Event invitation", label: "Event invitation" },
   { value: "Meeting invitation", label: "Meeting invitation" },
   { value: "Reactivation", label: "Reactivation" }
 ];
@@ -125,8 +126,15 @@ export function NurtureTaskDetailPage() {
     if (!task) return false;
     setSaving(true);
     try {
-      fillForm(await uploadNurtureAttachment(task.id, file));
-      message.success("参考附件已上传，并进入 AI 写信上下文");
+      const uploadedTask = await uploadNurtureAttachment(task.id, file);
+      const values = form.getFieldsValue(["generationPrompt", "writerRoleKey", "emailPurpose"]);
+      const regeneratedTask = await regenerateNurtureTask(uploadedTask.id, {
+        generationPrompt: values.generationPrompt ?? uploadedTask.generation_prompt ?? "",
+        writerRoleKey: values.writerRoleKey ?? uploadedTask.writer_role_key,
+        emailPurpose: values.emailPurpose ?? uploadedTask.email_purpose
+      });
+      fillForm(regeneratedTask);
+      message.success("参考附件已解析，并已结合邮件目的重新生成草稿");
     } finally {
       setSaving(false);
     }
@@ -236,14 +244,18 @@ export function NurtureTaskDetailPage() {
               <Form.Item name="draftContent" label="正文" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={8} /></Form.Item>
               <div className="nurture-prompt-panel">
                 <Form.Item name="generationPrompt" label="生成提示词 / 补充指令"><Input.TextArea rows={4} /></Form.Item>
-                <Typography.Paragraph className="muted">提示词、客户摘要、背景调查、销售反馈和参考附件会一起进入大模型生成上下文。</Typography.Paragraph>
+                <Typography.Paragraph className="muted">提示词、客户摘要、背景调查、销售反馈和参考附件正文会一起进入后台大模型生成上下文。</Typography.Paragraph>
               </div>
               <div className="nurture-upload-panel">
-                <div><strong>参考附件</strong><Typography.Paragraph className="muted">上传产品彩页、型号对比表或应用案例，默认作为 AI 写信素材；是否随邮件发送需要后续人工确认。</Typography.Paragraph></div>
+                <div><strong>参考附件</strong><Typography.Paragraph className="muted">上传活动邀请函、产品资料、型号对比表或应用案例；系统会解析可读内容并重新生成草稿。</Typography.Paragraph></div>
                 <Upload accept=".pdf,.doc,.docx,.xls,.xlsx" beforeUpload={(file) => handleUpload(file as File)} showUploadList={false}><Button icon={<Paperclip size={16} />}>上传 PDF / Word / Excel</Button></Upload>
               </div>
               <Space wrap className="tag-cluster">
-                {(task?.attachments ?? []).length ? task?.attachments.map((item) => <Tag key={`${item.filename}-${item.uploaded_at}`} color="blue">{item.filename} · {Math.max(1, Math.ceil(item.size / 1024))} KB</Tag>) : <Tag color="gold">暂无参考附件</Tag>}
+                {(task?.attachments ?? []).length ? task?.attachments.map((item) => (
+                  <Tag key={`${item.filename}-${item.uploaded_at}`} color={item.extracted_text ? "blue" : "gold"}>
+                    {item.filename} · {Math.max(1, Math.ceil(item.size / 1024))} KB · {item.extracted_text ? "已解析正文" : "仅元数据"}
+                  </Tag>
+                )) : <Tag color="gold">暂无参考附件</Tag>}
               </Space>
               <Space wrap style={{ marginTop: 16 }}>
                 <Button htmlType="submit" loading={saving} icon={<Save size={16} />}>保存修正</Button>

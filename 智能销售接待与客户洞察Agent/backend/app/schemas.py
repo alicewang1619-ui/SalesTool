@@ -606,6 +606,7 @@ class NurtureAttachmentOut(BaseModel):
     size: int
     uploaded_by: str
     uploaded_at: datetime
+    extracted_text: str = ""
 
 
 class NurturePromptContextOut(BaseModel):

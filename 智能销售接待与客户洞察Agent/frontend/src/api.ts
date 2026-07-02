@@ -829,6 +829,7 @@ export type NurtureAttachment = {
   size: number;
   uploaded_by: string;
   uploaded_at: string;
+  extracted_text?: string;
 };
 
 export type NurturePromptContext = {

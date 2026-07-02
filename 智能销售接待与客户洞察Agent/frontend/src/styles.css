@@ -466,6 +466,17 @@ body {
   border-top: 1px solid #e6ebf4;
 }
 
+.nurture-dt-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 14px;
+  padding: 8px 12px;
+  border: 1px solid #eee6ff;
+  border-radius: 999px;
+  background: #faf7ff;
+}
+
 .nurture-upload-panel {
   display: flex;
   align-items: center;

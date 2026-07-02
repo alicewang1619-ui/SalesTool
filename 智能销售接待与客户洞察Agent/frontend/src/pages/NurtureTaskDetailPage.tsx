@@ -1,6 +1,6 @@
-﻿import { Alert, Button, Card, Col, Descriptions, Form, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography, Upload, message } from "antd";
+﻿import { Alert, Button, Card, Col, Descriptions, Form, Input, Modal, Row, Select, Space, Tag, Typography, Upload, message } from "antd";
 import { ArrowLeft, Mail, Paperclip, Save, Send, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   confirmNurtureTask,
@@ -44,18 +44,6 @@ const emailPurposeOptions = [
   { value: "Reactivation", label: "Reactivation" }
 ];
 
-function writerTooltipTitle(writer: EmailWriterRole) {
-  return `Goal: ${writer.role_goal || writer.best_for || "Not configured"}; Capabilities: ${writer.capabilities || writer.style || "Not configured"}; Skills: ${writer.skills.join(", ") || "Not configured"}; Background: ${writer.background || "Not configured"}; Tags: ${(writer.tags ?? []).join(", ") || "None"}; Prompt: ${writer.prompt_directive || "Not configured"}`;
-}
-
-function writerNameLabel(writer: EmailWriterRole) {
-  return (
-    <Tooltip placement="right" title={writerTooltipTitle(writer)}>
-      <span>{writer.name}</span>
-    </Tooltip>
-  );
-}
-
 export function NurtureTaskDetailPage() {
   const { taskId = "" } = useParams();
   const [form] = Form.useForm<NurtureFormValues>();
@@ -64,12 +52,7 @@ export function NurtureTaskDetailPage() {
   const [defaultWriterRole, setDefaultWriterRole] = useState("reply_mirror");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const writerRoleKey = Form.useWatch("writerRoleKey", form);
   const emailPurpose = Form.useWatch("emailPurpose", form);
-  const selectedWriter = useMemo(
-    () => writerRoles.find((writer) => writer.key === writerRoleKey) ?? writerRoles.find((writer) => writer.key === task?.writer_role_key),
-    [task?.writer_role_key, writerRoleKey, writerRoles]
-  );
 
   function fillForm(nextTask: NurtureTask, nextDefaultWriterRole = defaultWriterRole) {
     setTask(nextTask);
@@ -223,11 +206,7 @@ export function NurtureTaskDetailPage() {
                   <Descriptions.Item label="产品">{task.product}</Descriptions.Item>
                   <Descriptions.Item label="模型">{task.model_provider} / {task.model_version}</Descriptions.Item>
                   <Descriptions.Item label="邮件目的"><Tag color="purple">Purpose: {task.email_purpose}</Tag></Descriptions.Item>
-                  <Descriptions.Item label="写手">
-                    <Tooltip title={selectedWriter ? writerTooltipTitle(selectedWriter) : task.writer_role_style}>
-                      <span>{task.writer_role_name}</span>
-                    </Tooltip>
-                  </Descriptions.Item>
+                  <Descriptions.Item label="写手">{task.writer_role_name}</Descriptions.Item>
                 </Descriptions>
               ) : null}
               <Form.Item name="nurtureReason" label="触达理由" rules={[{ required: true, min: 5 }]}><Input.TextArea rows={5} /></Form.Item>
@@ -245,16 +224,15 @@ export function NurtureTaskDetailPage() {
               </Form.Item>
               <Form.Item name="writerRoleKey" label="邮件写手角色" rules={[{ required: true }]}>
                 <Select
-                  options={writerRoles.map((writer) => ({ value: writer.key, label: writerNameLabel(writer) }))}
+                  options={writerRoles.map((writer) => ({ value: writer.key, label: writer.name }))}
                   placeholder="选择写邮件角色"
                   onChange={(value) => void handleRegenerate({ writerRoleKey: value })}
                 />
               </Form.Item>
-              {selectedWriter ? (
-                <Tooltip title={writerTooltipTitle(selectedWriter)}>
-                  <Button style={{ marginBottom: 12 }}>{selectedWriter.name}</Button>
-                </Tooltip>
-              ) : null}
+              <div className="nurture-dt-note">
+                <Tag color="purple">DT</Tag>
+                <Typography.Text className="muted">写手角色已进入后台 Prompt；切换角色后会自动重新生成草稿。</Typography.Text>
+              </div>
               <Form.Item name="draftContent" label="正文" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={8} /></Form.Item>
               <div className="nurture-prompt-panel">
                 <Form.Item name="generationPrompt" label="生成提示词 / 补充指令"><Input.TextArea rows={4} /></Form.Item>

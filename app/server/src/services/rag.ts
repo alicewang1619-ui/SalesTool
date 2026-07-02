@@ -5,7 +5,7 @@
  */
 import type { Db } from '../db.ts';
 import type { LlmProvider, ChatMessage } from '../llm/provider.ts';
-import { cosine, toRelevance } from '../util.ts';
+import { cosine, toRelevance, lexicalScore } from '../util.ts';
 import { loadAllEmbeddings } from './embedding.ts';
 import { getKnowledge } from './knowledge.ts';
 import { config } from '../config.ts';
@@ -69,9 +69,22 @@ export async function answerQuestion(
     if (!cur) seen.set(s.knowledgeId, { sim: s.sim, chunks: [s.chunk] });
     else if (cur.chunks.length < 2) cur.chunks.push(s.chunk);
   }
+  // 混合排序（issue #13）：向量相似度 + 字面命中，让标题/正文字面命中的知识也能进来源，
+  // 而不是纯向量把字面强相关的知识排掉。
+  const titles = new Map(
+    (db.prepare('SELECT id, title FROM knowledge WHERE deleted_at IS NULL').all() as { id: string; title: string }[]).map(
+      (r) => [r.id, r.title],
+    ),
+  );
   const ranked = Array.from(seen.entries())
-    .sort((a, b) => b[1].sim - a[1].sim)
-    .slice(0, topK);
+    .map(([kid, info]) => ({
+      kid,
+      info,
+      combined: info.sim + lexicalScore(q, titles.get(kid) ?? '', info.chunks.join('\n')),
+    }))
+    .sort((a, b) => b.combined - a.combined)
+    .slice(0, topK)
+    .map((x) => [x.kid, x.info] as [string, { sim: number; chunks: string[] }]);
 
   const sources: AnswerSource[] = [];
   let context = '';

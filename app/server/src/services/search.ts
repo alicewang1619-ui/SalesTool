@@ -4,7 +4,7 @@
  */
 import type { Db } from '../db.ts';
 import type { LlmProvider } from '../llm/provider.ts';
-import { cosine, toRelevance } from '../util.ts';
+import { cosine, toRelevance, lexicalScore } from '../util.ts';
 import { loadAllEmbeddings, type EmbeddingRow } from './embedding.ts';
 import { getKnowledge } from './knowledge.ts';
 import { config } from '../config.ts';
@@ -65,9 +65,19 @@ export async function semanticSearch(
   const rows = loadAllEmbeddings(db);
   if (rows.length === 0) return { query: q, hits: [], total: 0 };
   const queryVec = await provider.embed(q);
-  const scored = scoreByKnowledge(rows, queryVec).slice(0, topK);
+  // 混合检索（issue #13）：向量相似度 + 字面命中。对全部候选算 combined 后再取 Top-K，
+  // 否则字面命中的知识（如标题含「MAE」）可能根本进不了向量 Top-K。
+  const titles = new Map(
+    (db.prepare('SELECT id, title FROM knowledge WHERE deleted_at IS NULL').all() as { id: string; title: string }[]).map(
+      (r) => [r.id, r.title],
+    ),
+  );
+  const scored = scoreByKnowledge(rows, queryVec)
+    .map((s) => ({ s, lex: lexicalScore(q, titles.get(s.knowledgeId) ?? '', s.bestChunk) }))
+    .sort((a, b) => b.s.sim + b.lex - (a.s.sim + a.lex))
+    .slice(0, topK);
   const hits: SearchHit[] = [];
-  for (const s of scored) {
+  for (const { s, lex } of scored) {
     const k = getKnowledge(db, s.knowledgeId);
     if (!k) continue;
     hits.push({
@@ -78,7 +88,8 @@ export async function semanticSearch(
       source_type: k.source_type,
       source_url: k.source_url,
       tags: k.tags,
-      relevance: toRelevance(s.sim),
+      // 字面命中体现在相关度里，避免「命中的排第一却显示更低分」（issue #13）。
+      relevance: Math.min(100, toRelevance(s.sim) + Math.round(lex * 30)),
       created_at: k.created_at,
     });
   }

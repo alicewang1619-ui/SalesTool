@@ -31,6 +31,28 @@ export function cosine(a: number[], b: number[]): number {
 }
 
 /**
+ * 字面/关键词命中打分（0–1），用于与向量相似度做混合检索（issue #13）。
+ * 纯向量检索对短缩写（MAE）或字面标题（掩码图像建模）信号弱，需要字面命中来兜底。
+ * 标题整串命中最强，正文整串次之，再看分词命中。
+ */
+export function lexicalScore(query: string, title: string, text: string): number {
+  const q = query.trim().toLowerCase();
+  if (!q) return 0;
+  const t = (title ?? '').toLowerCase();
+  const c = (text ?? '').toLowerCase();
+  let score = 0;
+  if (t.includes(q)) score += 0.6;
+  if (c.includes(q)) score += 0.25;
+  const terms = q.split(/[\s,，。/、:：()（）]+/).filter((w) => w.length >= 1);
+  for (const w of terms) {
+    if (w === q) continue;
+    if (t.includes(w)) score += 0.15;
+    else if (c.includes(w)) score += 0.05;
+  }
+  return Math.min(1, score);
+}
+
+/**
  * 余弦相似度（-1..1）映射到 0–100 相关度（U-SR-06）。
  * 图谱对质心做均值中心化后余弦可为负（无关文本），此线性映射把 [-1,1] 映到 [0,100]，
  * 让无关文本落到 50% 以下、相关文本在 55%+，配合阈值才有区分度（见 issue #5 的中心化处理）。

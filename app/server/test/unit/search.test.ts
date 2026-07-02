@@ -94,6 +94,23 @@ describe('U-SR-05 Top-K 相似度排序', () => {
     const db = memDb();
     await expect(semanticSearch(db, provider, '   ')).rejects.toThrow();
   });
+
+  it('混合检索：短缩写/字面标题命中的知识能被搜到（issue #13）', async () => {
+    const db = memDb();
+    await seed(db); // 缓存穿透 / 红烧肉 / 西湖
+    const mae = createKnowledge(db, {
+      title: '掩码图像建模 MAE',
+      content: 'MAE 用编码器重建被随机掩码的图像块，是一种自监督表示学习方法。',
+      source_type: 'note',
+    });
+    await buildEmbeddings(db, provider, mae, getContent(db, mae));
+    // 短缩写：纯向量难命中，字面命中把它顶上来
+    const r1 = await semanticSearch(db, provider, 'MAE', { topK: 3 });
+    expect(r1.hits[0].title).toBe('掩码图像建模 MAE');
+    // 字面标题
+    const r2 = await semanticSearch(db, provider, '掩码图像建模', { topK: 3 });
+    expect(r2.hits[0].title).toBe('掩码图像建模 MAE');
+  });
 });
 
 describe('U-SR-06 相关度归一化', () => {

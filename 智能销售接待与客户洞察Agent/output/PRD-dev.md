@@ -244,3 +244,7 @@ assigned -> no_feedback -> manager_attention
 - `SettingsPage` 的邮件写手 Select 选项标签只显示 `writer.name`，不得拼接 `style`、`skills` 或 `tags`。
 - 角色说明通过 `Tooltip` / `Popover` 展示，内容包含角色目标、能力与技能方向、相关技能、背景定义和角色标签。
 - 编辑/删除所选写手不再放在 Card 顶部 `extra`，应渲染到选中写手详情卡片底部，按钮文案为“编辑”“删除”。
+
+## 2026-07-02 大模型连接配置 UI 补充
+- `SettingsPage` 的“大模型连接配置”Card 顶部 `extra` 只保留添加和保存动作。
+- 编辑/删除当前模型不再放在 Card 顶部，应渲染到选中模型详情卡片底部，按钮文案为“编辑”“删除”，删除仍走现有二次确认与绑定回退逻辑。

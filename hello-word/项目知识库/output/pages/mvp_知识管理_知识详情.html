@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 缓存穿透与击穿 · 项目知识库</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-body); font-size: var(--fs-body); line-height: var(--lh-normal); }
+  a { color: inherit; text-decoration: none; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); background: var(--bg-surface); border-right: 1px solid var(--border); position: fixed; top: 0; bottom: 0; left: 0; padding: var(--sp-5) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); }
+  .brand { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) var(--sp-5); font-size: var(--fs-h2); font-weight: var(--fw-bold); color: var(--text-strong); }
+  .brand .dot { width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--accent); }
+  .nav-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); color: var(--text-muted); font-weight: var(--fw-medium); transition: all var(--dur-fast) var(--ease); }
+  .nav-item:hover { background: var(--bg-subtle); color: var(--text-body); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+  .nav-item .ic { width: 18px; text-align: center; }
+  .main { flex: 1; margin-left: var(--sidebar-w); }
+  .topbar { height: var(--topbar-h); border-bottom: 1px solid var(--border); background: var(--bg-surface); position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-6); }
+  .topbar .back { color: var(--text-muted); font-size: var(--fs-sm); }
+  .topbar .ops { display: flex; gap: var(--sp-2); }
+  .btn { display: inline-flex; align-items: center; gap: var(--sp-2); height: 36px; padding: 0 var(--sp-4); border-radius: var(--radius-md); font-size: var(--fs-sm); font-weight: var(--fw-medium); font-family: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-body); transition: all var(--dur-fast) var(--ease); }
+  .btn:hover { background: var(--bg-subtle); box-shadow: var(--shadow-sm); }
+  .btn-danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+
+  .wrap { display: grid; grid-template-columns: 1fr 300px; gap: var(--sp-6); max-width: 1200px; margin: 0 auto; padding: var(--sp-6); }
+  .article { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-7); box-shadow: var(--shadow-xs); }
+  .article h1 { font-size: var(--fs-display); font-weight: var(--fw-bold); color: var(--text-strong); line-height: var(--lh-tight); margin-bottom: var(--sp-4); }
+  .article-meta { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; padding-bottom: var(--sp-5); margin-bottom: var(--sp-5); border-bottom: 1px solid var(--border); color: var(--text-faint); font-size: var(--fs-sm); }
+  .src-link { color: var(--accent); }
+  .summary-box { background: var(--accent-soft); border-radius: var(--radius-md); padding: var(--sp-4) var(--sp-5); margin-bottom: var(--sp-5); }
+  .summary-box .lab { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--accent); letter-spacing: 0.05em; margin-bottom: var(--sp-2); display: flex; justify-content: space-between; }
+  .summary-box .lab .edit { cursor: pointer; text-decoration: underline; }
+  .summary-box p { color: var(--text-body); line-height: var(--lh-relaxed); }
+  .body { font-size: var(--fs-body); line-height: var(--lh-relaxed); color: var(--text-body); }
+  .body h2 { font-size: var(--fs-h2); font-weight: var(--fw-semibold); color: var(--text-strong); margin: var(--sp-5) 0 var(--sp-3); }
+  .body p { margin-bottom: var(--sp-4); }
+  .body code { font-family: var(--font-mono); background: var(--bg-sunken); padding: 1px 6px; border-radius: var(--radius-sm); font-size: 0.92em; }
+  .tags-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--border); }
+  .tag { padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+  .tag-add { padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-full); border: 1px dashed var(--border-strong); color: var(--text-faint); font-size: var(--fs-sm); cursor: pointer; }
+
+  /* 右栏相关推荐 */
+  .aside-col { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .panel { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-5); box-shadow: var(--shadow-xs); }
+  .panel-title { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-strong); margin-bottom: var(--sp-4); display: flex; align-items: center; gap: var(--sp-2); }
+  .panel-title .accent-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .rel-item { display: block; padding: var(--sp-3); border-radius: var(--radius-md); transition: all var(--dur-fast) var(--ease); margin: 0 calc(-1 * var(--sp-2)); }
+  .rel-item:hover { background: var(--accent-soft); }
+  .rel-item .t { font-weight: var(--fw-medium); color: var(--text-body); margin-bottom: 4px; font-size: var(--fs-sm); }
+  .rel-item .r { font-size: var(--fs-xs); color: var(--accent); }
+  .rel-item + .rel-item { border-top: 1px solid var(--border); margin-top: var(--sp-2); padding-top: var(--sp-3); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>项目知识库</div>
+    <a class="nav-item" href="mvp_知识管理_知识列表.html"><span class="ic">📚</span>全部知识</a>
+    <a class="nav-item" href="mvp_标签_标签浏览.html"><span class="ic">🏷️</span>标签</a>
+    <a class="nav-item" href="mvp_问答_智能问答.html"><span class="ic">💬</span>问答</a>
+    <a class="nav-item" href="mvp_设置_设置.html"><span class="ic">⚙️</span>设置</a>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <a class="back" href="mvp_知识管理_知识列表.html">← 全部知识</a>
+      <div class="ops">
+        <a class="btn" href="mvp_知识管理_知识编辑.html">✏️ 编辑</a>
+        <button class="btn btn-danger">🗑️ 删除</button>
+      </div>
+    </header>
+    <div class="wrap">
+      <article class="article">
+        <h1>Redis 缓存穿透与击穿解决方案</h1>
+        <div class="article-meta">
+          <span>📎 来源：</span><a class="src-link" href="#">微信公众号原文 ↗</a>
+          <span>·</span><span>2 小时前添加</span>
+        </div>
+
+        <div class="summary-box">
+          <div class="lab"><span>✨ AI 摘要</span><span class="edit">编辑</span></div>
+          <p>缓存穿透指查询不存在的数据导致请求直达数据库，用布隆过滤器或空值缓存拦截；缓存击穿指热点 key 失效瞬间大量请求打到数据库，用互斥锁或逻辑过期解决。</p>
+        </div>
+
+        <div class="body">
+          <h2>一、缓存穿透</h2>
+          <p>缓存穿透是指查询一个<strong>数据库和缓存中都不存在</strong>的数据，每次请求都会穿过缓存打到数据库。常见于恶意攻击用不存在的 <code>id</code> 刷接口。</p>
+          <p>解决方案有两种：① <strong>布隆过滤器</strong>——把所有可能存在的 key 预先放入，查询前先过滤；② <strong>空值缓存</strong>——对查不到的 key 也缓存一个空值并设短过期。</p>
+          <h2>二、缓存击穿</h2>
+          <p>缓存击穿是指某个<strong>热点 key 在失效的瞬间</strong>，大量并发请求同时打到数据库。解决方案：① <code>互斥锁</code>——只让一个请求去重建缓存；② <strong>逻辑过期</strong>——不设真实过期，异步更新。</p>
+        </div>
+
+        <div class="tags-row">
+          <span class="tag">Redis</span>
+          <span class="tag">缓存</span>
+          <span class="tag">分布式</span>
+          <span class="tag-add">＋ 加标签</span>
+        </div>
+      </article>
+
+      <div class="aside-col">
+        <div class="panel">
+          <div class="panel-title"><span class="accent-dot"></span>相关知识</div>
+          <a class="rel-item" href="mvp_知识管理_知识详情.html">
+            <div class="t">缓存雪崩的三种应对</div>
+            <div class="r">相关度 84%</div>
+          </a>
+          <a class="rel-item" href="mvp_知识管理_知识详情.html">
+            <div class="t">和 AI 讨论：分布式锁的几种实现对比</div>
+            <div class="r">相关度 71%</div>
+          </a>
+          <a class="rel-item" href="mvp_知识管理_知识详情.html">
+            <div class="t">向量数据库选型：LanceDB vs Chroma</div>
+            <div class="r">相关度 52%</div>
+          </a>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span class="accent-dot"></span>同标签</div>
+          <a class="rel-item" href="mvp_标签_标签浏览.html"><div class="t">🏷️ Redis（12 条）</div></a>
+          <a class="rel-item" href="mvp_标签_标签浏览.html"><div class="t">🏷️ 缓存（8 条）</div></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

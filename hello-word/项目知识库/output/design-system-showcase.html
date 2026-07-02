@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设计系统 · 项目知识库</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-body); font-size: var(--fs-body); line-height: var(--lh-normal); padding: var(--sp-7); }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  header.h { margin-bottom: var(--sp-7); }
+  header.h h1 { font-size: var(--fs-display); font-weight: var(--fw-bold); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  header.h p { color: var(--text-muted); }
+  section { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-6); margin-bottom: var(--sp-5); box-shadow: var(--shadow-xs); }
+  section h2 { font-size: var(--fs-h2); font-weight: var(--fw-semibold); color: var(--text-strong); margin-bottom: var(--sp-5); display: flex; align-items: center; gap: var(--sp-2); }
+  section h2::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .grid { display: grid; gap: var(--sp-4); }
+  .g-color { grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); }
+  .swatch { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+  .swatch .chip { height: 64px; }
+  .swatch .lab { padding: var(--sp-2) var(--sp-3); font-size: var(--fs-xs); }
+  .swatch .lab .n { font-weight: var(--fw-medium); color: var(--text-strong); display: block; }
+  .swatch .lab .v { color: var(--text-faint); font-family: var(--font-mono); }
+  .type-row { padding: var(--sp-3) 0; border-bottom: 1px solid var(--border); }
+  .type-row:last-child { border: none; }
+  .type-row .meta { font-size: var(--fs-xs); color: var(--text-faint); font-family: var(--font-mono); }
+  .btn { display: inline-flex; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 var(--sp-4); border-radius: var(--radius-md); font-size: var(--fs-body); font-weight: var(--fw-medium); font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all var(--dur-fast) var(--ease); }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: var(--shadow-xs); }
+  .btn-primary:hover { background: var(--accent-hover); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--bg-subtle); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .row { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: center; }
+  .tag { padding: 2px var(--sp-2); border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+  .demo-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-5); box-shadow: var(--shadow-xs); transition: all var(--dur-normal) var(--ease); max-width: 420px; }
+  .demo-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .demo-card .t { font-size: var(--fs-h3); font-weight: var(--fw-semibold); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  .demo-card .s { color: var(--text-muted); line-height: var(--lh-relaxed); margin-bottom: var(--sp-3); }
+  .status-chip { display: inline-flex; align-items: center; gap: 6px; padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-md); font-size: var(--fs-sm); }
+  .st-ok { background: var(--success-soft); color: var(--success); }
+  .st-warn { background: var(--warning-soft); color: var(--warning); }
+  .st-danger { background: var(--danger-soft); color: var(--danger); }
+  .st-info { background: var(--info-soft); color: var(--info); }
+  .shadow-box { width: 120px; height: 80px; background: var(--bg-surface); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); color: var(--text-muted); }
+  .input-demo { width: 280px; height: 40px; border: 1px solid var(--border); background: var(--bg-sunken); border-radius: var(--radius-md); padding: 0 var(--sp-4); font-family: inherit; font-size: var(--fs-body); }
+  .input-demo:focus { outline: none; background: var(--bg-surface); border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--ring-focus); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="h">
+    <h1>项目知识库 · 设计系统</h1>
+    <p>浅色 · Linear 式冷静克制 · 强阅读友好 · 靛蓝强调 · 交互哲学：阴影提升。本页所有样式来自 tokens.css。</p>
+  </header>
+
+  <section>
+    <h2>色彩</h2>
+    <div class="grid g-color">
+      <div class="swatch"><div class="chip" style="background:var(--accent)"></div><div class="lab"><span class="n">accent 主强调</span><span class="v">#4f46e5</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--accent-soft)"></div><div class="lab"><span class="n">accent-soft</span><span class="v">#eef2ff</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--bg-app)"></div><div class="lab"><span class="n">bg-app 底色</span><span class="v">#f7f8fa</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--bg-surface);border-bottom:1px solid var(--border)"></div><div class="lab"><span class="n">bg-surface 卡片</span><span class="v">#ffffff</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--text-strong)"></div><div class="lab"><span class="n">text-strong</span><span class="v">#111827</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--text-muted)"></div><div class="lab"><span class="n">text-muted</span><span class="v">#6b7280</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--success)"></div><div class="lab"><span class="n">success</span><span class="v">#16a34a</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--warning)"></div><div class="lab"><span class="n">warning</span><span class="v">#d97706</span></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--danger)"></div><div class="lab"><span class="n">danger</span><span class="v">#dc2626</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>字体（中文友好 · 正文偏大行距宽）</h2>
+    <div class="type-row"><div style="font-size:var(--fs-display);font-weight:var(--fw-bold);color:var(--text-strong)">把碎片信息攒成知识资产</div><div class="meta">Display 28px / bold</div></div>
+    <div class="type-row"><div style="font-size:var(--fs-h1);font-weight:var(--fw-bold);color:var(--text-strong)">全部知识</div><div class="meta">H1 22px / bold</div></div>
+    <div class="type-row"><div style="font-size:var(--fs-h3);font-weight:var(--fw-semibold);color:var(--text-strong)">Redis 缓存穿透与击穿</div><div class="meta">H3 16px / semibold</div></div>
+    <div class="type-row"><div style="font-size:var(--fs-body);line-height:var(--lh-relaxed)">正文：缓存击穿指热点 key 失效瞬间大量请求打到数据库，用互斥锁或逻辑过期解决。长文阅读舒适、行距宽松。</div><div class="meta">Body 15px / 行高 1.75</div></div>
+    <div class="type-row"><div style="font-size:var(--fs-sm);color:var(--text-muted)">次要说明文字</div><div class="meta">Small 13px</div></div>
+  </section>
+
+  <section>
+    <h2>按钮</h2>
+    <div class="row">
+      <button class="btn btn-primary">＋ 新增知识</button>
+      <button class="btn btn-ghost">取消</button>
+      <button class="btn btn-danger">删除</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>输入框（聚焦：靛蓝描边 + focus ring）</h2>
+    <input class="input-demo" placeholder="点我聚焦看效果" />
+  </section>
+
+  <section>
+    <h2>标签 & 状态</h2>
+    <div class="row" style="margin-bottom:var(--sp-4)">
+      <span class="tag">Redis</span><span class="tag">缓存</span><span class="tag">分布式</span><span class="tag">RAG</span>
+    </div>
+    <div class="row">
+      <span class="status-chip st-ok">✅ 已入库</span>
+      <span class="status-chip st-info">⏳ 抓取中</span>
+      <span class="status-chip st-warn">⚠️ 抓取失败，回退粘贴</span>
+      <span class="status-chip st-danger">✕ 模型未连接</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>知识卡片（全站最高频单元 · hover 阴影提升）</h2>
+    <div class="demo-card">
+      <div class="t">Redis 缓存穿透与击穿解决方案</div>
+      <div class="s">缓存穿透用布隆过滤器拦截，缓存击穿用互斥锁或逻辑过期解决……</div>
+      <div class="row"><span class="tag">Redis</span><span class="tag">缓存</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>阴影（交互哲学：提升）</h2>
+    <div class="row">
+      <div class="shadow-box" style="box-shadow:var(--shadow-xs)">xs</div>
+      <div class="shadow-box" style="box-shadow:var(--shadow-sm)">sm</div>
+      <div class="shadow-box" style="box-shadow:var(--shadow-md)">md</div>
+      <div class="shadow-box" style="box-shadow:var(--shadow-lg)">lg</div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

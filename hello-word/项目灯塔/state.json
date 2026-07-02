@@ -1,0 +1,28 @@
+{
+  "project_name": "项目灯塔",
+  "product_alias": "Beacon",
+  "one_liner": "面向研发团队的轻量多项目灯塔：管理层一眼看清30个项目的进度/风险/人力健康度",
+  "current_stage": "done",
+  "next_action": "全流程完成。可进入设计大师(接着做设计)或直接喂PRD给Claude Code写代码",
+  "last_updated_at_utc": "2026-06-29T04:40:00Z",
+  "stages_done": ["stage-0-free-talk", "stage-1-socratic", "stage-2-value", "stage-3-research", "stage-4-debate", "stage-5-prd", "stage-6-ppt"],
+  "prd_validation": "evidence/format/consistency PASS; executability 535/600 (89%) 适合开工",
+  "ppt": "11页HTML at output/ppt/，:root外0硬编码色，导航闭合，16:9自适应",
+  "operator": "Zongmin",
+  "scope": {
+    "users": "管理层/PM/成员 3 角色，150人研发团队/30项目，内部非SaaS",
+    "platform": "Web 为主 + 手机轻量查看",
+    "deploy": "内网/私服，账号自建",
+    "mvp": "①多项目总览看板(健康度排序+暴露空白) ②进度(里程碑+任务%+轻量时间线+周报提取) ③风险(登记+自动预警) ④人力负载(PM粗估投入%)",
+    "deferred": "完整甘特、Git集成、钉钉飞书SSO/通知、移动端完整功能、报表导出",
+    "tech": "AI按通用最佳实践推荐",
+    "compliance": "无特殊要求，常规权限+审计"
+  },
+  "value": "150人×30万×5%≈225万/年损耗，用户认可",
+  "key_decisions": {
+    "A-002对策": "第一性设计：≤3点击 + 看板暴露谁没更新倒逼 + 自动预警 + 从周报自动提取进度",
+    "防ONES化": "边界写死，不做需求/缺陷/测试/工作流，任务仅作进度载体",
+    "进度数据源": "MVP手填为主+从项目周报自动提取(默认上传/粘贴文本)，不做Git集成"
+  },
+  "open_items": ["周报现存形态/位置待Stage5细化", "健康度具体阈值待细化"]
+}

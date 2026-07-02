@@ -1,0 +1,62 @@
+name: 报 Bug
+description: 报告一个出错的问题
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报 Bug！请尽量填全，信息越全修得越快。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 出了什么问题
+      description: 一句话描述现象
+      placeholder: "比如：点登录按钮后页面白屏"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 怎么复现（关键）
+      description: 按步骤写，让别人能照着重现
+      placeholder: |
+        1. 打开首页
+        2. 输入账号密码
+        3. 点登录
+        4. 页面白屏
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 本来应该怎样
+      description: 你期望的正确结果
+      placeholder: "比如：登录后跳到首页"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 浏览器 / 系统 / 版本（尽量写全）
+      placeholder: "比如：Chrome 120 / macOS 14 / App 1.2.3"
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 报错信息 / 截图（可选）
+      description: 把控制台报错或截图贴上来
+      render: shell
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 严重程度
+      options:
+        - 小问题（不影响使用）
+        - 中等（影响部分功能）
+        - 严重（用不了）
+    validations:
+      required: true

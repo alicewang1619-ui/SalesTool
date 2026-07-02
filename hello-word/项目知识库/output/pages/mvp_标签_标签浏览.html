@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标签 · 项目知识库</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-body); font-size: var(--fs-body); line-height: var(--lh-normal); }
+  a { color: inherit; text-decoration: none; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); background: var(--bg-surface); border-right: 1px solid var(--border); position: fixed; top: 0; bottom: 0; left: 0; padding: var(--sp-5) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); }
+  .brand { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) var(--sp-5); font-size: var(--fs-h2); font-weight: var(--fw-bold); color: var(--text-strong); }
+  .brand .dot { width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--accent); }
+  .nav-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); color: var(--text-muted); font-weight: var(--fw-medium); }
+  .nav-item:hover { background: var(--bg-subtle); color: var(--text-body); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+  .nav-item .ic { width: 18px; text-align: center; }
+  .main { flex: 1; margin-left: var(--sidebar-w); }
+  .topbar { height: var(--topbar-h); background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: var(--sp-4); padding: 0 var(--sp-6); }
+  .search { flex: 1; max-width: 560px; position: relative; }
+  .search input { width: 100%; height: 40px; border: 1px solid var(--border); background: var(--bg-sunken); border-radius: var(--radius-md); padding: 0 var(--sp-4) 0 40px; font-size: var(--fs-body); font-family: inherit; color: var(--text-body); }
+  .search input:focus { outline: none; background: var(--bg-surface); border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--ring-focus); }
+  .search .si { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-faint); }
+  .content { max-width: 1100px; margin: 0 auto; padding: var(--sp-6); }
+  .page-title { font-size: var(--fs-h1); font-weight: var(--fw-bold); color: var(--text-strong); margin-bottom: var(--sp-5); }
+  .section-lab { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-muted); margin-bottom: var(--sp-4); }
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-7); }
+  .tagc { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); border-radius: var(--radius-full); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-body); font-weight: var(--fw-medium); cursor: pointer; transition: all var(--dur-fast) var(--ease); }
+  .tagc:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); border-color: var(--accent-border); }
+  .tagc.active { background: var(--accent); color: var(--text-on-accent); border-color: var(--accent); }
+  .tagc .cnt { font-size: var(--fs-xs); opacity: 0.7; }
+  .tagc.big { font-size: var(--fs-h3); }
+
+  .cards { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-5); box-shadow: var(--shadow-xs); transition: all var(--dur-normal) var(--ease); cursor: pointer; }
+  .card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .card-title { font-size: var(--fs-h3); font-weight: var(--fw-semibold); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  .card-summary { color: var(--text-muted); line-height: var(--lh-relaxed); margin-bottom: var(--sp-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tag { padding: 2px var(--sp-2); border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--fs-xs); font-weight: var(--fw-medium); margin-right: var(--sp-2); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>项目知识库</div>
+    <a class="nav-item" href="mvp_知识管理_知识列表.html"><span class="ic">📚</span>全部知识</a>
+    <a class="nav-item active" href="mvp_标签_标签浏览.html"><span class="ic">🏷️</span>标签</a>
+    <a class="nav-item" href="mvp_问答_智能问答.html"><span class="ic">💬</span>问答</a>
+    <a class="nav-item" href="mvp_设置_设置.html"><span class="ic">⚙️</span>设置</a>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <form class="search" action="mvp_检索_检索结果.html">
+        <span class="si">🔍</span>
+        <input type="text" placeholder="用大白话搜知识" />
+      </form>
+    </header>
+    <div class="content">
+      <div class="page-title">标签</div>
+
+      <div class="section-lab">全部标签（24 个 · 按知识数排序）</div>
+      <div class="tag-cloud">
+        <span class="tagc active big">Redis <span class="cnt">12</span></span>
+        <span class="tagc big">缓存 <span class="cnt">8</span></span>
+        <span class="tagc big">分布式 <span class="cnt">7</span></span>
+        <span class="tagc">RAG <span class="cnt">6</span></span>
+        <span class="tagc">本地优先 <span class="cnt">5</span></span>
+        <span class="tagc">面试 <span class="cnt">5</span></span>
+        <span class="tagc">向量库 <span class="cnt">4</span></span>
+        <span class="tagc">高可用 <span class="cnt">4</span></span>
+        <span class="tagc">大模型 <span class="cnt">3</span></span>
+        <span class="tagc">架构 <span class="cnt">3</span></span>
+        <span class="tagc">心得 <span class="cnt">2</span></span>
+      </div>
+
+      <div class="section-lab">标签「Redis」下的 12 条知识</div>
+      <div class="cards">
+        <a class="card" href="mvp_知识管理_知识详情.html">
+          <div class="card-title">Redis 缓存穿透与击穿解决方案</div>
+          <div class="card-summary">缓存穿透用布隆过滤器拦截，缓存击穿用互斥锁或逻辑过期解决……</div>
+          <div><span class="tag">Redis</span><span class="tag">缓存</span><span class="tag">分布式</span></div>
+        </a>
+        <a class="card" href="mvp_知识管理_知识详情.html">
+          <div class="card-title">和 AI 讨论：分布式锁的几种实现对比</div>
+          <div class="card-summary">Redis SETNX、Redisson 看门狗、ZooKeeper、etcd 四种方案的可靠性与性能权衡……</div>
+          <div><span class="tag">分布式</span><span class="tag">Redis</span><span class="tag">面试</span></div>
+        </a>
+        <a class="card" href="mvp_知识管理_知识详情.html">
+          <div class="card-title">缓存雪崩的三种应对（个人心得）</div>
+          <div class="card-summary">过期时间加随机值、多级缓存兜底、熔断降级……</div>
+          <div><span class="tag">缓存</span><span class="tag">高可用</span></div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

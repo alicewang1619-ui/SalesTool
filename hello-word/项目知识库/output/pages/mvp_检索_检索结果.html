@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>检索结果 · 项目知识库</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-body); font-size: var(--fs-body); line-height: var(--lh-normal); }
+  a { color: inherit; text-decoration: none; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); background: var(--bg-surface); border-right: 1px solid var(--border); position: fixed; top: 0; bottom: 0; left: 0; padding: var(--sp-5) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); }
+  .brand { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) var(--sp-5); font-size: var(--fs-h2); font-weight: var(--fw-bold); color: var(--text-strong); }
+  .brand .dot { width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--accent); }
+  .nav-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); color: var(--text-muted); font-weight: var(--fw-medium); transition: all var(--dur-fast) var(--ease); }
+  .nav-item:hover { background: var(--bg-subtle); color: var(--text-body); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+  .nav-item .ic { width: 18px; text-align: center; }
+  .main { flex: 1; margin-left: var(--sidebar-w); }
+  .topbar { height: var(--topbar-h); background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: var(--sp-4); padding: 0 var(--sp-6); }
+  .search { flex: 1; max-width: 560px; position: relative; }
+  .search input { width: 100%; height: 40px; border: 1px solid var(--border-focus); background: var(--bg-surface); border-radius: var(--radius-md); padding: 0 var(--sp-4) 0 40px; font-size: var(--fs-body); font-family: inherit; color: var(--text-body); box-shadow: 0 0 0 3px var(--ring-focus); }
+  .search input:focus { outline: none; }
+  .search .si { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--accent); }
+  .btn { display: inline-flex; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 var(--sp-4); border-radius: var(--radius-md); font-size: var(--fs-body); font-weight: var(--fw-medium); font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all var(--dur-fast) var(--ease); }
+  .btn-primary { background: var(--accent); color: var(--text-on-accent); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .content { max-width: 1100px; margin: 0 auto; padding: var(--sp-6); }
+  .result-head { margin-bottom: var(--sp-5); }
+  .result-head h1 { font-size: var(--fs-h1); font-weight: var(--fw-bold); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  .result-head .q { color: var(--accent); }
+  .result-head .meta { color: var(--text-muted); font-size: var(--fs-sm); }
+  .ai-note { display: flex; gap: var(--sp-3); background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: var(--radius-md); padding: var(--sp-4); margin-bottom: var(--sp-5); color: var(--text-body); line-height: var(--lh-relaxed); }
+  .ai-note .ai-ic { font-size: 20px; }
+  .ai-note a { color: var(--accent); font-weight: var(--fw-medium); }
+  .cards { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-5); box-shadow: var(--shadow-xs); transition: all var(--dur-normal) var(--ease); cursor: pointer; }
+  .card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--border-strong); }
+  .card-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-2); }
+  .card-title { font-size: var(--fs-h3); font-weight: var(--fw-semibold); color: var(--text-strong); }
+  .relevance { flex-shrink: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--accent); background: var(--accent-soft); padding: 2px var(--sp-2); border-radius: var(--radius-full); }
+  .card-summary { color: var(--text-muted); line-height: var(--lh-relaxed); margin-bottom: var(--sp-3); }
+  .hl { background: var(--warning-soft); color: var(--text-strong); padding: 0 2px; border-radius: 3px; font-weight: var(--fw-medium); }
+  .card-meta { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+  .tag { padding: 2px var(--sp-2); border-radius: var(--radius-full); background: var(--bg-subtle); color: var(--text-muted); font-size: var(--fs-xs); }
+  .source { color: var(--text-faint); font-size: var(--fs-xs); }
+  .dotsep { color: var(--border-strong); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>项目知识库</div>
+    <a class="nav-item" href="mvp_知识管理_知识列表.html"><span class="ic">📚</span>全部知识</a>
+    <a class="nav-item" href="mvp_标签_标签浏览.html"><span class="ic">🏷️</span>标签</a>
+    <a class="nav-item" href="mvp_问答_智能问答.html"><span class="ic">💬</span>问答</a>
+    <a class="nav-item" href="mvp_设置_设置.html"><span class="ic">⚙️</span>设置</a>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <form class="search" action="mvp_检索_检索结果.html">
+        <span class="si">🔍</span>
+        <input type="text" value="上次那篇讲缓存击穿的" />
+      </form>
+      <a class="btn btn-primary" href="mvp_录入_内容录入.html"><span>＋</span>新增</a>
+    </header>
+    <div class="content">
+      <div class="result-head">
+        <h1>找到 3 条与 <span class="q">"上次那篇讲缓存击穿的"</span> 语义相关的知识</h1>
+        <div class="meta">按相关度排序 · 语义检索（非关键词匹配）</div>
+      </div>
+
+      <div class="ai-note">
+        <span class="ai-ic">✨</span>
+        <div>想直接得到答案而不是翻列表？试试 <a href="mvp_问答_智能问答.html">用「问答」直接提问</a>，AI 会基于你的库总结并标来源。</div>
+      </div>
+
+      <div class="cards">
+        <a class="card" href="mvp_知识管理_知识详情.html">
+          <div class="card-top">
+            <div class="card-title">Redis 缓存穿透与击穿解决方案</div>
+            <span class="relevance">相关度 92%</span>
+          </div>
+          <div class="card-summary">……缓存<span class="hl">击穿</span>指热点 key 失效的瞬间，大量请求同时打到数据库，可用<span class="hl">互斥锁</span>或逻辑过期来解决……</div>
+          <div class="card-meta">
+            <span class="tag">Redis</span><span class="tag">缓存</span>
+            <span class="dotsep">·</span><span class="source">📎 公众号</span>
+          </div>
+        </a>
+        <a class="card" href="mvp_知识管理_知识详情.html">
+          <div class="card-top">
+            <div class="card-title">缓存雪崩的三种应对（个人心得）</div>
+            <span class="relevance">相关度 78%</span>
+          </div>
+          <div class="card-summary">……与<span class="hl">击穿</span>不同，雪崩是大量 key 同时失效；给过期时间加随机值避免同时失效……</div>
+          <div class="card-meta">
+            <span class="tag">缓存</span><span class="tag">高可用</span>
+            <span class="dotsep">·</span><span class="source">✍️ 心得</span>
+          </div>
+        </a>
+        <a class="card" href="mvp_知识管理_知识详情.html">
+          <div class="card-top">
+            <div class="card-title">和 AI 讨论：分布式锁的几种实现对比</div>
+            <span class="relevance">相关度 61%</span>
+          </div>
+          <div class="card-summary">……解决缓存<span class="hl">击穿</span>用到的<span class="hl">互斥锁</span>，可用 Redisson 看门狗实现……</div>
+          <div class="card-meta">
+            <span class="tag">分布式</span><span class="tag">Redis</span>
+            <span class="dotsep">·</span><span class="source">💬 AI 对话</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

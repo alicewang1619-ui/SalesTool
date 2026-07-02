@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编辑知识 · 项目知识库</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-body); font-size: var(--fs-body); line-height: var(--lh-normal); }
+  a { color: inherit; text-decoration: none; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); background: var(--bg-surface); border-right: 1px solid var(--border); position: fixed; top: 0; bottom: 0; left: 0; padding: var(--sp-5) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); }
+  .brand { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) var(--sp-5); font-size: var(--fs-h2); font-weight: var(--fw-bold); color: var(--text-strong); }
+  .brand .dot { width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--accent); }
+  .nav-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); color: var(--text-muted); font-weight: var(--fw-medium); }
+  .nav-item:hover { background: var(--bg-subtle); color: var(--text-body); }
+  .nav-item .ic { width: 18px; text-align: center; }
+  .main { flex: 1; margin-left: var(--sidebar-w); }
+  .topbar { height: var(--topbar-h); border-bottom: 1px solid var(--border); background: var(--bg-surface); position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-6); }
+  .topbar .back { color: var(--text-muted); font-size: var(--fs-sm); }
+  .topbar h1 { font-size: var(--fs-h2); font-weight: var(--fw-semibold); color: var(--text-strong); }
+  .content { max-width: var(--content-max); margin: 0 auto; padding: var(--sp-6); }
+  .field { margin-bottom: var(--sp-5); }
+  .field label { display: block; font-weight: var(--fw-medium); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  .input, .textarea { width: 100%; border: 1px solid var(--border); background: var(--bg-surface); border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-body); font-family: inherit; color: var(--text-body); line-height: var(--lh-relaxed); transition: all var(--dur-normal) var(--ease); }
+  .input:focus, .textarea:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--ring-focus); }
+  .textarea { min-height: 280px; resize: vertical; font-family: var(--font-mono); font-size: var(--fs-sm); }
+  .summary-ta { min-height: 80px; font-family: inherit; }
+  .tags-edit { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+  .tag .x { cursor: pointer; opacity: 0.6; }
+  .tag-add { padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-full); border: 1px dashed var(--border-strong); color: var(--text-faint); font-size: var(--fs-sm); cursor: pointer; }
+  .btn { display: inline-flex; align-items: center; gap: var(--sp-2); height: 42px; padding: 0 var(--sp-5); border-radius: var(--radius-md); font-size: var(--fs-body); font-weight: var(--fw-medium); font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all var(--dur-fast) var(--ease); }
+  .btn-primary { background: var(--accent); color: var(--text-on-accent); box-shadow: var(--shadow-xs); }
+  .btn-primary:hover { background: var(--accent-hover); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--bg-subtle); }
+  .btn-danger { background: transparent; color: var(--danger); border-color: var(--border); margin-left: auto; }
+  .btn-danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+  .actions { display: flex; gap: var(--sp-3); margin-top: var(--sp-6); align-items: center; }
+
+  /* 删除二次确认弹窗 */
+  .overlay { position: fixed; inset: 0; background: var(--bg-overlay); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .overlay.show { display: flex; }
+  .modal { background: var(--bg-surface); border-radius: var(--radius-lg); padding: var(--sp-6); max-width: 400px; box-shadow: var(--shadow-lg); }
+  .modal h3 { font-size: var(--fs-h2); font-weight: var(--fw-semibold); color: var(--text-strong); margin-bottom: var(--sp-3); }
+  .modal p { color: var(--text-muted); line-height: var(--lh-relaxed); margin-bottom: var(--sp-5); }
+  .modal .m-actions { display: flex; gap: var(--sp-3); justify-content: flex-end; }
+  .btn-del-confirm { background: var(--danger); color: #fff; border-color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>项目知识库</div>
+    <a class="nav-item" href="mvp_知识管理_知识列表.html"><span class="ic">📚</span>全部知识</a>
+    <a class="nav-item" href="mvp_标签_标签浏览.html"><span class="ic">🏷️</span>标签</a>
+    <a class="nav-item" href="mvp_问答_智能问答.html"><span class="ic">💬</span>问答</a>
+    <a class="nav-item" href="mvp_设置_设置.html"><span class="ic">⚙️</span>设置</a>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <a class="back" href="mvp_知识管理_知识详情.html">← 返回详情</a>
+      <h1>编辑知识</h1>
+    </header>
+    <div class="content">
+      <div class="field">
+        <label>标题</label>
+        <input class="input" value="Redis 缓存穿透与击穿解决方案" />
+      </div>
+      <div class="field">
+        <label>AI 摘要（可改）</label>
+        <textarea class="textarea summary-ta">缓存穿透指查询不存在的数据导致请求直达数据库，用布隆过滤器或空值缓存拦截；缓存击穿指热点 key 失效瞬间大量请求打到数据库，用互斥锁或逻辑过期解决。</textarea>
+      </div>
+      <div class="field">
+        <label>标签</label>
+        <div class="tags-edit">
+          <span class="tag">Redis <span class="x">×</span></span>
+          <span class="tag">缓存 <span class="x">×</span></span>
+          <span class="tag">分布式 <span class="x">×</span></span>
+          <span class="tag-add">＋ 加标签</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>正文（Markdown）</label>
+        <textarea class="textarea">## 一、缓存穿透
+缓存穿透是指查询一个数据库和缓存中都不存在的数据……
+
+## 二、缓存击穿
+缓存击穿是指某个热点 key 在失效的瞬间，大量并发请求同时打到数据库……</textarea>
+      </div>
+      <div class="actions">
+        <a class="btn btn-primary" href="mvp_知识管理_知识详情.html">保存</a>
+        <a class="btn btn-ghost" href="mvp_知识管理_知识详情.html">取消</a>
+        <button class="btn btn-danger" onclick="document.getElementById('delModal').classList.add('show')">🗑️ 删除这条知识</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="delModal">
+  <div class="modal">
+    <h3>删除这条知识？</h3>
+    <p>《Redis 缓存穿透与击穿解决方案》将被移到回收站，可在「设置 → 回收站」中恢复。</p>
+    <div class="m-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('delModal').classList.remove('show')">取消</button>
+      <a class="btn btn-del-confirm" href="mvp_知识管理_知识列表.html">移到回收站</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

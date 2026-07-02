@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新增知识 · 项目知识库</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-body); font-size: var(--fs-body); line-height: var(--lh-normal); }
+  a { color: inherit; text-decoration: none; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); background: var(--bg-surface); border-right: 1px solid var(--border); position: fixed; top: 0; bottom: 0; left: 0; padding: var(--sp-5) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); }
+  .brand { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) var(--sp-5); font-size: var(--fs-h2); font-weight: var(--fw-bold); color: var(--text-strong); }
+  .brand .dot { width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--accent); }
+  .nav-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); color: var(--text-muted); font-weight: var(--fw-medium); transition: all var(--dur-fast) var(--ease); }
+  .nav-item:hover { background: var(--bg-subtle); color: var(--text-body); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+  .nav-item .ic { width: 18px; text-align: center; }
+  .main { flex: 1; margin-left: var(--sidebar-w); }
+  .topbar { height: var(--topbar-h); border-bottom: 1px solid var(--border); background: var(--bg-surface); position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-6); }
+  .topbar .back { color: var(--text-muted); font-size: var(--fs-sm); }
+  .topbar h1 { font-size: var(--fs-h2); font-weight: var(--fw-semibold); color: var(--text-strong); }
+  .content { max-width: var(--content-max); margin: 0 auto; padding: var(--sp-6); }
+
+  .tabs { display: flex; gap: var(--sp-2); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-5); }
+  .tab { padding: var(--sp-3) var(--sp-4); color: var(--text-muted); font-weight: var(--fw-medium); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all var(--dur-fast) var(--ease); }
+  .tab:hover { color: var(--text-body); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .field { margin-bottom: var(--sp-5); }
+  .field label { display: block; font-weight: var(--fw-medium); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  .field .hint { color: var(--text-faint); font-size: var(--fs-sm); margin-bottom: var(--sp-2); }
+  .input, .textarea { width: 100%; border: 1px solid var(--border); background: var(--bg-surface); border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-body); font-family: inherit; color: var(--text-body); line-height: var(--lh-relaxed); transition: all var(--dur-normal) var(--ease); }
+  .input:focus, .textarea:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--ring-focus); }
+  .textarea { min-height: 220px; resize: vertical; }
+  .row { display: flex; gap: var(--sp-3); }
+  .row .input { flex: 1; }
+
+  .btn { display: inline-flex; align-items: center; gap: var(--sp-2); height: 42px; padding: 0 var(--sp-5); border-radius: var(--radius-md); font-size: var(--fs-body); font-weight: var(--fw-medium); font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all var(--dur-fast) var(--ease); }
+  .btn-primary { background: var(--accent); color: var(--text-on-accent); box-shadow: var(--shadow-xs); }
+  .btn-primary:hover { background: var(--accent-hover); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--bg-subtle); }
+  .actions { display: flex; gap: var(--sp-3); margin-top: var(--sp-5); }
+
+  /* 抓取/整理状态 */
+  .status { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4); border-radius: var(--radius-md); margin-top: var(--sp-4); font-size: var(--fs-sm); }
+  .status.loading { background: var(--info-soft); color: var(--text-body); }
+  .status.fail { background: var(--danger-soft); color: var(--text-body); }
+  .status.ok { background: var(--success-soft); color: var(--text-body); }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--accent-border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status .link { color: var(--accent); font-weight: var(--fw-medium); cursor: pointer; text-decoration: underline; }
+
+  .upload { border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); padding: var(--sp-8); text-align: center; color: var(--text-muted); cursor: pointer; transition: all var(--dur-normal) var(--ease); }
+  .upload:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .upload .big { font-size: 36px; margin-bottom: var(--sp-3); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>项目知识库</div>
+    <a class="nav-item" href="mvp_知识管理_知识列表.html"><span class="ic">📚</span>全部知识</a>
+    <a class="nav-item" href="mvp_标签_标签浏览.html"><span class="ic">🏷️</span>标签</a>
+    <a class="nav-item" href="mvp_问答_智能问答.html"><span class="ic">💬</span>问答</a>
+    <a class="nav-item" href="mvp_设置_设置.html"><span class="ic">⚙️</span>设置</a>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <a class="back" href="mvp_知识管理_知识列表.html">← 返回</a>
+      <h1>新增知识</h1>
+    </header>
+    <div class="content">
+      <div class="tabs">
+        <div class="tab active" onclick="showTab(0)">🔗 贴链接</div>
+        <div class="tab" onclick="showTab(1)">📋 粘贴文本</div>
+        <div class="tab" onclick="showTab(2)">✍️ 写一条</div>
+        <div class="tab" onclick="showTab(3)">📄 上传文件</div>
+      </div>
+
+      <!-- Tab 1 贴链接 -->
+      <div class="panel active" id="p0">
+        <div class="field">
+          <label>文章链接</label>
+          <div class="hint">支持微信公众号、各类网页文章；粘贴后自动抓取正文。抓不到时会自动切到「粘贴文本」。</div>
+          <div class="row">
+            <input class="input" placeholder="https://mp.weixin.qq.com/s/..." value="https://mp.weixin.qq.com/s/redis-cache-penetration" />
+            <button class="btn btn-primary" onclick="document.getElementById('fetchOk').style.display='flex'">抓取</button>
+          </div>
+        </div>
+        <div class="status loading"><span class="spinner"></span>正在抓取正文…</div>
+        <div class="status ok" id="fetchOk" style="display:none">✅ 已抓取《Redis 缓存穿透与击穿解决方案》，AI 正在自动打标签和摘要…</div>
+        <div class="status fail">⚠️ 这个链接抓不到正文（可能有反爬）。<span class="link" onclick="showTab(1)">改用「粘贴文本」 →</span></div>
+        <div class="actions">
+          <a class="btn btn-primary" href="mvp_知识管理_知识详情.html">保存入库</a>
+          <a class="btn btn-ghost" href="mvp_知识管理_知识列表.html">取消</a>
+        </div>
+      </div>
+
+      <!-- Tab 2 粘贴文本 -->
+      <div class="panel" id="p1">
+        <div class="field">
+          <label>标题</label>
+          <input class="input" placeholder="给这条知识起个标题（留空将由 AI 自动生成）" />
+        </div>
+        <div class="field">
+          <label>正文 / AI 对话记录</label>
+          <div class="hint">直接粘贴文章正文，或从 ChatGPT/Claude 复制整段对话。</div>
+          <textarea class="textarea" placeholder="粘贴内容…"></textarea>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="mvp_知识管理_知识详情.html">保存入库</a>
+          <a class="btn btn-ghost" href="mvp_知识管理_知识列表.html">取消</a>
+        </div>
+      </div>
+
+      <!-- Tab 3 写一条 -->
+      <div class="panel" id="p2">
+        <div class="field">
+          <label>标题</label>
+          <input class="input" placeholder="心得标题" />
+        </div>
+        <div class="field">
+          <label>正文（Markdown）</label>
+          <div class="hint">随手记录你的想法和心得，支持 Markdown。已自动保存草稿。</div>
+          <textarea class="textarea" placeholder="# 我的心得&#10;&#10;今天想明白了一件事……"></textarea>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="mvp_知识管理_知识详情.html">保存入库</a>
+          <a class="btn btn-ghost" href="mvp_知识管理_知识列表.html">取消</a>
+        </div>
+      </div>
+
+      <!-- Tab 4 上传文件 -->
+      <div class="panel" id="p3">
+        <div class="upload">
+          <div class="big">📄</div>
+          <div style="font-weight:var(--fw-medium);color:var(--text-body)">点击或拖拽文件到此处</div>
+          <div class="hint" style="margin-top:8px">支持 PDF / Word / Markdown，解析文本后入库</div>
+        </div>
+        <div class="status loading" style="margin-top:24px"><span class="spinner"></span>正在解析《分布式系统设计.pdf》…</div>
+        <div class="actions">
+          <a class="btn btn-primary" href="mvp_知识管理_知识详情.html">保存入库</a>
+          <a class="btn btn-ghost" href="mvp_知识管理_知识列表.html">取消</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  function showTab(i){
+    document.querySelectorAll('.tab').forEach((t,idx)=>t.classList.toggle('active',idx===i));
+    document.querySelectorAll('.panel').forEach((p,idx)=>p.classList.toggle('active',idx===i));
+  }
+</script>
+</body>
+</html>

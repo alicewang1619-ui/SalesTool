@@ -1,0 +1,44 @@
+name: 提需求或改动
+description: 业务人员用这个模板提需求、改动或报 Bug
+title: "[需求]: "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢提需求！用大白话填就行，不用写代码。
+        填写前可以先看看是否已有类似 issue。
+  - type: dropdown
+    id: type
+    attributes:
+      label: 这是什么类型
+      options:
+        - 新功能
+        - 改进现有的
+        - 修 Bug
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 想要什么效果
+      description: 用大白话描述你想要的结果
+      placeholder: "比如：把首页登录按钮文案从『登录』改成『立即开始』"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 为什么要改（可选）
+      description: 说一下背景，帮助开发理解优先级
+      placeholder: "比如：用户反馈『登录』两字不够吸引点击"
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: 紧急程度
+      options:
+        - 不急
+        - 这周要
+        - 很急
+    validations:
+      required: true

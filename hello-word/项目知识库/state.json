@@ -1,0 +1,12 @@
+{
+  "project_name": "项目知识库",
+  "stage": "TDD 完成（营队三步链路全部完成：PRD→设计→TDD）",
+  "next_action": "把 项目知识库/output/ 整个目录交给 Claude Code，读 tests/验收门禁与GOAL契约.md，用 /go GOAL 模式逐条红绿重构写代码",
+  "operator": "Zongmin",
+  "last_updated_at_utc": "2026-06-30T01:56:52Z",
+  "deliverable_dir": "项目知识库/output",
+  "prd_status": "完成",
+  "design_status": "完成（设计系统+8页文档与HTML+技术方案）",
+  "tdd_status": "完成并按references/TDD模板.md标准重构：15份分层TDD(每份含元信息/测试策略/GWT分列用例清单/Mock策略/实现顺序回归协议5节)+测试索引+验收门禁契约；110条用例(P0=58/P1=38/P2=14)；门禁=P0+P1=96条全绿；ID前缀规范化U/C/I/E/S/B/A/P",
+  "tdd_hard_gates": ["安全SEC P0零失败", "失败态回退BND P0", "离线可用E2E-07/I-LLM-03/SEC-01"]
+}

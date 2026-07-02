@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设置 · 项目知识库</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-body); font-size: var(--fs-body); line-height: var(--lh-normal); }
+  a { color: inherit; text-decoration: none; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: var(--sidebar-w); background: var(--bg-surface); border-right: 1px solid var(--border); position: fixed; top: 0; bottom: 0; left: 0; padding: var(--sp-5) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); }
+  .brand { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) var(--sp-5); font-size: var(--fs-h2); font-weight: var(--fw-bold); color: var(--text-strong); }
+  .brand .dot { width: 18px; height: 18px; border-radius: var(--radius-sm); background: var(--accent); }
+  .nav-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); color: var(--text-muted); font-weight: var(--fw-medium); }
+  .nav-item:hover { background: var(--bg-subtle); color: var(--text-body); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+  .nav-item .ic { width: 18px; text-align: center; }
+  .main { flex: 1; margin-left: var(--sidebar-w); }
+  .topbar { height: var(--topbar-h); border-bottom: 1px solid var(--border); background: var(--bg-surface); position: sticky; top: 0; z-index: 10; display: flex; align-items: center; padding: 0 var(--sp-6); }
+  .topbar h1 { font-size: var(--fs-h2); font-weight: var(--fw-semibold); color: var(--text-strong); }
+  .content { max-width: 760px; margin: 0 auto; padding: var(--sp-6); }
+
+  .card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-6); box-shadow: var(--shadow-xs); margin-bottom: var(--sp-5); }
+  .card h2 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  .card .desc { color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-5); line-height: var(--lh-relaxed); }
+
+  .opt { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: var(--sp-3); cursor: pointer; transition: all var(--dur-fast) var(--ease); }
+  .opt:hover { border-color: var(--accent-border); }
+  .opt.active { border-color: var(--accent); background: var(--accent-soft); }
+  .opt .radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border-strong); flex-shrink: 0; position: relative; }
+  .opt.active .radio { border-color: var(--accent); }
+  .opt.active .radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent); }
+  .opt .o-body { flex: 1; }
+  .opt .o-title { font-weight: var(--fw-medium); color: var(--text-strong); display: flex; align-items: center; gap: var(--sp-2); }
+  .opt .o-sub { font-size: var(--fs-sm); color: var(--text-muted); margin-top: 2px; }
+  .badge { font-size: var(--fs-xs); padding: 1px var(--sp-2); border-radius: var(--radius-full); }
+  .badge-ok { background: var(--success-soft); color: var(--success); }
+  .badge-rec { background: var(--accent-soft); color: var(--accent); }
+
+  .field { margin-top: var(--sp-4); }
+  .field label { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-strong); margin-bottom: var(--sp-2); }
+  .input { width: 100%; height: 40px; border: 1px solid var(--border); background: var(--bg-sunken); border-radius: var(--radius-md); padding: 0 var(--sp-4); font-size: var(--fs-body); font-family: inherit; }
+  .input:focus { outline: none; background: var(--bg-surface); border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--ring-focus); }
+
+  .privacy { display: flex; gap: var(--sp-3); background: var(--warning-soft); border-radius: var(--radius-md); padding: var(--sp-4); font-size: var(--fs-sm); line-height: var(--lh-relaxed); margin-top: var(--sp-4); }
+
+  .row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
+  .btn { display: inline-flex; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 var(--sp-5); border-radius: var(--radius-md); font-size: var(--fs-body); font-weight: var(--fw-medium); font-family: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-body); transition: all var(--dur-fast) var(--ease); }
+  .btn:hover { background: var(--bg-subtle); box-shadow: var(--shadow-sm); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .stat { color: var(--text-muted); font-size: var(--fs-sm); }
+  .recycle-row { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-3) 0; border-bottom: 1px solid var(--border); }
+  .recycle-row:last-child { border-bottom: none; }
+  .recycle-row .t { color: var(--text-body); }
+  .recycle-row .restore { color: var(--accent); font-size: var(--fs-sm); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>项目知识库</div>
+    <a class="nav-item" href="mvp_知识管理_知识列表.html"><span class="ic">📚</span>全部知识</a>
+    <a class="nav-item" href="mvp_标签_标签浏览.html"><span class="ic">🏷️</span>标签</a>
+    <a class="nav-item" href="mvp_问答_智能问答.html"><span class="ic">💬</span>问答</a>
+    <a class="nav-item active" href="mvp_设置_设置.html"><span class="ic">⚙️</span>设置</a>
+  </aside>
+  <div class="main">
+    <header class="topbar"><h1>设置</h1></header>
+    <div class="content">
+
+      <div class="card">
+        <h2>大模型</h2>
+        <div class="desc">用于自动整理、语义检索、问答。本地优先——数据不出本机；也可切换到云端大模型（速度更快、效果更强）。</div>
+        <div class="opt active">
+          <div class="radio"></div>
+          <div class="o-body">
+            <div class="o-title">本地大模型（Ollama）<span class="badge badge-rec">推荐</span><span class="badge badge-ok">● 已连接</span></div>
+            <div class="o-sub">qwen2.5:7b · 数据完全不出本机，可离线使用</div>
+          </div>
+        </div>
+        <div class="opt">
+          <div class="radio"></div>
+          <div class="o-body">
+            <div class="o-title">云端大模型（API）</div>
+            <div class="o-sub">DeepSeek / 通义 / 智谱等 OpenAI 兼容接口，速度快、效果强</div>
+            <div class="field">
+              <label>API Key</label>
+              <input class="input" type="password" placeholder="sk-..." />
+            </div>
+          </div>
+        </div>
+        <div class="privacy">
+          <span>🔒</span>
+          <div>使用云端大模型时，仅将<strong>必要的上下文</strong>发送到云端用于生成答案；你的完整知识库始终保存在本机。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>数据与备份</h2>
+        <div class="desc">所有知识与索引都存在你本机。建议定期导出备份。</div>
+        <div class="row-between">
+          <div class="stat">📦 当前：128 条知识 · 24 个标签 · 本地占用 42 MB</div>
+          <button class="btn btn-primary">⬇️ 导出备份</button>
+        </div>
+        <div class="row-between" style="margin-top:var(--sp-4)">
+          <div class="stat">从备份文件恢复数据</div>
+          <button class="btn">⬆️ 导入备份</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🗑️ 回收站</h2>
+        <div class="desc">删除的知识会先移到这里，可恢复。清空后不可找回。</div>
+        <div class="recycle-row">
+          <span class="t">过时的 Webpack 配置笔记</span>
+          <span class="restore">↩️ 恢复</span>
+        </div>
+        <div class="recycle-row">
+          <span class="t">重复的「Redis 入门」</span>
+          <span class="restore">↩️ 恢复</span>
+        </div>
+        <div class="row-between" style="margin-top:var(--sp-4)">
+          <div class="stat">回收站中 2 条</div>
+          <button class="btn">清空回收站</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.opt').forEach(o=>o.addEventListener('click',()=>{
+    document.querySelectorAll('.opt').forEach(x=>x.classList.remove('active'));
+    o.classList.add('active');
+  }));
+</script>
+</body>
+</html>

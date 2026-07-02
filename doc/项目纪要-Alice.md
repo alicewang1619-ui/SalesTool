@@ -627,3 +627,4 @@ pm.cmd run build 通过但保留既有 Vite chunk size warning；客户态势 HT
 - [07-02-2026 16:53:37] 回归测试基线重置｜背景：完整后端契约跑到群发邮件测试时失败，原因是前置销售反馈测试按新逻辑把种子客户 GlobalMed Peru 的客户池分层从高意向改为撤单/流失，后续测试仍按种子基线筛选高意向客户。｜结论：测试 fixture 每轮需重置 GlobalMed Peru 的客户分层、负责人和背景编辑状态，保证测试验证业务逻辑而不是前序用例的跨用例残留；生产代码保留反馈驱动分层。｜来源：AI
 - [07-02-2026 16:55:18] 核心闭环 P0 修复验证｜背景：完成导入自动分配反馈链接、线索详情分配反馈链接、客户池负责人/分层同步和缺失客户补建后，需要确认后端契约与前端构建。｜结论：后端执行 py -m pytest .\\tests -q，结果 109 passed；前端执行 
 pm.cmd run build，结果构建成功，仅保留既有 FastAPI/datetime deprecation warnings 和 Vite chunk size warning。｜来源：AI
+- [07-02-2026 16:56:01] 核心闭环 P0 修复推送完成｜背景：核心闭环 P0 修复已提交并按用户要求推送到 Alice 仓库。｜结论：commit 165ee445（修复销售闭环P0断点）已推送到 origin/main，远端为 https://github.com/alicewang1619-ui/SalesTool.git；未推送到 chenguozeng-origin。｜来源：AI

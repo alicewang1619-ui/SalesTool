@@ -1,4 +1,4 @@
-import { App, Button, Card, Col, Descriptions, Empty, Form, Input, Rate, Row, Space, Table, Tag, Timeline, Typography } from "antd";
+import { App, Button, Card, Col, Collapse, Descriptions, Empty, Form, Input, Rate, Row, Space, Table, Tag, Timeline, Typography } from "antd";
 import { ArrowLeft, FileText, Save, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -115,7 +115,7 @@ export function CustomerDetailPage() {
   const returnLabel = sourceLeadId ? "返回线索池" : "返回客户池";
 
   return (
-    <section>
+    <section className="customer-detail-page">
       <div className="page-heading">
         <div>
           <Typography.Title level={2}>{customer.name}</Typography.Title>
@@ -140,7 +140,7 @@ export function CustomerDetailPage() {
         </Space>
       </div>
 
-      <Card title="客户基本信息">
+      <Card title="客户基本信息" className="customer-detail-overview">
         <Descriptions column={{ xs: 1, md: 2, xl: 3 }}>
           <Descriptions.Item label="姓名">{customer.name}</Descriptions.Item>
           <Descriptions.Item label="邮箱">{customer.email || "—"}</Descriptions.Item>
@@ -168,154 +168,204 @@ export function CustomerDetailPage() {
         </Row>
       </Card>
 
-      <Card title="AI 五星评分" style={{ marginTop: 16 }}>
-        <Space wrap align="center">
-          <Rate disabled count={score.max_score || fallbackScore.max_score} value={score.total} />
-          <Tag color={score.total >= 4 ? "green" : score.total >= 3 ? "purple" : "gold"}>{score.label}</Tag>
-          <Typography.Text type="secondary">每个维度 1 分，用于运营判断询盘质量。</Typography.Text>
-        </Space>
-        <Table
-          rowKey="key"
-          size="small"
-          pagination={false}
-          dataSource={scoreDimensions}
-          style={{ marginTop: 12 }}
-          columns={[
-            { title: "评分维度", dataIndex: "label", width: 180 },
-            { title: "得分", dataIndex: "earned", width: 100, render: (earned: boolean) => <Tag color={earned ? "green" : "default"}>{earned ? "1 分" : "0 分"}</Tag> },
-            { title: "AI 判断理由", dataIndex: "reason" }
-          ]}
-        />
-      </Card>
-
-      <Row gutter={[16, 16]} className="metric-row">
-        <Col xs={24} md={6}><Card title="历史线索"><Typography.Title level={3}>{leadHistory.length}</Typography.Title></Card></Col>
-        <Col xs={24} md={6}><Card title="反馈记录"><Typography.Title level={3}>{feedbackRecords.length}</Typography.Title></Card></Col>
-        <Col xs={24} md={6}><Card title="态势信号"><Typography.Title level={3}>{signals.length}</Typography.Title></Card></Col>
-        <Col xs={24} md={6}><Card title="背景可信度"><Typography.Title level={3}>{background.confidence}</Typography.Title></Card></Col>
-      </Row>
-
-      <Card title="建议动作与主动再营销" style={{ marginTop: 16 }}>
-        {nurtureTask ? (
-          <Space direction="vertical" size={12} style={{ width: "100%" }}>
-            <div className="subtle-note">
-              <Typography.Text strong>{nurtureTask.recommended_next_action}</Typography.Text>
-              <Typography.Text className="muted">{nurtureTask.customer_note}</Typography.Text>
-            </div>
-            <Space wrap>
-              <Tag color="purple">{nurtureTask.approval_status === "pending" ? "待确认" : nurtureTask.approval_status}</Tag>
-              <Tag>{nurtureTask.email_status === "sent" ? "已发送" : "邮件草稿"}</Tag>
-              <Tag color={nurtureTask.attachments.length ? "green" : "gold"}>{nurtureTask.attachments.length} 个参考附件</Tag>
-              <Link to={nurtureTask.detail_path}>
-                <Button type="primary" icon={<FileText size={16} />}>查看邮件草稿</Button>
-              </Link>
-            </Space>
-          </Space>
-        ) : (
-          <Empty description="暂无 AI 建议动作，也可以主动为该客户创建再营销邮件" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-            <Button type="primary" icon={<Send size={16} />} loading={creatingNurture} onClick={() => void launchNurture()}>
-              创建再营销邮件
-            </Button>
-          </Empty>
-        )}
-      </Card>
-
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={14}>
-          <Card title={<Space><ShieldCheck size={18} />客户背景调查</Space>}>
-            <Typography.Paragraph>{background.auto_summary}</Typography.Paragraph>
-            <Typography.Paragraph className="muted">最近更新：{formatDate(background.updated_at)} · {background.updated_by}</Typography.Paragraph>
-            <Form key={customer.id} form={form} layout="vertical" initialValues={{ manualSummary: background.current_summary }} onFinish={(values) => void saveBackground(values)}>
-              <Form.Item name="manualSummary" label="人工修订内容" rules={[{ required: true, min: 10 }]}>
-                <Input.TextArea rows={8} disabled={!canEditBackground} />
-              </Form.Item>
-              <Button type="primary" htmlType="submit" icon={<Save size={16} />} loading={saving} disabled={!canEditBackground}>
-                保存人工修订
-              </Button>
-            </Form>
-          </Card>
-        </Col>
-        <Col xs={24} lg={10}>
-          <Card title="调查来源与证据">
-            <Table
-              rowKey={(record) => `${record.type}-${record.title}`}
-              size="small"
-              pagination={false}
-              dataSource={background.sources}
-              columns={[
-                { title: "来源", dataIndex: "title" },
-                { title: "类型", dataIndex: "type", render: (value: string) => <Tag>{value}</Tag> },
-                { title: "内容", dataIndex: "detail" }
-              ]}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Card title="客户态势信号" style={{ marginTop: 16 }}>
-        <Table
-          rowKey="id"
-          pagination={false}
-          dataSource={signals}
-          columns={[
-            { title: "观察时间", dataIndex: "observed_at", width: 180, render: formatDate },
-            { title: "来源", dataIndex: "source_label", width: 140 },
-            { title: "标题", dataIndex: "signal_title", width: 220 },
-            { title: "摘要", dataIndex: "signal_summary" },
-            { title: "状态", dataIndex: "status", width: 120, render: (value: string) => <Tag color="purple">{value}</Tag> }
-          ]}
-        />
-      </Card>
-
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={12}>
-          <Card title="历史线索">
-            <Table
-              rowKey="id"
-              pagination={false}
-              dataSource={leadHistory}
-              rowClassName={(record) => (record.id === sourceLeadId ? "selected-customer-lead-row" : "")}
-              columns={[
-                { title: "时间", dataIndex: "created_at", render: formatDate },
-                { title: "来源", dataIndex: "source" },
-                { title: "产品", dataIndex: "product" },
-                { title: "状态", dataIndex: "feedback_status", render: (value: string) => <Tag>{value}</Tag> },
-                { title: "负责人", dataIndex: "owner_name" }
-              ]}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card title="反馈记录">
-            <Table
-              rowKey={(record) => `${record.happened_at}-${record.owner_name}`}
-              pagination={false}
-              dataSource={feedbackRecords}
-              columns={[
-                { title: "时间", dataIndex: "happened_at", render: formatDate },
-                { title: "状态", dataIndex: "status", render: (value: string) => <Tag color="purple">{value}</Tag> },
-                { title: "销售判断", dataIndex: "judgement" },
-                { title: "备注", dataIndex: "remark" },
-                { title: "负责人", dataIndex: "owner_name" }
-              ]}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Card title="客户时间线" style={{ marginTop: 16 }}>
-        <Timeline
-          items={timeline.map((item) => ({
-            color: item.status.includes("background") ? "blue" : "purple",
+      <Collapse
+        className="customer-detail-collapse"
+        defaultActiveKey={["score", "nurture"]}
+        expandIconPosition="end"
+        items={[
+          {
+            key: "score",
+            label: (
+              <Space wrap>
+                <Typography.Text strong>AI 五星评分</Typography.Text>
+                <Tag color={score.total >= 4 ? "green" : score.total >= 3 ? "purple" : "gold"}>
+                  {score.total}/{score.max_score || fallbackScore.max_score} 星 · {score.label}
+                </Tag>
+              </Space>
+            ),
             children: (
-              <Space direction="vertical" size={2}>
-                <Typography.Text>{item.summary}</Typography.Text>
-                <Typography.Text type="secondary">{formatDate(item.happened_at)}</Typography.Text>
+              <>
+                <Space wrap align="center">
+                  <Rate disabled count={score.max_score || fallbackScore.max_score} value={score.total} />
+                  <Typography.Text type="secondary">每个维度 1 分，用于运营判断询盘质量。</Typography.Text>
+                </Space>
+                <Table
+                  rowKey="key"
+                  size="small"
+                  pagination={false}
+                  dataSource={scoreDimensions}
+                  style={{ marginTop: 12 }}
+                  columns={[
+                    { title: "评分维度", dataIndex: "label", width: 180 },
+                    { title: "得分", dataIndex: "earned", width: 100, render: (earned: boolean) => <Tag color={earned ? "green" : "default"}>{earned ? "1 分" : "0 分"}</Tag> },
+                    { title: "AI 判断理由", dataIndex: "reason" }
+                  ]}
+                />
+              </>
+            )
+          },
+          {
+            key: "nurture",
+            label: (
+              <Space wrap>
+                <Typography.Text strong>建议动作与主动再营销</Typography.Text>
+                <Tag color={nurtureTask ? "purple" : "gold"}>{nurtureTask ? "已有草稿" : "可创建草稿"}</Tag>
+              </Space>
+            ),
+            children: nurtureTask ? (
+              <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                <div className="subtle-note">
+                  <Typography.Text strong>{nurtureTask.recommended_next_action}</Typography.Text>
+                  <Typography.Text className="muted">{nurtureTask.customer_note}</Typography.Text>
+                </div>
+                <Space wrap>
+                  <Tag color="purple">{nurtureTask.approval_status === "pending" ? "待确认" : nurtureTask.approval_status}</Tag>
+                  <Tag>{nurtureTask.email_status === "sent" ? "已发送" : "邮件草稿"}</Tag>
+                  <Tag color={nurtureTask.attachments.length ? "green" : "gold"}>{nurtureTask.attachments.length} 个参考附件</Tag>
+                  <Link to={nurtureTask.detail_path}>
+                    <Button type="primary" icon={<FileText size={16} />}>查看邮件草稿</Button>
+                  </Link>
+                </Space>
+              </Space>
+            ) : (
+              <Empty description="暂无 AI 建议动作，也可以主动为该客户创建再营销邮件" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+                <Button type="primary" icon={<Send size={16} />} loading={creatingNurture} onClick={() => void launchNurture()}>
+                  创建再营销邮件
+                </Button>
+              </Empty>
+            )
+          },
+          {
+            key: "background",
+            label: (
+              <Space wrap>
+                <Typography.Text strong>客户背景调查</Typography.Text>
+                <Tag color={background.confidence === "高" ? "green" : "gold"}>可信度：{background.confidence}</Tag>
+                <Tag>{canEditBackground ? "可编辑" : "只读"}</Tag>
+              </Space>
+            ),
+            children: (
+              <Row gutter={[16, 16]}>
+                <Col xs={24} lg={14}>
+                  <Card title={<Space><ShieldCheck size={18} />调查内容</Space>}>
+                    <Typography.Paragraph>{background.auto_summary}</Typography.Paragraph>
+                    <Typography.Paragraph className="muted">最近更新：{formatDate(background.updated_at)} · {background.updated_by}</Typography.Paragraph>
+                    <Form key={customer.id} form={form} layout="vertical" initialValues={{ manualSummary: background.current_summary }} onFinish={(values) => void saveBackground(values)}>
+                      <Form.Item name="manualSummary" label="人工修订内容" rules={[{ required: true, min: 10 }]}>
+                        <Input.TextArea rows={8} disabled={!canEditBackground} />
+                      </Form.Item>
+                      <Button type="primary" htmlType="submit" icon={<Save size={16} />} loading={saving} disabled={!canEditBackground}>
+                        保存人工修订
+                      </Button>
+                    </Form>
+                  </Card>
+                </Col>
+                <Col xs={24} lg={10}>
+                  <Card title="调查来源与证据">
+                    <Table
+                      rowKey={(record) => `${record.type}-${record.title}`}
+                      size="small"
+                      pagination={false}
+                      dataSource={background.sources}
+                      columns={[
+                        { title: "来源", dataIndex: "title" },
+                        { title: "类型", dataIndex: "type", render: (value: string) => <Tag>{value}</Tag> },
+                        { title: "内容", dataIndex: "detail" }
+                      ]}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+            )
+          },
+          {
+            key: "signals",
+            label: (
+              <Space wrap>
+                <Typography.Text strong>客户态势信号</Typography.Text>
+                <Tag color={signals.length ? "purple" : "default"}>{signals.length} 条</Tag>
+              </Space>
+            ),
+            children: (
+              <Table
+                rowKey="id"
+                pagination={false}
+                dataSource={signals}
+                columns={[
+                  { title: "观察时间", dataIndex: "observed_at", width: 180, render: formatDate },
+                  { title: "来源", dataIndex: "source_label", width: 140 },
+                  { title: "标题", dataIndex: "signal_title", width: 220 },
+                  { title: "摘要", dataIndex: "signal_summary" },
+                  { title: "状态", dataIndex: "status", width: 120, render: (value: string) => <Tag color="purple">{value}</Tag> }
+                ]}
+              />
+            )
+          },
+          {
+            key: "history",
+            label: (
+              <Space wrap>
+                <Typography.Text strong>历史记录</Typography.Text>
+                <Tag>{leadHistory.length} 条线索</Tag>
+                <Tag>{feedbackRecords.length} 条反馈</Tag>
+                <Tag>{timeline.length} 条时间线</Tag>
+              </Space>
+            ),
+            children: (
+              <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                <Row gutter={[16, 16]}>
+                  <Col xs={24} lg={12}>
+                    <Card title="历史线索">
+                      <Table
+                        rowKey="id"
+                        pagination={false}
+                        dataSource={leadHistory}
+                        rowClassName={(record) => (record.id === sourceLeadId ? "selected-customer-lead-row" : "")}
+                        columns={[
+                          { title: "时间", dataIndex: "created_at", render: formatDate },
+                          { title: "来源", dataIndex: "source" },
+                          { title: "产品", dataIndex: "product" },
+                          { title: "状态", dataIndex: "feedback_status", render: (value: string) => <Tag>{value}</Tag> },
+                          { title: "负责人", dataIndex: "owner_name" }
+                        ]}
+                      />
+                    </Card>
+                  </Col>
+                  <Col xs={24} lg={12}>
+                    <Card title="反馈记录">
+                      <Table
+                        rowKey={(record) => `${record.happened_at}-${record.owner_name}`}
+                        pagination={false}
+                        dataSource={feedbackRecords}
+                        columns={[
+                          { title: "时间", dataIndex: "happened_at", render: formatDate },
+                          { title: "状态", dataIndex: "status", render: (value: string) => <Tag color="purple">{value}</Tag> },
+                          { title: "销售判断", dataIndex: "judgement" },
+                          { title: "备注", dataIndex: "remark" },
+                          { title: "负责人", dataIndex: "owner_name" }
+                        ]}
+                      />
+                    </Card>
+                  </Col>
+                </Row>
+                <Card title="客户时间线">
+                  <Timeline
+                    items={timeline.map((item) => ({
+                      color: item.status.includes("background") ? "blue" : "purple",
+                      children: (
+                        <Space direction="vertical" size={2}>
+                          <Typography.Text>{item.summary}</Typography.Text>
+                          <Typography.Text type="secondary">{formatDate(item.happened_at)}</Typography.Text>
+                        </Space>
+                      )
+                    }))}
+                  />
+                </Card>
               </Space>
             )
-          }))}
-        />
-      </Card>
+          }
+        ]}
+      />
     </section>
   );
 }

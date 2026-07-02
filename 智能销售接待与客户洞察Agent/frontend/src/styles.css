@@ -517,6 +517,36 @@ body {
   background: #fbfaff !important;
 }
 
+.customer-detail-collapse {
+  margin-top: 16px;
+  background: transparent;
+}
+
+.customer-detail-collapse.ant-collapse {
+  border: 0;
+}
+
+.customer-detail-collapse .ant-collapse-item {
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e8ecf5;
+  border-radius: 12px !important;
+}
+
+.customer-detail-collapse .ant-collapse-header {
+  align-items: center !important;
+  padding: 18px 20px !important;
+}
+
+.customer-detail-collapse .ant-collapse-content {
+  border-top: 1px solid #edf0f7;
+}
+
+.customer-detail-collapse .ant-collapse-content-box {
+  padding: 18px 20px 20px !important;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;

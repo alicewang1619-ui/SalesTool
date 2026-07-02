@@ -50,4 +50,16 @@ describe('U-SR-08 超长上下文截断', () => {
     expect(res.sources.length).toBeLessThanOrEqual(3);
     expect(res.hasContext).toBe(true);
   });
+
+  it('每来源均摊预算：块很长时 Top-K 仍足额展示，不因前几条吃满预算而丢末位（issue #4）', async () => {
+    const db = memDb();
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      title: `长知识${i}`,
+      content: `第${i}条，缓存关键词。`.repeat(400), // 单条正文远超总预算
+    }));
+    await seed(db, many);
+    const res = await answerQuestion(db, new StubProvider({ chatFn: () => '答案' }), '缓存', { topK: 5 });
+    expect(res.sources.length).toBe(5); // 修复前会因 6000 截断只剩 1~4 条
+    expect(res.sources.map((s) => s.index)).toEqual([1, 2, 3, 4, 5]);
+  });
 });

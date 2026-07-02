@@ -64,12 +64,19 @@ export async function answerQuestion(
   const sources: AnswerSource[] = [];
   let context = '';
   let idx = 0;
+  // 每条来源均摊上下文预算：过长的块截到预算内，而不是让前几条吃满 6000 后整条丢弃末位来源，
+  // 否则 Top-K 实际展示不足 K 条（issue #4）。
+  const perSourceBudget = Math.floor(MAX_CONTEXT_CHARS / ranked.length || 1);
   for (const [kid, info] of ranked) {
     const k = getKnowledge(db, kid);
     if (!k) continue;
     idx += 1;
-    const piece = `[${idx}] 标题：${k.title}\n${info.chunks.join('\n')}\n`;
-    if (context.length + piece.length > MAX_CONTEXT_CHARS) break;
+    const header = `[${idx}] 标题：${k.title}\n`;
+    let body = info.chunks.join('\n');
+    const bodyBudget = Math.max(200, perSourceBudget - header.length - 2);
+    if (body.length > bodyBudget) body = body.slice(0, bodyBudget) + '…';
+    const piece = `${header}${body}\n`;
+    if (context.length + piece.length > MAX_CONTEXT_CHARS) break; // 安全阀（正常均摊下不会触发）
     context += piece;
     sources.push({ index: idx, knowledge_id: k.id, title: k.title, relevance: toRelevance(info.sim) });
   }

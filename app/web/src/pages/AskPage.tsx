@@ -135,7 +135,7 @@ export function AskPage() {
                       {renderAnswer(m.answer.answer, m.answer.sources)}
                       {m.answer.sources.length > 0 && (
                         <div className="sources">
-                          <div className="lab">📎 答案来源（{m.answer.sources.length} 条知识）</div>
+                          <div className="lab">📎 答案来源（引用最相关的 {m.answer.sources.length} 条知识）</div>
                           {m.answer.sources.map((s) => (
                             <Link className="src-item" to={`/k/${s.knowledge_id}`} key={s.index} data-testid="source-item">
                               <span className="num">{s.index}</span>

@@ -9,13 +9,16 @@ import type { DataStats, Knowledge, ModelSettingsPublic } from '../api/types.ts'
 import { useToast } from '../components/Toast.tsx';
 import { ConfirmModal } from '../components/ConfirmModal.tsx';
 
-/** 云端服务商预设：选中即回填 OpenAI 兼容 baseUrl 与建议模型名，用户只需粘贴 API Key。 */
+/**
+ * 云端服务商预设：选中即回填 OpenAI 兼容 baseUrl 与建议对话模型，用户只需粘贴 API Key。
+ * 注意：embedding 始终走本地 Ollama（保证与已建索引一致且不外泄），云端只负责对话生成，故这里只需对话模型。
+ */
 const CLOUD_PRESETS = [
-  { id: 'custom', label: '自定义', baseUrl: '', chat: '', embed: '' },
-  { id: 'google', label: 'Google AI Studio（Gemini）', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', chat: 'gemini-2.0-flash', embed: 'text-embedding-004' },
-  { id: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', chat: 'deepseek-chat', embed: '' },
-  { id: 'dashscope', label: '通义千问（DashScope）', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', chat: 'qwen-plus', embed: 'text-embedding-v3' },
-  { id: 'zhipu', label: '智谱 GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', chat: 'glm-4-flash', embed: 'embedding-3' },
+  { id: 'custom', label: '自定义', baseUrl: '', chat: '' },
+  { id: 'google', label: 'Google AI Studio（Gemini）', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', chat: 'gemini-2.0-flash' },
+  { id: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', chat: 'deepseek-chat' },
+  { id: 'dashscope', label: '通义千问（DashScope）', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', chat: 'qwen-plus' },
+  { id: 'zhipu', label: '智谱 GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', chat: 'glm-4-flash' },
 ] as const;
 
 export function SettingsPage() {
@@ -205,7 +208,7 @@ export function SettingsPage() {
                     <option key={p.id} value={p.id}>{p.label}</option>
                   ))}
                 </select>
-                <div className="hint">选服务商自动回填接口地址与建议模型；也可选「自定义」手填。任何 OpenAI 兼容接口均可。</div>
+                <div className="hint">选服务商自动回填接口地址与建议模型；也可选「自定义」手填任意 OpenAI 兼容接口。云端仅用于对话生成，向量索引始终用本地模型（保证检索一致且不外泄）。</div>
               </div>
               <div className="field">
                 <label htmlFor="cloud-base">接口地址（baseUrl）</label>

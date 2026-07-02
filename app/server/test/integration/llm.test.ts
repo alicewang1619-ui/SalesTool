@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import {
   createProvider,
   OllamaProvider,
-  OpenAICompatProvider,
   LlmError,
   listLocalChatModels,
 } from '../../src/llm/provider.ts';
@@ -31,7 +30,7 @@ describe('I-LLM 接口契约（结构 / 切换 / 配置）', () => {
       cloudApiKey: 'sk-test',
     });
     expect(local).toBeInstanceOf(OllamaProvider);
-    expect(cloud).toBeInstanceOf(OpenAICompatProvider);
+    expect(cloud).not.toBeInstanceOf(OllamaProvider); // 云端为「云 chat + 本地 embed」混合 provider
     for (const p of [local, cloud]) {
       expect(typeof p.embed).toBe('function');
       expect(typeof p.chat).toBe('function');
@@ -39,6 +38,39 @@ describe('I-LLM 接口契约（结构 / 切换 / 配置）', () => {
     }
     expect(local.isLocal).toBe(true);
     expect(cloud.isLocal).toBe(false);
+  });
+
+  it('I-LLM-08 切云端时 embedding 仍走本地 Ollama、对话走云端（issue #8）', async () => {
+    const calls: string[] = [];
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (url: unknown) => {
+      const u = String(url);
+      calls.push(u);
+      if (u.endsWith('/api/embeddings')) return new Response(JSON.stringify({ embedding: [1, 2, 3] }), { status: 200 });
+      if (u.endsWith('/chat/completions')) return new Response(JSON.stringify({ choices: [{ message: { content: 'hi' } }] }), { status: 200 });
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+    try {
+      const cloud = createProvider({
+        provider: 'cloud',
+        chatModel: 'gemini-2.0-flash',
+        embedModel: 'ignored',
+        cloudBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        cloudApiKey: 'k',
+      });
+      await cloud.embed('x');
+      await cloud.chat([{ role: 'user', content: 'hi' }]);
+      // embedding 打到本地 Ollama
+      expect(calls.some((u) => u === `${config.ollamaBaseUrl}/api/embeddings`)).toBe(true);
+      // 对话打到云端 baseUrl
+      expect(calls.some((u) => u.startsWith('https://generativelanguage.googleapis.com') && u.endsWith('/chat/completions'))).toBe(true);
+      // embedding 未发往云端
+      expect(calls.some((u) => u.startsWith('https://generativelanguage.googleapis.com') && u.endsWith('/embeddings'))).toBe(false);
+      // 使用本地默认 embed 模型，保证与已建索引一致
+      expect(cloud.embedModel).toBe(config.defaultEmbedModel);
+    } finally {
+      globalThis.fetch = orig;
+    }
   });
 
   it('云端缺 API Key 立即 throw（红线：配置缺失不静默兜底）', () => {

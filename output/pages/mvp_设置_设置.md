@@ -15,7 +15,8 @@
 
 ## 4. 核心组件
 - 大模型单选项（本地/云端，含连接状态徽标、API Key 输入）
-- 云端「服务商」预设下拉（Google AI Studio(Gemini) / DeepSeek / 通义 / 智谱 / 自定义），选中自动回填 baseUrl 与建议模型名
+- 云端「服务商」预设下拉（Google AI Studio(Gemini) / DeepSeek / 通义 / 智谱 / 自定义），选中自动回填 baseUrl 与建议对话模型名
+- 云端只负责**对话生成**；**embedding 始终走本地 Ollama**，保证与已建索引一致且完整知识库不外泄（issue #8）
 - 隐私提示条
 - 导出/导入按钮、数据统计
 - 回收站列表（恢复/清空）

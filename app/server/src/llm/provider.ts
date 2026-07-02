@@ -190,17 +190,47 @@ export async function listLocalChatModels(baseUrl = config.ollamaBaseUrl): Promi
     .sort();
 }
 
+/**
+ * 混合 provider：对话走云端，embedding 始终走本地 Ollama。
+ * 理由（issue #8）：
+ *  1) 已建索引是本地 embed 模型生成的；若查询改用云端 embed，模型/维度不一致，检索/问答匹配不到任何知识 → 云端「无法工作」。
+ *  2) 隐私红线：设置页承诺「完整知识库始终保存在本机，只把必要上下文发云端生成」——embedding 覆盖全库内容，必须留在本地。
+ * 故切云端只改 chat，embed 恒用本地 embed 模型，保证与索引一致且不外泄。
+ */
+class CloudChatLocalEmbedProvider implements LlmProvider {
+  readonly name = 'cloud-chat+local-embed';
+  readonly isLocal = false;
+  constructor(
+    private readonly cloud: OpenAICompatProvider,
+    private readonly localEmbed: OllamaProvider,
+    readonly chatModel: string,
+    readonly embedModel: string,
+  ) {}
+  embed(text: string): Promise<number[]> {
+    return this.localEmbed.embed(text);
+  }
+  chat(messages: ChatMessage[]): Promise<string> {
+    return this.cloud.chat(messages);
+  }
+  health(): Promise<{ ok: boolean; detail: string }> {
+    return this.cloud.health();
+  }
+}
+
 /** 按设置构造 provider。云端缺关键配置即 throw（红线：配置缺失 throw）。 */
 export function createProvider(settings: ModelSettings): LlmProvider {
   if (settings.provider === 'cloud') {
     if (!settings.cloudBaseUrl) throw new LlmError('云端模式缺 baseUrl', false, 'config');
     if (!settings.cloudApiKey) throw new LlmError('云端模式缺 API Key', false, 'config');
-    return new OpenAICompatProvider(
+    const cloud = new OpenAICompatProvider(
       settings.cloudBaseUrl.replace(/\/+$/, ''),
       settings.cloudApiKey,
       settings.chatModel,
       settings.embedModel,
     );
+    // embedding 恒用本地 Ollama 的 embed 模型，保证与已建索引一致（issue #8）。
+    const localEmbed = new OllamaProvider(config.ollamaBaseUrl, settings.chatModel, config.defaultEmbedModel);
+    return new CloudChatLocalEmbedProvider(cloud, localEmbed, settings.chatModel, config.defaultEmbedModel);
   }
   return new OllamaProvider(config.ollamaBaseUrl, settings.chatModel, settings.embedModel);
 }

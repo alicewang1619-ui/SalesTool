@@ -196,17 +196,36 @@ describe('B-BND 边界与失败态', () => {
     expect(res.body.error.retryable).toBe(true);
   });
 
-  it('B-BND-03 云端 Key 失效/不可达返回可重试错误', async () => {
-    updateModelSettings(db, { provider: 'cloud', cloudBaseUrl: 'http://127.0.0.1:1/v1', cloudApiKey: 'sk-bad' });
-    const app = createApp({ db, getProvider: () => createProvider(getModelSettings(db)) });
+  it('B-BND-03 云端不可达时问答(生成)返回可重试错误；检索不受影响（embed 本地，issue #8）', async () => {
+    // 用 StubProvider 建 64 维索引
     const id = (
-      await request(makeApp(db, new StubProvider())).post('/api/knowledge').send({ content: '正文', source_type: 'note' })
+      await request(makeApp(db, new StubProvider())).post('/api/knowledge').send({ content: '正文内容', source_type: 'note' })
     ).body.id;
     const { buildEmbeddings } = await import('../../src/services/embedding.ts');
-    await buildEmbeddings(db, new StubProvider(), id, '正文');
-    const res = await request(app).get('/api/search').query({ q: '正文' });
-    expect(res.status).toBe(502);
-    expect(res.body.error.retryable).toBe(true);
+    await buildEmbeddings(db, new StubProvider(), id, '正文内容');
+    updateModelSettings(db, { provider: 'cloud', cloudBaseUrl: 'http://cloud.invalid/v1', cloudApiKey: 'sk-bad' });
+    resetRateLimits();
+
+    // 本地 embed 成功（返回与 stub 同为 64 维），云端 chat 不可达
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (url: unknown) => {
+      const u = String(url);
+      if (u.endsWith('/api/embeddings')) return new Response(JSON.stringify({ embedding: new Array(64).fill(0.1) }), { status: 200 });
+      if (u.endsWith('/chat/completions')) throw new TypeError('fetch failed');
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+    try {
+      const app = createApp({ db, getProvider: () => createProvider(getModelSettings(db)) });
+      // 检索只需本地 embed → 成功（云端坏配置不影响）
+      const s = await request(app).get('/api/search').query({ q: '正文' });
+      expect(s.status).toBe(200);
+      // 问答生成走云端 → 可重试 502
+      const a = await request(app).post('/api/ask').send({ question: '正文相关' });
+      expect(a.status).toBe(502);
+      expect(a.body.error.retryable).toBe(true);
+    } finally {
+      globalThis.fetch = orig;
+    }
   });
 });
 

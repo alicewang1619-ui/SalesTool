@@ -2,3 +2,12 @@
 node_modules/
 dist/
 data/
+__pycache__/
+*.pyc
+*.log
+*.err.log
+*.db
+*.sqlite
+*.sqlite3
+*.tsbuildinfo
+.vite/

@@ -48,6 +48,8 @@
 ## 2026-07-02 英文邮件模板生成 TDD
 - NURTURE-DETAIL-P0-07：重新生成必须走后端模型生成链路，输入包含客户上下文、写手风格技能、人工提示词和附件元数据；`prompt_context_snapshot` 保留完整上下文。
 - NURTURE-DETAIL-P0-08：重新生成返回的 `draft_content` 必须是可人工调整的英文邮件模板正文，不得夹杂中文提示词、中文写手技能或后端拼接说明；由 `test_nurture_regeneration_returns_english_template_without_chinese_leakage` 验证。
+- NURTURE-DETAIL-P0-09：`draft_content` 必须是完整可发送英文邮件草稿，包含 greeting、客户背景/需求、资料或产品价值、合规边界、CTA 和 sign-off；不得只是“将使用某写手风格/接下来发送资料”的动作摘要。
+- NURTURE-DETAIL-P0-10：打开草稿详情时如发现历史旧草稿属于动作摘要或缺少 CTA/落款等完整邮件结构，后端必须自动替换为完整英文邮件草稿；由 `test_nurture_detail_replaces_legacy_action_summary_with_sendable_email` 和 `test_nurture_detail_replaces_incomplete_draft_with_sendable_email` 验证。
 - NURTURE-DETAIL-P0-09：设置页填写的模型 API Key 必须可被服务端模型调用复用，但 `/api/settings/ai-model` 响应不得回显明文 Key 或服务端密钥字段。
 
 ## 2026-07-02 英文模板实现门禁记录

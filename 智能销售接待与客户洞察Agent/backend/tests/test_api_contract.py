@@ -2629,9 +2629,17 @@ def first_nurture_task(client: TestClient, headers: dict[str, str]) -> dict:
 
 
 def assert_english_email_body(draft_content: str) -> None:
+    normalized = draft_content.lower()
     assert not re.search(r"[\u3400-\u9fff]", draft_content)
-    assert "Hi " in draft_content
-    assert "Best regards" in draft_content
+    assert re.search(r"(^|\n\s*\n)\s*(hi|hello|dear)\b", normalized)
+    assert any(marker in normalized for marker in ["best regards", "kind regards", "sincerely", "regards,"])
+    assert any(
+        marker in normalized
+        for marker in ["could you", "would it be", "would you", "please let me know", "let me know", "schedule a short call"]
+    )
+    assert "will use a" not in normalized
+    assert "we prepared a concise follow-up using" not in normalized
+    assert len(draft_content.split()) >= 35
 
 
 def test_nurture_tasks_list_uses_persistent_prompt_context_and_pagination(client: TestClient) -> None:
@@ -2918,6 +2926,87 @@ def test_nurture_regeneration_returns_english_template_without_chinese_leakage(c
     assert "推动决策" in body["prompt_context_snapshot"]["rendered_prompt"]
     assert_english_email_body(body["draft_content"])
     assert "Portable Ultrasound" in body["draft_content"]
+
+
+def test_nurture_detail_replaces_legacy_action_summary_with_sendable_email(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "nurture-legacy-draft-test"}
+    monkeypatch.setattr(main_module, "call_nurture_email_model", lambda model, context: "")
+    task = first_nurture_task(client, headers)
+    legacy_draft = (
+        "Hi GlobalMed Peru, based on your 3 天内发送 Portable Ultrasound 对比资料，"
+        "并询问代理区域、年度采购量和预算窗口。 大白 will use a 稳重、专业、可靠 style "
+        "with 正式邮件, 医疗客户, 技术沟通 skills, and we prepared a concise follow-up using no attachment. "
+        "Would it be useful if I send the comparison and confirm your priority application?"
+    )
+
+    saved = client.put(
+        f"/api/nurture-tasks/{task['id']}",
+        json={
+            "recommended_next_action": "3 天内发送 Portable Ultrasound 对比资料，并询问代理区域、年度采购量和预算窗口。",
+            "customer_note": "客户官网显示新增 Lima 分部，适合温和再营销触达。",
+            "nurture_reason": "旧草稿是动作摘要，打开详情时需要替换为英文邮件正文。",
+            "draft_content": legacy_draft,
+            "generation_prompt": "专业但不强推，突出区域诊所部署。",
+            "writer_role_key": "baymax",
+        },
+        headers=headers,
+    )
+    assert saved.status_code == 200
+
+    detail = client.get(f"/api/nurture-tasks/{task['id']}", headers=headers)
+
+    assert detail.status_code == 200
+    body = detail.json()
+    assert_english_email_body(body["draft_content"])
+    assert "GlobalMed Peru" in body["draft_content"]
+    assert "Portable Ultrasound" in body["draft_content"]
+    assert body["approval_status"] == "pending"
+    audit = client.get("/api/audit-logs", headers=auth_headers(client)).json()["items"]
+    assert any(
+        event["action"] == "nurture_legacy_draft_repaired" and event["trace_id"] == "nurture-legacy-draft-test"
+        for event in audit
+    )
+
+
+def test_nurture_detail_replaces_incomplete_draft_with_sendable_email(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "nurture-incomplete-draft-test"}
+    monkeypatch.setattr(main_module, "call_nurture_email_model", lambda model, context: "")
+    task = first_nurture_task(client, headers)
+
+    saved = client.put(
+        f"/api/nurture-tasks/{task['id']}",
+        json={
+            "recommended_next_action": "发送 Portable Ultrasound 对比资料并确认重点应用场景。",
+            "customer_note": "客户关注区域诊所部署，避免承诺价格。",
+            "nurture_reason": "旧草稿只有一句下一步动作，没有完整邮件结构。",
+            "draft_content": (
+                "Hi Carlos, based on your interest in portable ultrasound for regional clinics, "
+                "we prepared a short comparison for your team."
+            ),
+            "generation_prompt": "生成完整英文邮件草稿。",
+            "writer_role_key": "baymax",
+        },
+        headers=headers,
+    )
+    assert saved.status_code == 200
+
+    detail = client.get(f"/api/nurture-tasks/{task['id']}", headers=headers)
+
+    assert detail.status_code == 200
+    body = detail.json()
+    assert_english_email_body(body["draft_content"])
+    assert "formal commercial process" in body["draft_content"]
+    audit = client.get("/api/audit-logs", headers=auth_headers(client)).json()["items"]
+    assert any(
+        event["action"] == "nurture_legacy_draft_repaired" and event["trace_id"] == "nurture-incomplete-draft-test"
+        for event in audit
+    )
 
 
 def test_nurture_confirm_send_is_manual_idempotent_and_audited(client: TestClient) -> None:

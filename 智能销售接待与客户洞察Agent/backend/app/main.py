@@ -3238,10 +3238,41 @@ def build_nurture_context(db: Session, task: NurtureTask) -> NurturePromptContex
 
 
 CJK_PATTERN = re.compile(r"[\u3400-\u9fff]")
+ACTION_SUMMARY_PATTERN = re.compile(
+    r"(\bwill use a\b[\s\S]{0,180}\bstyle\b[\s\S]{0,180}\bskills\b)"
+    r"|(\bbased on your\b[\s\S]{0,180}\band we prepared\b)"
+    r"|(\bwe prepared a concise follow-up using\b)",
+    re.IGNORECASE,
+)
 
 
 def contains_cjk(text_value: str) -> bool:
     return bool(CJK_PATTERN.search(text_value))
+
+
+def is_action_summary_draft(text_value: str) -> bool:
+    return bool(ACTION_SUMMARY_PATTERN.search(text_value.strip()))
+
+
+def is_sendable_email_body(text_value: str) -> bool:
+    normalized = text_value.strip().lower()
+    has_greeting = bool(re.search(r"(^|\n\s*\n)\s*(hi|hello|dear)\b", normalized))
+    has_signoff = any(
+        marker in normalized
+        for marker in ["best regards", "kind regards", "sincerely", "regards,"]
+    )
+    has_cta = any(
+        marker in normalized
+        for marker in [
+            "could you",
+            "would it be",
+            "would you",
+            "please let me know",
+            "let me know",
+            "schedule a short call",
+        ]
+    )
+    return has_greeting and has_signoff and has_cta
 
 
 def env_slug(value: str) -> str:
@@ -3353,7 +3384,11 @@ def clean_generated_email(text_value: str) -> str:
     cleaned = "\n".join(lines).strip()
     if contains_cjk(cleaned):
         return ""
+    if is_action_summary_draft(cleaned):
+        return ""
     if len(cleaned.split()) < 25:
+        return ""
+    if not is_sendable_email_body(cleaned):
         return ""
     return cleaned
 
@@ -3433,20 +3468,21 @@ def fallback_nurture_email_template(context: NurturePromptContextOut) -> str:
     if attachment_names:
         attachment_sentence = (
             f"I can also use {', '.join(attachment_names[:3])} as reference material "
-            "when preparing the comparison, while keeping pricing, registration, and exclusivity details subject to formal confirmation."
+            "to make the comparison more specific to your evaluation."
         )
     else:
         attachment_sentence = (
-            "I can prepare a concise comparison summary for your review, while keeping pricing, registration, "
-            "and exclusivity details subject to formal confirmation."
+            "I can prepare a concise comparison summary that focuses on application fit, workflow value, "
+            "portability, and after-sales support."
         )
     return "\n\n".join(
         [
             f"Hi {customer_name},",
-            f"Thank you for your interest in {product}. I wanted to follow up with a practical next step for your {customer_type.lower()} needs in {country}.",
-            "Based on your recent inquiry and our sales follow-up, it would be useful to confirm the priority application, expected timing, and the right contact for evaluation.",
+            f"Thank you for your continued interest in {product}. I understand that your team is evaluating options for {customer_type.lower()} needs in {country}, and I wanted to share a focused update that can help your team move the review forward.",
+            "From the information we have, the most useful next step is to compare the fit for your priority application, expected workflow, and support requirements before discussing commercial details.",
             attachment_sentence,
-            "Would it be helpful to schedule a short call this week so I can understand your main application scenario and share the most relevant comparison details?",
+            "To keep the discussion accurate, any pricing, registration, delivery schedule, or exclusivity arrangement should be confirmed through the formal commercial process before being treated as final.",
+            "Could you let me know which application scenario is most important for your team right now, and whether you would prefer a short call or an email comparison first?",
             "Best regards,",
         ]
     )
@@ -3457,6 +3493,31 @@ def generate_nurture_email_draft(model: AIModelOptionOut, context: NurturePrompt
     if model_draft:
         return model_draft
     return fallback_nurture_email_template(context)
+
+
+def should_repair_legacy_nurture_draft(task: NurtureTask) -> bool:
+    if task.approval_status != "pending" or task.email_status != "draft":
+        return False
+    return (
+        contains_cjk(task.draft_content)
+        or is_action_summary_draft(task.draft_content)
+        or not is_sendable_email_body(task.draft_content)
+    )
+
+
+def repair_legacy_nurture_draft(db: Session, task: NurtureTask, user: User) -> bool:
+    if not should_repair_legacy_nurture_draft(task):
+        return False
+    context = build_nurture_context(db, task)
+    email_model = ai_model_for_use_case(db, "email_draft")
+    task.draft_content = generate_nurture_email_draft(email_model, context)
+    task.prompt_context_snapshot = context.model_dump_json()
+    task.model_provider = email_model.provider
+    task.model_version = email_model.value
+    task.approval_status = "pending"
+    task.updated_by = user.id
+    db.flush()
+    return True
 
 
 def nurture_context_from_snapshot(db: Session, task: NurtureTask) -> NurturePromptContextOut:
@@ -3732,6 +3793,18 @@ def get_nurture_task(
 ) -> NurtureTaskOut:
     task = get_nurture_task_or_404(db, task_id)
     require_nurture_scope(db, request, user, task)
+    if repair_legacy_nurture_draft(db, task, user):
+        add_audit(
+            db,
+            request.state.trace_id,
+            "nurture_legacy_draft_repaired",
+            "Legacy action-summary nurture draft replaced with a sendable English email body",
+            actor_id=user.id,
+            target_type="nurture_task",
+            target_id=task.id,
+        )
+        db.commit()
+        db.refresh(task)
     return nurture_task_out(db, task, user)
 
 

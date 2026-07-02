@@ -111,6 +111,23 @@ describe('U-SR-05 Top-K 相似度排序', () => {
     const r2 = await semanticSearch(db, provider, '掩码图像建模', { topK: 3 });
     expect(r2.hits[0].title).toBe('掩码图像建模 MAE');
   });
+
+  it('字面命中正文（非标题、且在非首块）也能召回（issue #16）', async () => {
+    const db = memDb();
+    // 造多条噪声 + 一条正文里含「召回率」的知识（标题不含），且关键词放在靠后位置以落入非首块
+    for (let i = 0; i < 6; i++) {
+      const nid = createKnowledge(db, { title: `噪声知识${i}`, content: `与目标无关的内容第${i}条。`.repeat(20), source_type: 'note' });
+      await buildEmbeddings(db, provider, nid, getContent(db, nid));
+    }
+    const target = createKnowledge(db, {
+      title: '性能指标 - F1分数',
+      content: '先介绍精确率的定义与场景。'.repeat(30) + ' 之后再讲召回率：召回率衡量正样本被找回的比例。'.repeat(3),
+      source_type: 'note',
+    });
+    await buildEmbeddings(db, provider, target, getContent(db, target));
+    const r = await semanticSearch(db, provider, '召回率', { topK: 3 });
+    expect(r.hits.some((h) => h.title === '性能指标 - F1分数')).toBe(true);
+  });
 });
 
 describe('U-SR-06 相关度归一化', () => {

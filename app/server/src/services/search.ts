@@ -72,8 +72,11 @@ export async function semanticSearch(
       (r) => [r.id, r.title],
     ),
   );
+  // 字面匹配用该知识的全部块文本（≈全文），而非单个最佳块——否则关键词落在别的块里会漏（issue #16）。
+  const fullText = new Map<string, string>();
+  for (const r of rows) fullText.set(r.knowledge_id, `${fullText.get(r.knowledge_id) ?? ''}\n${r.chunk_text}`);
   const scored = scoreByKnowledge(rows, queryVec)
-    .map((s) => ({ s, lex: lexicalScore(q, titles.get(s.knowledgeId) ?? '', s.bestChunk) }))
+    .map((s) => ({ s, lex: lexicalScore(q, titles.get(s.knowledgeId) ?? '', fullText.get(s.knowledgeId) ?? s.bestChunk) }))
     .sort((a, b) => b.s.sim + b.lex - (a.s.sim + a.lex))
     .slice(0, topK);
   const hits: SearchHit[] = [];

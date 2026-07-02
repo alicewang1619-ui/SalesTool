@@ -76,11 +76,14 @@ export async function answerQuestion(
       (r) => [r.id, r.title],
     ),
   );
+  // 字面匹配用该知识的全部块文本（≈全文），而非保留的前 2 块——否则关键词落在别的块里会漏（issue #16）。
+  const fullText = new Map<string, string>();
+  for (const r of rows) fullText.set(r.knowledge_id, `${fullText.get(r.knowledge_id) ?? ''}\n${r.chunk_text}`);
   const ranked = Array.from(seen.entries())
     .map(([kid, info]) => ({
       kid,
       info,
-      combined: info.sim + lexicalScore(q, titles.get(kid) ?? '', info.chunks.join('\n')),
+      combined: info.sim + lexicalScore(q, titles.get(kid) ?? '', fullText.get(kid) ?? info.chunks.join('\n')),
     }))
     .sort((a, b) => b.combined - a.combined)
     .slice(0, topK)

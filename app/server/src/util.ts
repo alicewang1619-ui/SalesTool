@@ -43,11 +43,21 @@ export function lexicalScore(query: string, title: string, text: string): number
   let score = 0;
   if (t.includes(q)) score += 0.6;
   if (c.includes(q)) score += 0.25;
-  const terms = q.split(/[\s,，。/、:：()（）]+/).filter((w) => w.length >= 1);
-  for (const w of terms) {
-    if (w === q) continue;
-    if (t.includes(w)) score += 0.15;
-    else if (c.includes(w)) score += 0.05;
+
+  const seen = new Set<string>();
+  const add = (w: string, wt: number, wc: number) => {
+    if (w.length < 2 || w === q || seen.has(w)) return;
+    seen.add(w);
+    if (t.includes(w)) score += wt;
+    else if (c.includes(w)) score += wc;
+  };
+  // 空白/标点分词（英文、混排）
+  for (const w of q.split(/[\s,，。/、:：()（）?？!！；;]+/)) add(w, 0.15, 0.08);
+  // 中文无空格：对含中文的片段补 3-gram / 2-gram 子串匹配，命中「召回率是什么」里的「召回率」等（issue #16）。
+  for (const w of q.split(/[\s,，。/、:：()（）?？!！；;]+/)) {
+    if (!/[一-龥]/.test(w) || w.length < 3) continue;
+    for (let i = 0; i + 3 <= w.length; i++) add(w.slice(i, i + 3), 0.12, 0.09);
+    for (let i = 0; i + 2 <= w.length; i++) add(w.slice(i, i + 2), 0.08, 0.06);
   }
   return Math.min(1, score);
 }

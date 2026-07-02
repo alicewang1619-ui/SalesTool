@@ -1,7 +1,11 @@
 ﻿import csv
 import io
 import json
+import os
+import re
 from datetime import datetime, timedelta, timezone
+from urllib import request as urllib_request
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from uuid import uuid4
 import zipfile
@@ -3233,6 +3237,228 @@ def build_nurture_context(db: Session, task: NurtureTask) -> NurturePromptContex
     )
 
 
+CJK_PATTERN = re.compile(r"[\u3400-\u9fff]")
+
+
+def contains_cjk(text_value: str) -> bool:
+    return bool(CJK_PATTERN.search(text_value))
+
+
+def env_slug(value: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", "_", value.upper()).strip("_")
+
+
+def model_api_key(model: AIModelOptionOut) -> str:
+    if model.api_key_secret.strip():
+        return model.api_key_secret.strip()
+    model_slug = env_slug(model.value)
+    provider_slug = env_slug(model.provider)
+    candidates = [
+        f"UG_LLM_API_KEY_{model_slug}",
+        f"UG_LLM_API_KEY_{provider_slug}",
+        f"{provider_slug}_API_KEY",
+        "UG_LLM_API_KEY",
+    ]
+    if provider_slug == "ANTHROPIC":
+        candidates.append("ANTHROPIC_API_KEY")
+    if provider_slug == "OPENAI":
+        candidates.append("OPENAI_API_KEY")
+    if provider_slug == "DEEPSEEK":
+        candidates.append("DEEPSEEK_API_KEY")
+    for key in candidates:
+        value = os.getenv(key, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def model_api_url(model: AIModelOptionOut) -> str:
+    model_slug = env_slug(model.value)
+    base_url = (
+        model.api_base_url
+        or os.getenv(f"UG_LLM_API_BASE_URL_{model_slug}", "").strip()
+        or os.getenv("UG_LLM_API_BASE_URL", "").strip()
+    )
+    if not base_url:
+        return ""
+    endpoint_path = (
+        model.endpoint_path
+        or os.getenv(f"UG_LLM_ENDPOINT_PATH_{model_slug}", "").strip()
+        or os.getenv("UG_LLM_ENDPOINT_PATH", "/v1/chat/completions").strip()
+    )
+    return f"{base_url.rstrip('/')}/{endpoint_path.lstrip('/')}"
+
+
+def nurture_generation_prompts(context: NurturePromptContextOut) -> tuple[str, str]:
+    system_prompt = (
+        "You are an international medical device sales email writer. "
+        "Write only an English customer-facing email body. "
+        "Do not include Chinese text, internal notes, markdown fences, or system explanations. "
+        "Use the writer style and skills as guidance, but translate the effect into natural English. "
+        "Do not promise final pricing, exclusive agency rights, registration certificates, or delivery dates."
+    )
+    user_prompt = "\n".join(
+        [
+            "Generate a concise English follow-up email template/reference that an operator can adjust before sending.",
+            "Use the customer context, sales feedback, recommended next action, operator prompt, writer style, writer skills, and attachment metadata.",
+            "The output must be the email body only, with greeting and sign-off, and must stay in English.",
+            "",
+            context.rendered_prompt,
+        ]
+    )
+    return system_prompt, user_prompt
+
+
+def extract_model_text(response_body: object) -> str:
+    if not isinstance(response_body, dict):
+        return ""
+    output_text = response_body.get("output_text")
+    if isinstance(output_text, str):
+        return output_text.strip()
+    choices = response_body.get("choices")
+    if isinstance(choices, list) and choices:
+        first_choice = choices[0]
+        if isinstance(first_choice, dict):
+            message = first_choice.get("message")
+            if isinstance(message, dict) and isinstance(message.get("content"), str):
+                return str(message["content"]).strip()
+            if isinstance(first_choice.get("text"), str):
+                return str(first_choice["text"]).strip()
+    content = response_body.get("content")
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(str(item["text"]))
+        return "\n".join(parts).strip()
+    output = response_body.get("output")
+    if isinstance(output, list):
+        parts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            item_content = item.get("content")
+            if isinstance(item_content, list):
+                for content_item in item_content:
+                    if isinstance(content_item, dict) and isinstance(content_item.get("text"), str):
+                        parts.append(str(content_item["text"]))
+        return "\n".join(parts).strip()
+    return ""
+
+
+def clean_generated_email(text_value: str) -> str:
+    cleaned = text_value.strip()
+    cleaned = cleaned.removeprefix("```text").removeprefix("```").removesuffix("```").strip()
+    lines = [line for line in cleaned.splitlines() if not line.strip().lower().startswith("subject:")]
+    cleaned = "\n".join(lines).strip()
+    if contains_cjk(cleaned):
+        return ""
+    if len(cleaned.split()) < 25:
+        return ""
+    return cleaned
+
+
+def call_nurture_email_model(model: AIModelOptionOut, context: NurturePromptContextOut) -> str:
+    api_url = model_api_url(model)
+    api_key = model_api_key(model)
+    if not api_url or not api_key:
+        return ""
+    system_prompt, user_prompt = nurture_generation_prompts(context)
+    endpoint = model.endpoint_path.lower()
+    headers = {"Content-Type": "application/json"}
+    if model.auth_type == "x-api-key":
+        headers["x-api-key"] = api_key
+        if "anthropic" in model.provider.lower() or "/messages" in endpoint:
+            headers["anthropic-version"] = "2023-06-01"
+    else:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    if "/responses" in endpoint:
+        payload: dict[str, object] = {
+            "model": model.value,
+            "input": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.4,
+            "max_output_tokens": 700,
+        }
+    elif "/messages" in endpoint:
+        payload = {
+            "model": model.value,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_prompt}],
+            "temperature": 0.4,
+            "max_tokens": 700,
+        }
+    else:
+        payload = {
+            "model": model.value,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.4,
+            "max_tokens": 700,
+        }
+
+    request_payload = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib_request.Request(api_url, data=request_payload, headers=headers, method="POST")
+    try:
+        with urllib_request.urlopen(request, timeout=20) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return ""
+    return clean_generated_email(extract_model_text(body))
+
+
+def english_fragment(value: str, fallback: str) -> str:
+    text_value = re.sub(r"[\u3400-\u9fff]", "", value)
+    text_value = re.sub(r"[，。；：、（）【】《》“”‘’]+", " ", text_value)
+    text_value = re.sub(r"\s+", " ", text_value).strip(" /,;:-")
+    return text_value or fallback
+
+
+def fallback_nurture_email_template(context: NurturePromptContextOut) -> str:
+    parts = [item.strip() for item in context.customer_summary.split(" / ")]
+    customer_name = english_fragment(parts[0] if len(parts) > 0 else "", "there")
+    country = english_fragment(parts[1] if len(parts) > 1 else "", "your market")
+    customer_type = english_fragment(parts[2] if len(parts) > 2 else "", "your team")
+    product = english_fragment(parts[3] if len(parts) > 3 else "", "ultrasound solutions")
+    attachment_names = [
+        english_fragment(item.filename, "")
+        for item in context.attachments
+        if english_fragment(item.filename, "")
+    ]
+    if attachment_names:
+        attachment_sentence = (
+            f"I can also use {', '.join(attachment_names[:3])} as reference material "
+            "when preparing the comparison, while keeping pricing, registration, and exclusivity details subject to formal confirmation."
+        )
+    else:
+        attachment_sentence = (
+            "I can prepare a concise comparison summary for your review, while keeping pricing, registration, "
+            "and exclusivity details subject to formal confirmation."
+        )
+    return "\n\n".join(
+        [
+            f"Hi {customer_name},",
+            f"Thank you for your interest in {product}. I wanted to follow up with a practical next step for your {customer_type.lower()} needs in {country}.",
+            "Based on your recent inquiry and our sales follow-up, it would be useful to confirm the priority application, expected timing, and the right contact for evaluation.",
+            attachment_sentence,
+            "Would it be helpful to schedule a short call this week so I can understand your main application scenario and share the most relevant comparison details?",
+            "Best regards,",
+        ]
+    )
+
+
+def generate_nurture_email_draft(model: AIModelOptionOut, context: NurturePromptContextOut) -> str:
+    model_draft = call_nurture_email_model(model, context)
+    if model_draft:
+        return model_draft
+    return fallback_nurture_email_template(context)
+
+
 def nurture_context_from_snapshot(db: Session, task: NurtureTask) -> NurturePromptContextOut:
     if task.prompt_context_snapshot:
         try:
@@ -3608,15 +3834,9 @@ def regenerate_nurture_draft(
     if payload.writer_role_key is not None:
         task.writer_role_key = validate_email_writer_key(db, payload.writer_role_key)
     context = build_nurture_context(db, task)
-    attachment_names = ", ".join(item.filename for item in context.attachments) or "no attachment"
-    task.draft_content = (
-        f"Hi {context.customer_summary.split(' / ')[0]}, based on your {task.recommended_next_action} "
-        f"{context.writer_role_name} will use a {context.writer_role_style} style with {', '.join(context.writer_role_skills)} skills, "
-        f"and we prepared a concise follow-up using {attachment_names}. "
-        "Would it be useful if I send the comparison and confirm your priority application?"
-    )
-    task.prompt_context_snapshot = context.model_dump_json()
     email_model = ai_model_for_use_case(db, "email_draft")
+    task.draft_content = generate_nurture_email_draft(email_model, context)
+    task.prompt_context_snapshot = context.model_dump_json()
     task.model_provider = email_model.provider
     task.model_version = email_model.value
     task.approval_status = "pending"
@@ -4115,12 +4335,15 @@ def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[
         endpoint_path = str(item.get("endpoint_path", "")).strip()
         auth_type = str(item.get("auth_type", "bearer")).strip() or "bearer"
         raw_api_key = item.get("api_key")
+        raw_api_key_secret = item.get("api_key_secret")
         api_key_configured = bool(item.get("api_key_configured")) or (
             isinstance(raw_api_key, str) and bool(raw_api_key.strip())
+        ) or (
+            isinstance(raw_api_key_secret, str) and bool(raw_api_key_secret.strip())
         )
         if not value or not label or not provider or not scenario or not capability:
             continue
-        options_by_value[value] = {
+        normalised: dict[str, object] = {
             "value": value,
             "label": label,
             "provider": provider,
@@ -4132,6 +4355,11 @@ def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[
             "auth_type": auth_type,
             "api_key_configured": api_key_configured,
         }
+        if isinstance(raw_api_key, str) and raw_api_key.strip():
+            normalised["api_key_secret"] = raw_api_key.strip()
+        elif isinstance(raw_api_key_secret, str) and raw_api_key_secret.strip():
+            normalised["api_key_secret"] = raw_api_key_secret.strip()
+        options_by_value[value] = normalised
     return list(options_by_value.values())
 
 
@@ -4880,15 +5108,24 @@ def update_settings_ai_model(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ops),
 ) -> AIModelConfigOut:
-    current_config = ai_model_config(db)
-    current_options = [item.model_dump() for item in current_config.options]
-    current_use_cases = [item.model_dump() for item in current_config.use_cases]
-    current_writers = [item.model_dump() for item in current_config.email_writers]
+    _, stored_options, stored_use_cases, stored_bindings, stored_writers, stored_default_writer, _ = stored_ai_model_config(db)
+    current_options = stored_options
+    current_use_cases = stored_use_cases
+    current_writers = stored_writers
+    existing_secrets = {
+        str(item.get("value")): str(item.get("api_key_secret"))
+        for item in current_options
+        if item.get("api_key_secret")
+    }
     options = normalise_ai_model_options(
         [item.model_dump() for item in payload.options]
         if payload.options is not None
         else current_options
     )
+    for option in options:
+        value = str(option.get("value"))
+        if not option.get("api_key_secret") and option.get("api_key_configured") and value in existing_secrets:
+            option["api_key_secret"] = existing_secrets[value]
     allowed_models = [item["value"] for item in options if item.get("status") != "disabled"]
     if not allowed_models:
         raise HTTPException(status_code=422, detail=error_detail("AI_MODEL_UNSUPPORTED", "At least one enabled AI model is required"))
@@ -4899,7 +5136,7 @@ def update_settings_ai_model(
         else current_use_cases
     )
     bindings = normalise_ai_model_bindings(
-        payload.use_case_bindings if payload.use_case_bindings is not None else current_config.use_case_bindings,
+        payload.use_case_bindings if payload.use_case_bindings is not None else stored_bindings,
         selected_model,
         options,
         use_cases,
@@ -4909,7 +5146,7 @@ def update_settings_ai_model(
         if payload.email_writers is not None
         else current_writers
     )
-    default_writer = default_email_writer_key(payload.default_email_writer or current_config.default_email_writer, writers)
+    default_writer = default_email_writer_key(payload.default_email_writer or stored_default_writer, writers)
     setting = db.get(SystemSetting, AI_MODEL_SETTING_KEY)
     if not setting:
         setting = SystemSetting(key=AI_MODEL_SETTING_KEY, updated_by=user.id)

@@ -792,6 +792,7 @@ class AIModelOptionOut(BaseModel):
     endpoint_path: str = ""
     auth_type: str = "bearer"
     api_key_configured: bool = False
+    api_key_secret: str = Field(default="", exclude=True, repr=False)
 
 
 class AIModelOptionUpdateRequest(AIModelOptionOut):

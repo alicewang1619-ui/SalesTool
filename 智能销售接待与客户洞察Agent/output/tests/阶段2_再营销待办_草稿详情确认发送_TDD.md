@@ -44,3 +44,13 @@
 - 群发邮件放在“再营销 / 群发邮件”，仅管理员和运营可见；群发目的包含“开发信、活动推广、自定义类型”，选择后自动带出主题模板、正文模板和生成 Prompt，并允许选择邮件写手和上传 PDF/Word/Excel 参考附件。
 - 群发邮件第一版只创建草稿/模板/预览和审计记录，不绕过人工确认直接发送；真正发送依赖邮箱接口配置成功后的人工确认流程。
 - 再营销页面内蓝色说明框改为悬浮提示/说明按钮，减少页面铺满说明文本；单客户附件支持 PDF、Word、Excel。
+
+## 2026-07-02 英文邮件模板生成 TDD
+- NURTURE-DETAIL-P0-07：重新生成必须走后端模型生成链路，输入包含客户上下文、写手风格技能、人工提示词和附件元数据；`prompt_context_snapshot` 保留完整上下文。
+- NURTURE-DETAIL-P0-08：重新生成返回的 `draft_content` 必须是可人工调整的英文邮件模板正文，不得夹杂中文提示词、中文写手技能或后端拼接说明；由 `test_nurture_regeneration_returns_english_template_without_chinese_leakage` 验证。
+- NURTURE-DETAIL-P0-09：设置页填写的模型 API Key 必须可被服务端模型调用复用，但 `/api/settings/ai-model` 响应不得回显明文 Key 或服务端密钥字段。
+
+## 2026-07-02 英文模板实现门禁记录
+- 后端专项：`py -m pytest .\tests\test_api_contract.py -q -k "nurture or ai_model_library"` 通过，9 passed。
+- 全量后端：`py -m pytest .\tests -q` 通过，110 passed。
+- 前端构建：`npm.cmd run build` 通过；保留既有 Vite chunk size warning。

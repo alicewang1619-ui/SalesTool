@@ -1,12 +1,15 @@
 ﻿from fastapi.testclient import TestClient
 from datetime import datetime
 import io
+import json
 import pytest
+import re
 from sqlalchemy import delete
 from uuid import uuid4
 import zipfile
 
 from app.database import Base, SessionLocal, engine
+import app.main as main_module
 from app.main import app, ensure_sqlite_compatibility
 from app.models import (
     AuditLog,
@@ -50,7 +53,19 @@ def make_xlsx(rows: list[list[str]]) -> bytes:
 
 
 @pytest.fixture()
-def client() -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    for key in [
+        "UG_LLM_API_KEY",
+        "UG_LLM_API_BASE_URL",
+        "UG_LLM_API_KEY_CLAUDE_SONNET",
+        "UG_LLM_API_KEY_ANTHROPIC",
+        "UG_LLM_API_KEY_DEEPSEEK",
+        "UG_LLM_API_KEY_OPENAI",
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+    ]:
+        monkeypatch.delenv(key, raising=False)
     Base.metadata.create_all(bind=engine)
     ensure_sqlite_compatibility()
     with SessionLocal() as db:
@@ -1977,8 +1992,48 @@ def test_settings_ai_model_config_can_be_saved_and_audited(client: TestClient) -
     )
 
 
-def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_regeneration(client: TestClient) -> None:
+def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_regeneration(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     headers = {**auth_headers(client), "x-trace-id": "settings-ai-model-library-test"}
+
+    captured_model_request: dict[str, str] = {}
+
+    class FakeModelResponse:
+        def __enter__(self) -> "FakeModelResponse":
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "content": [
+                        {
+                            "text": (
+                                "Hi GlobalMed Peru,\n\n"
+                                "Thank you for your interest in Portable Ultrasound. "
+                                "Based on your clinic network needs, I can share a concise comparison and confirm the priority application with your team. "
+                                "Pricing, registration, and exclusivity details can be reviewed after formal confirmation.\n\n"
+                                "Would it be helpful to schedule a short call this week?\n\n"
+                                "Best regards,"
+                            )
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(request: object, timeout: int) -> FakeModelResponse:
+        assert timeout == 20
+        assert isinstance(request, main_module.urllib_request.Request)
+        captured_model_request["url"] = request.full_url
+        captured_model_request["api_key"] = request.get_header("X-api-key") or request.get_header("x-api-key") or ""
+        return FakeModelResponse()
+
+    monkeypatch.setattr(main_module.urllib_request, "urlopen", fake_urlopen)
+
     response = client.put(
         "/api/settings/ai-model",
         json={
@@ -2034,6 +2089,18 @@ def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_reg
     assert claude["auth_type"] == "x-api-key"
     assert claude["api_key_configured"] is True
     assert "api_key" not in claude
+    assert "api_key_secret" not in claude
+
+    follow_up = client.put(
+        "/api/settings/ai-model",
+        json={"selected_model": "claude-sonnet"},
+        headers=headers,
+    )
+    assert follow_up.status_code == 200
+    kept_claude = next(option for option in follow_up.json()["options"] if option["value"] == "claude-sonnet")
+    assert kept_claude["api_key_configured"] is True
+    assert "api_key" not in kept_claude
+    assert "api_key_secret" not in kept_claude
 
     task = client.get("/api/nurture-tasks", headers=headers).json()["items"][0]
     regenerated = client.post(
@@ -2046,6 +2113,8 @@ def test_settings_ai_model_library_bindings_can_be_saved_and_used_by_nurture_reg
     task_body = regenerated.json()
     assert task_body["model_provider"] == "Anthropic"
     assert task_body["model_version"] == "claude-sonnet"
+    assert_english_email_body(task_body["draft_content"])
+    assert captured_model_request == {"url": "https://api.anthropic.com/v1/messages", "api_key": "secret-test-key"}
     audit = client.get("/api/audit-logs", headers=headers).json()["items"]
     assert any(
         event["action"] == "settings_ai_model_updated" and event["trace_id"] == "settings-ai-model-library-test"
@@ -2559,6 +2628,12 @@ def first_nurture_task(client: TestClient, headers: dict[str, str]) -> dict:
     return body["items"][0]
 
 
+def assert_english_email_body(draft_content: str) -> None:
+    assert not re.search(r"[\u3400-\u9fff]", draft_content)
+    assert "Hi " in draft_content
+    assert "Best regards" in draft_content
+
+
 def test_nurture_tasks_list_uses_persistent_prompt_context_and_pagination(client: TestClient) -> None:
     headers = auth_headers(client)
 
@@ -2739,6 +2814,7 @@ def test_nurture_attachment_upload_validates_and_participates_in_regeneration(cl
     result = regenerated.json()
     assert "Portable-US-comparison.xlsx" in result["prompt_context_snapshot"]["rendered_prompt"]
     assert "Portable-US-comparison.xlsx" in result["draft_content"]
+    assert_english_email_body(result["draft_content"])
     assert result["model_provider"]
     assert result["model_version"]
     assert result["approval_status"] == "pending"
@@ -2806,6 +2882,42 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
     assert "推动决策" in body["writer_role_skills"]
     assert "超级马里奥" in body["prompt_context_snapshot"]["rendered_prompt"]
     assert "推动决策" in body["prompt_context_snapshot"]["rendered_prompt"]
+    assert_english_email_body(body["draft_content"])
+
+
+def test_nurture_regeneration_returns_english_template_without_chinese_leakage(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "nurture-english-template-test"}
+    task = first_nurture_task(client, headers)
+
+    saved = client.put(
+        f"/api/nurture-tasks/{task['id']}",
+        json={
+            "recommended_next_action": "3 天内发送 Portable Ultrasound 对比资料，并询问代理区域、年度采购量和预算窗口。",
+            "customer_note": "客户关注区域诊所部署，避免承诺价格、独家代理或注册证书。",
+            "nurture_reason": "客户已报价未回复且官网显示新增分部，需要温和跟进。",
+            "draft_content": "Hi Carlos, I can share a concise portable ultrasound comparison for your clinic network.",
+            "generation_prompt": "专业但不强推，突出区域诊所部署，禁止承诺价格、独家代理或注册证书。",
+            "writer_role_key": "mario",
+        },
+        headers=headers,
+    )
+    assert saved.status_code == 200
+
+    regenerated = client.post(
+        f"/api/nurture-tasks/{task['id']}/regenerate",
+        json={
+            "generation_prompt": "结合写手技能和提示词，生成英文邮件模板参考，后期人工调整。",
+            "writer_role_key": "mario",
+        },
+        headers=headers,
+    )
+
+    assert regenerated.status_code == 200
+    body = regenerated.json()
+    assert "结合写手技能" in body["prompt_context_snapshot"]["rendered_prompt"]
+    assert "推动决策" in body["prompt_context_snapshot"]["rendered_prompt"]
+    assert_english_email_body(body["draft_content"])
+    assert "Portable Ultrasound" in body["draft_content"]
 
 
 def test_nurture_confirm_send_is_manual_idempotent_and_audited(client: TestClient) -> None:

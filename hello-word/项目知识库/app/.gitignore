@@ -1,0 +1,14 @@
+node_modules/
+dist/
+data/
+*.log
+.DS_Store
+.env
+.env.local
+server/data/
+web/dist/
+coverage/
+web/.e2e-data/
+web/test-results/
+web/playwright-report/
+.run/

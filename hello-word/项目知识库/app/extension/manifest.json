@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "项目知识库 · 一键剪藏",
+  "version": "1.0.0",
+  "description": "把当前网页 / 微信公众号文章一键剪藏到本地知识库（用浏览器已渲染页面，绕过反爬）。",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "剪藏到知识库"
+  }
+}

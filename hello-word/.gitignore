@@ -7,5 +7,6 @@ __pycache__/
 .venv/
 venv/
 
-# 独立子项目（有自己的 .git，单独管理）
-项目知识库/app/
+# Node（app 子项目依赖/构建产物）
+node_modules/
+dist/

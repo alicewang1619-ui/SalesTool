@@ -1,0 +1,55 @@
+name: CI
+
+# 门禁：push 到 main 或任何 PR 时，跑后端与前端的类型检查 + 测试 + 构建。
+# 注：真实本地 Ollama 的集成用例在无 Ollama 的 CI 环境会自动 ctx.skip()（见 test/integration/llm.test.ts）；
+#     E2E（Playwright，需 Ollama+浏览器+真实后端）不在 CI 跑，仅本地执行。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 后端（typecheck + 测试）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'          # ≥22.5，含内置 node:sqlite
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 单元 + 集成 + API 测试
+        run: npm test
+
+  web:
+    name: 前端（typecheck + 测试 + 构建）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 组件测试
+        run: npm test
+      - name: 生产构建
+        run: npm run build

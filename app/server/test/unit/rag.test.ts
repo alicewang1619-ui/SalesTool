@@ -30,6 +30,23 @@ describe('U-SR-07 RAG 收集来源', () => {
     expect(res.answer).toContain('答案');
   });
 
+  it('系统提示注入知识库真实总数，避免把来源数误当总数（issue #5）', async () => {
+    const db = memDb();
+    await seed(db, Array.from({ length: 7 }, (_, i) => ({ title: `知识${i}`, content: `第${i}条缓存相关内容。` })));
+    let sys = '';
+    const recorder = new StubProvider({
+      chatFn: (msgs) => {
+        sys = msgs.find((m) => m.role === 'system')?.content ?? '';
+        return '答案';
+      },
+    });
+    // Top-K=3：只有 3 条来源，但系统提示里总数应是 7
+    const res = await answerQuestion(db, recorder, '缓存', { topK: 3 });
+    expect(res.sources.length).toBe(3);
+    expect(sys).toContain('共有 7 条知识');
+    expect(sys).toContain('不代表知识库总数');
+  });
+
   it('空库返回 hasContext=false（无相关知识空态）', async () => {
     const db = memDb();
     const res = await answerQuestion(db, stub, '任何问题');

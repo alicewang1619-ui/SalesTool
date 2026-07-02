@@ -10,6 +10,7 @@ import { sha256, nowIso } from '../util.ts';
 import {
   createKnowledge,
   getKnowledge,
+  beginProcessing,
   setOrganizeStatus,
   setSummary,
   setTags,
@@ -64,7 +65,7 @@ export async function processKnowledge(
 ): Promise<{ ok: boolean; error?: string }> {
   const k = getKnowledge(db, id);
   if (!k) return { ok: false, error: '知识不存在或已删除' };
-  setOrganizeStatus(db, id, 'processing');
+  beginProcessing(db, id);
   const log = logger.child({ knowledge_id: id });
   try {
     // 先建向量（快）——检索/相关推荐/RAG 立即可用，不被慢的标签摘要阻塞。

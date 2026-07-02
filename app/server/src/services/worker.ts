@@ -16,7 +16,14 @@ export interface WorkerDeps {
   /** 每次取 provider（设置可能在运行中被改）。 */
   getProvider: () => LlmProvider;
   pollIntervalMs?: number;
+  /** failed 任务最多自动重试次数（含首次），超过不再重试。 */
+  maxAttempts?: number;
+  /** 两次重试之间的最小退避（毫秒），避免对暂时坏掉的任务紧密重试。 */
+  retryBackoffMs?: number;
 }
+
+const DEFAULT_MAX_ATTEMPTS = 5;
+const DEFAULT_RETRY_BACKOFF_MS = 60_000;
 
 export class TaskWorker {
   private timer: NodeJS.Timeout | null = null;
@@ -25,15 +32,25 @@ export class TaskWorker {
 
   constructor(private readonly deps: WorkerDeps) {}
 
-  /** 取一条待处理知识 id。 */
+  /**
+   * 取一条待处理知识 id：pending 优先；此外对 failed 做有界重试
+   * （尝试次数未超上限且已过退避窗口）——修复「瞬时失败→永久搜不到且不重试」的 P0。
+   */
   private nextPendingId(): string | null {
+    const maxAttempts = this.deps.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    const backoffMs = this.deps.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS;
+    const cutoff = new Date(Date.now() - backoffMs).toISOString();
     const row = this.deps.db
       .prepare(
         `SELECT id FROM knowledge
-         WHERE organize_status='pending' AND deleted_at IS NULL
-         ORDER BY created_at ASC LIMIT 1`,
+         WHERE deleted_at IS NULL AND (
+           organize_status='pending'
+           OR (organize_status='failed' AND organize_attempts < ? AND updated_at < ?)
+         )
+         ORDER BY (organize_status='failed'), created_at ASC
+         LIMIT 1`,
       )
-      .get() as { id: string } | undefined;
+      .get(maxAttempts, cutoff) as { id: string } | undefined;
     return row?.id ?? null;
   }
 

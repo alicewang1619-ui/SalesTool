@@ -289,6 +289,20 @@ export function setOrganizeStatus(
   );
 }
 
+/** 开始处理：置 processing 并累加尝试次数（供 worker 有界重试 failed 任务，避免死循环）。 */
+export function beginProcessing(db: Db, id: string): void {
+  db.prepare(
+    "UPDATE knowledge SET organize_status='processing', organize_attempts=organize_attempts+1, updated_at=? WHERE id=?",
+  ).run(nowIso(), id);
+}
+
+/** 重新入队：置 pending 并清零尝试次数与错误（编辑正文等「全新一轮」场景）。 */
+export function requeuePending(db: Db, id: string): void {
+  db.prepare(
+    "UPDATE knowledge SET organize_status='pending', organize_attempts=0, organize_error=NULL, updated_at=? WHERE id=?",
+  ).run(nowIso(), id);
+}
+
 export function setSummary(db: Db, id: string, summary: string): void {
   db.prepare('UPDATE knowledge SET summary=?, updated_at=? WHERE id=?').run(summary, nowIso(), id);
 }

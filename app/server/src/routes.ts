@@ -225,7 +225,7 @@ export function buildRouter(ctx: RouteCtx): Router {
           req.log.warn('编辑后重建向量失败，置 pending 待 worker 重试', {
             error: (err as Error).message,
           });
-          repo.setOrganizeStatus(ctx.db, req.params.id, 'pending');
+          repo.requeuePending(ctx.db, req.params.id);
           ctx.nudgeWorker?.();
         }
       }

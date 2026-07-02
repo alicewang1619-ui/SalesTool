@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS knowledge (
   organize_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (organize_status IN ('pending','processing','done','failed')),
   organize_error TEXT,
+  organize_attempts INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -81,7 +82,17 @@ export function openDatabase(filePath: string): Db {
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+/** 幂等迁移：为已存在的库补加后来新增的列。 */
+function migrate(db: Db): void {
+  const cols = (db.prepare("PRAGMA table_info('knowledge')").all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('organize_attempts')) {
+    db.exec('ALTER TABLE knowledge ADD COLUMN organize_attempts INTEGER NOT NULL DEFAULT 0');
+    logger.info('数据库迁移：knowledge 增加 organize_attempts 列');
+  }
 }
 
 /** 事务 helper：fn 内任意 throw 即整体回滚（钱/多表状态变更必事务）。 */

@@ -13,6 +13,7 @@ vi.mock('../api/client.ts', async () => {
 import { api } from '../api/client.ts';
 const mLink = api.ingestLink as unknown as ReturnType<typeof vi.fn>;
 const mCreate = api.createKnowledge as unknown as ReturnType<typeof vi.fn>;
+const mFile = api.ingestFile as unknown as ReturnType<typeof vi.fn>;
 
 function renderPage() {
   return render(
@@ -30,6 +31,7 @@ function renderPage() {
 beforeEach(() => {
   mLink.mockReset();
   mCreate.mockReset();
+  mFile.mockReset();
   localStorage.clear();
 });
 
@@ -106,6 +108,41 @@ describe('C-ING-06 超大文件提示', () => {
     Object.defineProperty(big, 'size', { value: 26 * 1024 * 1024 });
     await userEvent.upload(input, big);
     expect(await screen.findByText(/文件过大/)).toBeInTheDocument();
+  });
+});
+
+describe('C-ING-09 多文件批量上传（issue #3）', () => {
+  it('一次选多个文件全部入库，显示汇总', async () => {
+    mFile.mockResolvedValueOnce({ id: 'k1', deduped: false, title: '笔记一' })
+      .mockResolvedValueOnce({ id: 'k2', deduped: false, title: '笔记二' })
+      .mockResolvedValueOnce({ id: 'k3', deduped: false, title: '笔记三' });
+    renderPage();
+    await userEvent.click(screen.getByRole('tab', { name: '📄 上传文件' }));
+    const input = screen.getByLabelText('上传文件') as HTMLInputElement;
+    expect(input.multiple).toBe(true);
+    const files = [
+      new File(['# a'], 'a.md', { type: 'text/markdown' }),
+      new File(['# b'], 'b.md', { type: 'text/markdown' }),
+      new File(['# c'], 'c.md', { type: 'text/markdown' }),
+    ];
+    await userEvent.upload(input, files);
+    await waitFor(() => expect(mFile).toHaveBeenCalledTimes(3));
+    expect(await screen.findByText(/3 个文件已解析入库/)).toBeInTheDocument();
+  });
+
+  it('部分失败时汇总列出失败文件', async () => {
+    mFile.mockResolvedValueOnce({ id: 'k1', deduped: false, title: '好文件' })
+      .mockRejectedValueOnce(new ApiError('PARSE', '解析失败(pdf)', false, 422));
+    renderPage();
+    await userEvent.click(screen.getByRole('tab', { name: '📄 上传文件' }));
+    const input = screen.getByLabelText('上传文件') as HTMLInputElement;
+    await userEvent.upload(input, [
+      new File(['# ok'], 'ok.md', { type: 'text/markdown' }),
+      new File(['bad'], 'bad.pdf', { type: 'application/pdf' }),
+    ]);
+    await waitFor(() => expect(mFile).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/1 个成功，1 个失败/)).toBeInTheDocument();
+    expect(screen.getByText(/《bad.pdf》/)).toBeInTheDocument();
   });
 });
 

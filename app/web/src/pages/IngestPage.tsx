@@ -120,23 +120,44 @@ export function IngestPage() {
     }
   }
 
-  async function onFile(file: File) {
+  async function onFiles(list: FileList | File[]) {
     if (submitting) return;
-    if (file.size > MAX_FILE_BYTES) {
-      setStatus({ kind: 'fail', text: `⚠️ 文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），上限 25MB。` });
+    const files = Array.from(list);
+    if (files.length === 0) return;
+    const oversize = files.filter((f) => f.size > MAX_FILE_BYTES);
+    if (oversize.length > 0) {
+      setStatus({ kind: 'fail', text: `⚠️ 文件过大（上限 25MB）：${oversize.map((f) => `《${f.name}》`).join('、')}` });
       return;
     }
     setSubmitting(true);
-    setStatus({ kind: 'loading', text: `正在解析《${file.name}》…` });
-    try {
-      const base64 = await fileToBase64(file);
-      const res = await api.ingestFile(file.name, base64);
-      setCreatedId(res.id);
-      setStatus({ kind: 'ok', text: `✅ 已解析《${res.title}》，AI 正在打标签和摘要…` });
-    } catch (err) {
-      setStatus({ kind: 'fail', text: err instanceof ApiError ? err.message : String(err) });
-    } finally {
-      setSubmitting(false);
+    const okTitles: string[] = [];
+    const fails: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const progress = files.length > 1 ? `（${i + 1}/${files.length}）` : '';
+      setStatus({ kind: 'loading', text: `正在解析${progress}《${file.name}》…` });
+      try {
+        const base64 = await fileToBase64(file);
+        const res = await api.ingestFile(file.name, base64);
+        setCreatedId(res.id);
+        okTitles.push(res.title);
+      } catch (err) {
+        fails.push(`《${file.name}》${err instanceof ApiError ? err.message : String(err)}`);
+      }
+    }
+    setSubmitting(false);
+    if (fails.length === 0) {
+      setStatus({
+        kind: 'ok',
+        text: files.length > 1
+          ? `✅ ${okTitles.length} 个文件已解析入库，AI 正在打标签和摘要…`
+          : `✅ 已解析《${okTitles[0]}》，AI 正在打标签和摘要…`,
+      });
+    } else {
+      setStatus({
+        kind: 'fail',
+        text: `⚠️ ${okTitles.length} 个成功，${fails.length} 个失败：${fails.join('；')}`,
+      });
     }
   }
 
@@ -254,23 +275,22 @@ export function IngestPage() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                const f = e.dataTransfer.files?.[0];
-                if (f) void onFile(f);
+                if (e.dataTransfer.files?.length) void onFiles(e.dataTransfer.files);
               }}
             >
               <div className="big">📄</div>
               <div style={{ fontWeight: 'var(--fw-medium)', color: 'var(--text-body)' }}>点击或拖拽文件到此处</div>
-              <div className="hint" style={{ marginTop: 8 }}>支持 PDF / Word / Markdown，解析文本后入库</div>
+              <div className="hint" style={{ marginTop: 8 }}>支持 PDF / Word / Markdown，可一次选择多个文件，解析文本后入库</div>
             </div>
             <input
               ref={fileInput}
               type="file"
+              multiple
               accept=".pdf,.docx,.doc,.md,.markdown,.txt"
               aria-label="上传文件"
               style={{ display: 'none' }}
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onFile(f);
+                if (e.target.files?.length) void onFiles(e.target.files);
               }}
             />
             <StatusBar status={status} />

@@ -94,6 +94,18 @@ describe('U-ING-03 抓取失败判定', () => {
     });
   });
 
+  it('403/401/429 反爬/付费墙给出可操作的回退提示（issue #9）', async () => {
+    for (const status of [401, 402, 403, 429]) {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('blocked', { status })));
+      await expect(fetchAndExtract('https://www.science.org/doi/10.1126/x')).rejects.toMatchObject({
+        name: 'FetchError',
+        kind: 'http',
+        status,
+      });
+      await expect(fetchAndExtract('https://www.science.org/doi/10.1126/x')).rejects.toThrow(/剪藏扩展|粘贴文本/);
+    }
+  });
+
   it('超时抛 FetchError(kind=timeout)', async () => {
     vi.stubGlobal(
       'fetch',

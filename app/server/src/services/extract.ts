@@ -136,6 +136,15 @@ export async function fetchAndExtract(url: string): Promise<Article> {
   }
   clearTimeout(timer);
   if (!res.ok) {
+    // 401/402/403/429：网站主动拒绝自动抓取（登录墙 / 付费墙 / 反爬 / 人机验证 / 限流）。
+    // 典型如 Science、Nature 等学术出版商——服务器抓不到，给出可操作的回退指引。
+    if ([401, 402, 403, 429].includes(res.status)) {
+      throw new FetchError(
+        `该网站拒绝了自动抓取（HTTP ${res.status}）。学术出版商（Science / Nature 等）或付费/反爬网站需要登录或人机验证，无法直接抓取——请用浏览器「剪藏扩展」在你已登录的页面上剪藏，或复制正文用「粘贴文本」录入。`,
+        'http',
+        res.status,
+      );
+    }
     throw new FetchError(`抓取失败 HTTP ${res.status}`, 'http', res.status);
   }
   const html = await res.text();

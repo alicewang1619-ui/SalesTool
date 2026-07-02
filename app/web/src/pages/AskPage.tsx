@@ -65,10 +65,47 @@ function renderAnswer(text: string, sources: AnswerResult['sources']) {
   );
 }
 
+/**
+ * 从本地存储恢复多会话（含旧单对话迁移）。
+ * 关键：在 useState 惰性初始化里同步完成，而不是用 useEffect——否则持久化 effect 会先用
+ * 初始空态覆盖已存历史，随后（尤其 StrictMode 双调用）再读到空的，导致「切换页面后历史丢失」（issue #17）。
+ */
+function loadInitial(): { sessions: Conversation[]; activeId: string } {
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { sessions?: Conversation[]; activeId?: string };
+      const cleaned = (parsed.sessions ?? [])
+        .map((s) => ({ ...s, msgs: settled(s.msgs ?? []) }))
+        .filter((s) => s.msgs.length > 0);
+      if (cleaned.length) {
+        const activeId = cleaned.some((s) => s.id === parsed.activeId) ? parsed.activeId! : cleaned[0].id;
+        return { sessions: cleaned, activeId };
+      }
+    }
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const m = settled(JSON.parse(legacy) as Msg[]);
+      localStorage.removeItem(LEGACY_KEY);
+      if (m.length) {
+        const s: Conversation = { id: genId(), title: firstQuestion(m) ?? DEFAULT_TITLE, msgs: m, updatedAt: Date.now() };
+        return { sessions: [s], activeId: s.id };
+      }
+    }
+  } catch {
+    /* 忽略损坏的历史 */
+  }
+  const s = makeSession();
+  return { sessions: [s], activeId: s.id };
+}
+
 export function AskPage() {
   const [params] = useSearchParams();
-  const [sessions, setSessions] = useState<Conversation[]>(() => [makeSession()]);
-  const [activeId, setActiveId] = useState<string>(() => sessions[0].id);
+  // 惰性初始化恢复历史，只计算一次（用 ref 保证 sessions/activeId 来自同一次读取）。
+  const initialRef = useRef<{ sessions: Conversation[]; activeId: string }>(undefined);
+  if (!initialRef.current) initialRef.current = loadInitial();
+  const [sessions, setSessions] = useState<Conversation[]>(initialRef.current.sessions);
+  const [activeId, setActiveId] = useState<string>(initialRef.current.activeId);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [model, setModel] = useState('加载中…');
@@ -89,34 +126,6 @@ export function AskPage() {
     const q = params.get('q');
     if (q) setInput(q);
   }, [params]);
-
-  // 恢复多会话（含旧单对话迁移）。
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SESSIONS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { sessions: Conversation[]; activeId: string };
-        const cleaned = (parsed.sessions ?? []).map((s) => ({ ...s, msgs: settled(s.msgs ?? []) }));
-        if (cleaned.length) {
-          setSessions(cleaned);
-          setActiveId(cleaned.some((s) => s.id === parsed.activeId) ? parsed.activeId : cleaned[0].id);
-          return;
-        }
-      }
-      const legacy = localStorage.getItem(LEGACY_KEY);
-      if (legacy) {
-        const m = settled(JSON.parse(legacy) as Msg[]);
-        if (m.length) {
-          const s: Conversation = { id: genId(), title: firstQuestion(m) ?? DEFAULT_TITLE, msgs: m, updatedAt: Date.now() };
-          setSessions([s]);
-          setActiveId(s.id);
-        }
-        localStorage.removeItem(LEGACY_KEY);
-      }
-    } catch {
-      /* 忽略损坏的历史 */
-    }
-  }, []);
 
   // 持久化：丢弃「思考中」；不保留除当前外的空会话。
   useEffect(() => {

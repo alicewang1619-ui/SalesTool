@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -126,6 +127,47 @@ describe('C-QA-09 对话持久化（issue #10：刷新后保留历史问答）',
     renderPage();
     expect(document.querySelector('.msg.user .bubble')?.textContent).toBe('缓存穿透是什么');
     expect(screen.getByTestId('answer')).toBeInTheDocument();
+  });
+});
+
+describe('C-QA-11 切换页面/StrictMode 下历史不丢失（issue #17 竞态回归）', () => {
+  it('预置历史 + StrictMode 双挂载后，历史仍在且未被空态覆盖', async () => {
+    // 预置一个含历史的会话
+    localStorage.setItem(
+      'zkb-ask-sessions',
+      JSON.stringify({
+        sessions: [
+          {
+            id: 's1',
+            title: '历史会话',
+            msgs: [
+              { role: 'user', text: '之前问过的问题' },
+              { role: 'ai', status: 'answer', answer: answer() },
+            ],
+            updatedAt: 1,
+          },
+        ],
+        activeId: 's1',
+      }),
+    );
+    // StrictMode 会双挂载/双跑 effect —— 曾因此把历史覆盖成空（issue #17）
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/ask']}>
+          <Routes>
+            <Route path="/ask" element={<AskPage />} />
+            <Route path="/k/:id" element={<div>详情页</div>} />
+          </Routes>
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    // 历史立即可见
+    expect(document.querySelector('.msg.user .bubble')?.textContent).toBe('之前问过的问题');
+    // localStorage 未被初始空态覆盖
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('zkb-ask-sessions')!);
+      expect(saved.sessions.some((s: { title: string }) => s.title === '历史会话')).toBe(true);
+    });
   });
 });
 

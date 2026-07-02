@@ -102,12 +102,9 @@ const fallbackUseCases: AIModelUseCase[] = [
 ];
 
 const fallbackWriters: EmailWriterRole[] = [
-  { key: "doraemon", name: "Doraemon", display_name: "哆啦A梦", style: "温暖、可靠、什么都能帮你", skills: ["万能助手", "日常回复"], best_for: "万能助手、日常回复、客户维护", status: "enabled" },
-  { key: "mario", name: "Mario", display_name: "超级马里奥", style: "积极、行动派、有冲劲", skills: ["销售跟进", "推动决策"], best_for: "销售跟进、催单、推动决策", status: "enabled" },
-  { key: "pikachu", name: "Pikachu", display_name: "皮卡丘", style: "活泼、可爱、有亲和力", skills: ["社媒互动", "轻松话题"], best_for: "社媒互动、年轻客户、轻松话题", status: "enabled" },
-  { key: "totoro", name: "Totoro", display_name: "龙猫", style: "温柔、治愈、让人安心", skills: ["客户关怀", "暖心邮件"], best_for: "客户关怀、节日问候、暖心邮件", status: "enabled" },
-  { key: "baymax", name: "Baymax", display_name: "大白", style: "稳重、专业、可靠", skills: ["正式邮件", "技术沟通"], best_for: "正式邮件、医疗客户、技术沟通", status: "enabled" },
-  { key: "nemo", name: "Nemo", display_name: "海底总动员", style: "好奇、探索、愿意沟通", skills: ["陌生开发", "破冰邮件"], best_for: "陌生开发、初次接触、破冰邮件", status: "enabled" }
+  { key: "reply_mirror", name: "ReplyMirror", display_name: "ReplyMirror", style: "Reflective, precise, customer-led", skills: ["Customer email reply", "Intent reflection", "Follow-up CTA"], best_for: "Replying to existing inquiries", capabilities: "Mirror customer intent and turn scattered inquiry context into a clear response.", role_goal: "Write a natural reply that clarifies the next step.", background: "Best for customer replies after an inquiry or follow-up.", tags: ["reply", "mirror-customer-intent"], status: "enabled" },
+  { key: "mario", name: "Mario", display_name: "Mario", style: "Energetic, direct, momentum-building", skills: ["Sales follow-up", "Decision push"], best_for: "Active follow-up and decision momentum", capabilities: "Move a conversation toward a clear next step.", role_goal: "Help the customer make a concrete decision.", background: "Best for stalled deals after quote or product comparison.", tags: ["action", "sales-follow-up"], status: "enabled" },
+  { key: "baymax", name: "Baymax", display_name: "Baymax", style: "Steady, professional, reliable", skills: ["Formal email", "Medical customer communication", "Technical explanation"], best_for: "Formal medical customer communication", capabilities: "Turn technical points into credible commercial language.", role_goal: "Provide a reliable reply with compliance boundaries.", background: "Best for hospitals and technical discussions.", tags: ["formal", "medical", "technical"], status: "enabled" }
 ];
 
 const knowledgeBaseLinks = [
@@ -125,7 +122,7 @@ const fallbackAIModelConfig: AIModelConfig = {
   use_cases: fallbackUseCases,
   use_case_bindings: { customer_research: "deepseek-chat", email_draft: "claude-sonnet", default: "ug-balanced-v1" },
   email_writers: fallbackWriters,
-  default_email_writer: "baymax",
+  default_email_writer: "reply_mirror",
   updated_by: null,
   updated_at: null
 };
@@ -214,7 +211,7 @@ export function SettingsPage() {
   const [searchParams] = useSearchParams();
   const [accountForm] = Form.useForm<AccountFormValues>();
   const [modelForm] = Form.useForm<AIModelOption & { apiKey?: string }>();
-  const [writerForm] = Form.useForm<EmailWriterRole & { skillsText?: string }>();
+  const [writerForm] = Form.useForm<EmailWriterRole & { skillsText?: string; tagsText?: string }>();
   const [useCaseForm] = Form.useForm<AIModelUseCase>();
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
   const [activeMenu, setActiveMenu] = useState(sectionMenuMap[searchParams.get("section") ?? ""] ?? "overview");
@@ -241,12 +238,12 @@ export function SettingsPage() {
   const [aiModelUseCases, setAIModelUseCases] = useState<AIModelUseCase[]>(fallbackUseCases);
   const [aiModelBindings, setAIModelBindings] = useState<Record<string, string>>(fallbackAIModelConfig.use_case_bindings);
   const [emailWriters, setEmailWriters] = useState<EmailWriterRole[]>(fallbackWriters);
-  const [defaultEmailWriter, setDefaultEmailWriter] = useState("baymax");
+  const [defaultEmailWriter, setDefaultEmailWriter] = useState("reply_mirror");
   const [savingAIModel, setSavingAIModel] = useState(false);
   const [selectedSourceCategory, setSelectedSourceCategory] = useState("网站");
   const [selectedUseCaseKey, setSelectedUseCaseKey] = useState("email_draft");
   const [selectedModelValue, setSelectedModelValue] = useState("ug-balanced-v1");
-  const [selectedWriterKey, setSelectedWriterKey] = useState("baymax");
+  const [selectedWriterKey, setSelectedWriterKey] = useState("reply_mirror");
   const [modelModalOpen, setModelModalOpen] = useState(false);
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null);
   const [useCaseModalOpen, setUseCaseModalOpen] = useState(false);
@@ -471,9 +468,12 @@ export function SettingsPage() {
     writerForm.setFieldsValue({
       key: `writer_${Date.now()}`,
       name: "",
-      display_name: "",
       style: "",
       skillsText: "",
+      capabilities: "",
+      role_goal: "",
+      background: "",
+      tagsText: "",
       best_for: "",
       status: "enabled"
     });
@@ -483,21 +483,29 @@ export function SettingsPage() {
   function openEditWriter(index: number) {
     const writer = emailWriters[index];
     setEditingWriterIndex(index);
-    writerForm.setFieldsValue({ ...writer, skillsText: writer.skills.join("、") });
+    writerForm.setFieldsValue({ ...writer, skillsText: writer.skills.join("\n"), tagsText: (writer.tags ?? []).join(", ") });
     setWriterModalOpen(true);
   }
 
-  function submitWriter(values: EmailWriterRole & { skillsText?: string }) {
+  function submitWriter(values: EmailWriterRole & { skillsText?: string; tagsText?: string }) {
     const skills = (values.skillsText || "")
       .split(/[、,，\n]/)
       .map((skill) => skill.trim())
       .filter(Boolean);
+    const tags = (values.tagsText || "")
+      .split(/[、,，\n]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean);
     const nextWriter: EmailWriterRole = {
       key: values.key.trim(),
       name: values.name.trim(),
-      display_name: values.display_name.trim(),
+      display_name: values.name.trim(),
       style: values.style.trim(),
       skills,
+      capabilities: (values.capabilities ?? "").trim(),
+      role_goal: (values.role_goal ?? "").trim(),
+      background: (values.background ?? "").trim(),
+      tags,
       best_for: values.best_for.trim(),
       status: values.status || "enabled"
     };
@@ -628,7 +636,9 @@ export function SettingsPage() {
       const availableValues = new Set(availableModels.map((item) => item.value));
       const safeBindings = Object.fromEntries(Object.entries(aiModelBindings).map(([key, value]) => [key, availableValues.has(value) ? value : safeDefaultModel]));
       const cleanUseCases = aiModelUseCases.filter((item) => item.key.trim() && item.label.trim());
-      const cleanWriters = emailWriters.filter((item) => item.key.trim() && item.name.trim() && item.display_name.trim());
+      const cleanWriters = emailWriters
+        .filter((item) => item.key.trim() && item.name.trim())
+        .map((item) => ({ ...item, display_name: item.name }));
       const saved = await updateSettingsAIModel({
         selectedModel: safeDefaultModel,
         options: cleanModels,
@@ -637,7 +647,7 @@ export function SettingsPage() {
         emailWriters: cleanWriters,
         defaultEmailWriter
       });
-      setNotice(`AI 配置已保存：默认模型 ${saved.selected_label}，默认写手 ${saved.email_writers.find((writer) => writer.key === saved.default_email_writer)?.display_name ?? saved.default_email_writer}`);
+      setNotice(`AI 配置已保存：默认模型 ${saved.selected_label}，默认写手 ${saved.email_writers.find((writer) => writer.key === saved.default_email_writer)?.name ?? saved.default_email_writer}`);
       await load();
     } catch (failure) {
       setError(asError(failure));
@@ -749,7 +759,7 @@ export function SettingsPage() {
     }
     Modal.confirm({
       title: "删除邮件写手？",
-      content: `将删除“${target.display_name} / ${target.name}”。若它是默认写手，将自动切换到其他启用写手。删除后请点击“保存写手配置”生效。`,
+      content: `将删除“${target.name}”。若它是默认写手，将自动切换到其他启用写手。删除后请点击“保存写手配置”生效。`,
       okText: "删除写手",
       okType: "danger",
       cancelText: "取消",
@@ -987,17 +997,19 @@ export function SettingsPage() {
             <Row gutter={[16, 16]}>
               <Col xs={24} md={8}>
                 <Typography.Text className="field-label">默认邮件写手</Typography.Text>
-                <Select value={defaultEmailWriter} options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
+                <Select value={defaultEmailWriter} options={enabledEmailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.style}` }))} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
               </Col>
               <Col xs={24} md={8}>
                 <Typography.Text className="field-label">角色下拉菜单</Typography.Text>
-                <Select value={selectedWriterKey} options={emailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.display_name}` }))} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
+                <Select value={selectedWriterKey} options={emailWriters.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.style}` }))} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
               </Col>
               <Col xs={24} md={8}>
                 <div className="config-detail-card compact">
-                  <strong>{selectedWriterForDetails?.display_name} / {selectedWriterForDetails?.name}</strong>
-                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.style}</Typography.Paragraph>
+                  <strong>{selectedWriterForDetails?.name}</strong>
+                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.role_goal || selectedWriterForDetails?.best_for}</Typography.Paragraph>
+                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.capabilities || selectedWriterForDetails?.style}</Typography.Paragraph>
                   <Space wrap>{selectedWriterForDetails?.skills.map((skill) => <Tag key={skill}>{skill}</Tag>)}</Space>
+                  <Space wrap style={{ marginTop: 8 }}>{(selectedWriterForDetails?.tags ?? []).map((tag) => <Tag color="purple" key={tag}>{tag}</Tag>)}</Space>
                 </div>
               </Col>
             </Row>
@@ -1080,10 +1092,13 @@ export function SettingsPage() {
       <Modal title={editingWriterIndex === null ? "新增邮件写手" : "编辑邮件写手"} open={writerModalOpen} onCancel={() => setWriterModalOpen(false)} footer={null} destroyOnClose width={640}>
         <Form form={writerForm} layout="vertical" onFinish={submitWriter}>
           <Form.Item name="key" label="角色 Key" rules={[{ required: true, min: 2 }]}><Input placeholder="例如 baymax" /></Form.Item>
-          <Form.Item name="name" label="英文角色" rules={[{ required: true, min: 2 }]}><Input placeholder="Baymax" /></Form.Item>
-          <Form.Item name="display_name" label="中文名" rules={[{ required: true, min: 1 }]}><Input placeholder="大白" /></Form.Item>
-          <Form.Item name="style" label="风格" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={2} placeholder="稳重、专业、可靠" /></Form.Item>
-          <Form.Item name="skillsText" label="技能（用顿号或换行分隔）" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={3} placeholder="正式邮件、医疗客户、技术沟通" /></Form.Item>
+          <Form.Item name="name" label="英文角色名" rules={[{ required: true, min: 2 }]}><Input placeholder="ReplyMirror" /></Form.Item>
+          <Form.Item name="capabilities" label="能力与技能方向" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={2} placeholder="Mirror customer intent and turn scattered inquiry context into a clear response." /></Form.Item>
+          <Form.Item name="role_goal" label="角色目标" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={2} placeholder="Write a natural reply that clarifies the next step." /></Form.Item>
+          <Form.Item name="skillsText" label="相关技能（用逗号或换行分隔）" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={3} placeholder="Customer email reply&#10;Intent reflection&#10;Follow-up CTA" /></Form.Item>
+          <Form.Item name="background" label="其他背景定义" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={3} placeholder="Best for customer replies after an inquiry or follow-up." /></Form.Item>
+          <Form.Item name="tagsText" label="角色定义标签（用逗号或换行分隔）"><Input.TextArea rows={2} placeholder="reply, mirror-customer-intent, compliance" /></Form.Item>
+          <Form.Item name="style" label="风格" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={2} placeholder="Reflective, precise, customer-led" /></Form.Item>
           <Form.Item name="best_for" label="适用场景" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={2} /></Form.Item>
           <Form.Item name="status" label="状态" rules={[{ required: true }]}><Select options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} /></Form.Item>
           <Button type="primary" htmlType="submit">保存角色</Button>

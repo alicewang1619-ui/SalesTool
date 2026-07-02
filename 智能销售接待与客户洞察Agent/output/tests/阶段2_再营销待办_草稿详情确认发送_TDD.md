@@ -56,3 +56,8 @@
 - 后端专项：`py -m pytest .\tests\test_api_contract.py -q -k "nurture or ai_model_library"` 通过，9 passed。
 - 全量后端：`py -m pytest .\tests -q` 通过，110 passed。
 - 前端构建：`npm.cmd run build` 通过；保留既有 Vite chunk size warning。
+
+## 2026-07-02 邮件写手角色返修门禁
+- NURTURE-DETAIL-P0-11：草稿详情展示邮件目的标签/字段，保存或重新生成后 `prompt_context_snapshot.email_purpose` 与页面当前值一致。
+- NURTURE-DETAIL-P0-12：切换邮件写手角色后必须重新生成草稿，`draft_content`、`writer_role_key` 和角色定义快照同步变化，不得沿用旧写手模板。
+- NURTURE-DETAIL-P0-13：重新生成上下文必须包含写手能力与技能方向、角色目标、相关技能、背景定义和角色标签；接口返回不依赖中文名。

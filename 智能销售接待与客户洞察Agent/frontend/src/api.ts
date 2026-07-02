@@ -648,6 +648,10 @@ export type EmailWriterRole = {
   skills: string[];
   best_for: string;
   status: string;
+  capabilities?: string;
+  role_goal?: string;
+  background?: string;
+  tags?: string[];
 };
 
 export type AIModelConfig = {
@@ -828,6 +832,7 @@ export type NurtureAttachment = {
 
 export type NurturePromptContext = {
   safety_boundary: string;
+  email_purpose: string;
   customer_summary: string;
   customer_background: string;
   customer_note: string;
@@ -836,6 +841,10 @@ export type NurturePromptContext = {
   writer_role_name: string;
   writer_role_style: string;
   writer_role_skills: string[];
+  writer_role_capabilities: string;
+  writer_role_goal: string;
+  writer_role_background: string;
+  writer_role_tags: string[];
   attachments: NurtureAttachment[];
   rendered_prompt: string;
 };
@@ -855,6 +864,7 @@ export type NurtureTask = {
   email_subject: string;
   draft_content: string;
   generation_prompt: string;
+  email_purpose: string;
   prompt_context_snapshot: NurturePromptContext;
   attachments: NurtureAttachment[];
   model_provider: string;
@@ -863,6 +873,10 @@ export type NurtureTask = {
   writer_role_name: string;
   writer_role_style: string;
   writer_role_skills: string[];
+  writer_role_capabilities: string;
+  writer_role_goal: string;
+  writer_role_background: string;
+  writer_role_tags: string[];
   email_status: string;
   approval_status: "pending" | "confirmed" | "cancelled";
   detail_path: string;
@@ -1400,6 +1414,7 @@ export function updateNurtureTask(
     emailSubject?: string;
     draftContent: string;
     generationPrompt: string;
+    emailPurpose?: string;
     writerRoleKey?: string;
   }
 ): Promise<NurtureTask> {
@@ -1412,6 +1427,7 @@ export function updateNurtureTask(
       email_subject: payload.emailSubject ?? null,
       draft_content: payload.draftContent,
       generation_prompt: payload.generationPrompt,
+      email_purpose: payload.emailPurpose ?? null,
       writer_role_key: payload.writerRoleKey ?? null
     })
   });
@@ -1423,10 +1439,17 @@ export function uploadNurtureAttachment(taskId: number, file: File): Promise<Nur
   return requestForm<NurtureTask>(`/api/nurture-tasks/${taskId}/attachments`, body);
 }
 
-export function regenerateNurtureTask(taskId: number, generationPrompt: string, writerRoleKey?: string): Promise<NurtureTask> {
+export function regenerateNurtureTask(
+  taskId: number,
+  payload: { generationPrompt: string; writerRoleKey?: string; emailPurpose?: string }
+): Promise<NurtureTask> {
   return request<NurtureTask>(`/api/nurture-tasks/${taskId}/regenerate`, {
     method: "POST",
-    body: JSON.stringify({ generation_prompt: generationPrompt, writer_role_key: writerRoleKey ?? null })
+    body: JSON.stringify({
+      generation_prompt: payload.generationPrompt,
+      email_purpose: payload.emailPurpose ?? null,
+      writer_role_key: payload.writerRoleKey ?? null
+    })
   });
 }
 

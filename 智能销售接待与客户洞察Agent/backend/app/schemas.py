@@ -610,6 +610,7 @@ class NurtureAttachmentOut(BaseModel):
 
 class NurturePromptContextOut(BaseModel):
     safety_boundary: str
+    email_purpose: str = ""
     customer_summary: str
     customer_background: str
     customer_note: str
@@ -618,6 +619,10 @@ class NurturePromptContextOut(BaseModel):
     writer_role_name: str = ""
     writer_role_style: str = ""
     writer_role_skills: list[str] = Field(default_factory=list)
+    writer_role_capabilities: str = ""
+    writer_role_goal: str = ""
+    writer_role_background: str = ""
+    writer_role_tags: list[str] = Field(default_factory=list)
     attachments: list[NurtureAttachmentOut]
     rendered_prompt: str
 
@@ -637,6 +642,7 @@ class NurtureTaskOut(BaseModel):
     email_subject: str
     draft_content: str
     generation_prompt: str
+    email_purpose: str
     prompt_context_snapshot: NurturePromptContextOut
     attachments: list[NurtureAttachmentOut]
     model_provider: str
@@ -645,6 +651,10 @@ class NurtureTaskOut(BaseModel):
     writer_role_name: str
     writer_role_style: str
     writer_role_skills: list[str]
+    writer_role_capabilities: str
+    writer_role_goal: str
+    writer_role_background: str
+    writer_role_tags: list[str]
     email_status: str
     approval_status: str
     detail_path: str
@@ -668,11 +678,13 @@ class NurtureTaskUpdateRequest(BaseModel):
     email_subject: str | None = Field(default=None, max_length=255)
     draft_content: str = Field(min_length=10, max_length=8000)
     generation_prompt: str = Field(default="", max_length=4000)
+    email_purpose: str | None = Field(default=None, max_length=80)
     writer_role_key: str | None = Field(default=None, min_length=2, max_length=80)
 
 
 class NurtureTaskRegenerateRequest(BaseModel):
     generation_prompt: str = Field(default="", max_length=4000)
+    email_purpose: str | None = Field(default=None, max_length=80)
     writer_role_key: str | None = Field(default=None, min_length=2, max_length=80)
 
 
@@ -808,11 +820,15 @@ class AIModelUseCaseOut(BaseModel):
 class EmailWriterRoleOut(BaseModel):
     key: str
     name: str
-    display_name: str
+    display_name: str = ""
     style: str
     skills: list[str]
     best_for: str
     status: str
+    capabilities: str = ""
+    role_goal: str = ""
+    background: str = ""
+    tags: list[str] = Field(default_factory=list)
 
 
 class AIModelConfigOut(BaseModel):

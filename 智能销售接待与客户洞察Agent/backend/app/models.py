@@ -217,6 +217,7 @@ class NurtureTask(Base):
     email_subject: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     draft_content: Mapped[str] = mapped_column(Text, nullable=False)
     generation_prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    email_purpose: Mapped[str] = mapped_column(String(80), nullable=False, default="Follow-up reply")
     prompt_context_snapshot: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     attachment_refs: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     model_provider: Mapped[str] = mapped_column(String(80), nullable=False, default="ultrasound_growth_llm")

@@ -20,6 +20,7 @@ type NurtureFormValues = {
   emailSubject: string;
   draftContent: string;
   generationPrompt: string;
+  emailPurpose: string;
   writerRoleKey: string;
 };
 
@@ -30,12 +31,17 @@ const emailStatusLabels: Record<string, string> = {
 };
 
 const fallbackEmailWriterRoles: EmailWriterRole[] = [
-  { key: "doraemon", name: "Doraemon", display_name: "哆啦A梦", style: "温暖、可靠、什么都能帮你", skills: ["万能助手", "日常回复"], best_for: "万能助手、日常回复、客户维护", status: "enabled" },
-  { key: "mario", name: "Mario", display_name: "超级马里奥", style: "积极、行动派、有冲劲", skills: ["销售跟进", "推动决策"], best_for: "销售跟进、催单、推动决策", status: "enabled" },
-  { key: "pikachu", name: "Pikachu", display_name: "皮卡丘", style: "活泼、可爱、有亲和力", skills: ["社媒互动", "轻松话题"], best_for: "社媒互动、年轻客户、轻松话题", status: "enabled" },
-  { key: "totoro", name: "Totoro", display_name: "龙猫", style: "温柔、治愈、让人安心", skills: ["客户关怀", "暖心邮件"], best_for: "客户关怀、节日问候、暖心邮件", status: "enabled" },
-  { key: "baymax", name: "Baymax", display_name: "大白", style: "稳重、专业、可靠", skills: ["正式邮件", "技术沟通"], best_for: "正式邮件、医疗客户、技术沟通", status: "enabled" },
-  { key: "nemo", name: "Nemo", display_name: "海底总动员", style: "好奇、探索、愿意沟通", skills: ["陌生开发", "破冰邮件"], best_for: "陌生开发、初次接触、破冰邮件", status: "enabled" }
+  { key: "reply_mirror", name: "ReplyMirror", display_name: "ReplyMirror", style: "Reflective, precise, customer-led", skills: ["Customer email reply", "Intent reflection", "Follow-up CTA"], best_for: "Replying to existing inquiries", capabilities: "Mirror customer intent and turn scattered inquiry context into a clear response.", role_goal: "Write a natural reply that clarifies the next step.", background: "Best for customer replies after an inquiry or follow-up.", tags: ["reply", "mirror-customer-intent"], status: "enabled" },
+  { key: "mario", name: "Mario", display_name: "Mario", style: "Energetic, direct, momentum-building", skills: ["Sales follow-up", "Decision push"], best_for: "Active follow-up and decision momentum", capabilities: "Move a conversation toward a clear next step.", role_goal: "Help the customer make a concrete decision.", background: "Best for stalled deals after quote or product comparison.", tags: ["action", "sales-follow-up"], status: "enabled" },
+  { key: "baymax", name: "Baymax", display_name: "Baymax", style: "Steady, professional, reliable", skills: ["Formal email", "Medical customer communication", "Technical explanation"], best_for: "Formal medical customer communication", capabilities: "Turn technical points into credible commercial language.", role_goal: "Provide a reliable reply with compliance boundaries.", background: "Best for hospitals and technical discussions.", tags: ["formal", "medical", "technical"], status: "enabled" }
+];
+
+const emailPurposeOptions = [
+  { value: "Customer reply follow-up", label: "Customer reply follow-up" },
+  { value: "Post-quote follow-up", label: "Post-quote follow-up" },
+  { value: "Product comparison", label: "Product comparison" },
+  { value: "Meeting invitation", label: "Meeting invitation" },
+  { value: "Reactivation", label: "Reactivation" }
 ];
 
 export function NurtureTaskDetailPage() {
@@ -43,10 +49,11 @@ export function NurtureTaskDetailPage() {
   const [form] = Form.useForm<NurtureFormValues>();
   const [task, setTask] = useState<NurtureTask | null>(null);
   const [writerRoles, setWriterRoles] = useState<EmailWriterRole[]>(fallbackEmailWriterRoles);
-  const [defaultWriterRole, setDefaultWriterRole] = useState("baymax");
+  const [defaultWriterRole, setDefaultWriterRole] = useState("reply_mirror");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const writerRoleKey = Form.useWatch("writerRoleKey", form);
+  const emailPurpose = Form.useWatch("emailPurpose", form);
   const selectedWriter = useMemo(
     () => writerRoles.find((writer) => writer.key === writerRoleKey) ?? writerRoles.find((writer) => writer.key === task?.writer_role_key),
     [task?.writer_role_key, writerRoleKey, writerRoles]
@@ -61,6 +68,7 @@ export function NurtureTaskDetailPage() {
       emailSubject: nextTask.email_subject,
       draftContent: nextTask.draft_content,
       generationPrompt: nextTask.generation_prompt,
+      emailPurpose: nextTask.email_purpose || "Customer reply follow-up",
       writerRoleKey: nextTask.writer_role_key || nextDefaultWriterRole
     });
   }
@@ -71,13 +79,13 @@ export function NurtureTaskDetailPage() {
     try {
       const [nextTask, writers] = await Promise.all([
         fetchNurtureTask(taskId),
-        fetchEmailWriterRoles().catch(() => ({ default_email_writer: "baymax", items: [] }))
+        fetchEmailWriterRoles().catch(() => ({ default_email_writer: "reply_mirror", items: [] }))
       ]);
       const nextWriterRoles = writers.items.length ? [...writers.items] : [...fallbackEmailWriterRoles];
       const writerRoleKeys = new Set(nextWriterRoles.map((writer) => writer.key));
       const taskWriterFallback = fallbackEmailWriterRoles.find((writer) => writer.key === nextTask.writer_role_key);
       if (taskWriterFallback && !writerRoleKeys.has(taskWriterFallback.key)) nextWriterRoles.push(taskWriterFallback);
-      const nextDefaultWriterRole = writers.default_email_writer || nextWriterRoles[0]?.key || "baymax";
+      const nextDefaultWriterRole = writers.default_email_writer || nextWriterRoles[0]?.key || "reply_mirror";
       setWriterRoles(nextWriterRoles);
       setDefaultWriterRole(nextDefaultWriterRole);
       fillForm(nextTask, nextDefaultWriterRole);
@@ -101,13 +109,18 @@ export function NurtureTaskDetailPage() {
     }
   }
 
-  async function handleRegenerate() {
+  async function handleRegenerate(overrides: Partial<Pick<NurtureFormValues, "writerRoleKey" | "emailPurpose">> = {}) {
     if (!task) return;
-    const values = await form.validateFields(["generationPrompt", "writerRoleKey"]);
+    const values = await form.validateFields(["generationPrompt", "writerRoleKey", "emailPurpose"]);
+    const nextValues = { ...values, ...overrides };
     setSaving(true);
     try {
-      fillForm(await regenerateNurtureTask(task.id, values.generationPrompt ?? "", values.writerRoleKey));
-      message.success("已结合提示词、写手角色和参考附件重新生成草稿");
+      fillForm(await regenerateNurtureTask(task.id, {
+        generationPrompt: nextValues.generationPrompt ?? "",
+        writerRoleKey: nextValues.writerRoleKey,
+        emailPurpose: nextValues.emailPurpose
+      }));
+      message.success("已结合邮件目的、写手角色和参考附件重新生成草稿");
     } finally {
       setSaving(false);
     }
@@ -157,7 +170,7 @@ export function NurtureTaskDetailPage() {
         </div>
         <Space wrap>
           <Link to="/admin/nurture"><Button icon={<ArrowLeft size={16} />}>返回列表</Button></Link>
-          <Button loading={saving} icon={<Sparkles size={16} />} onClick={handleRegenerate}>重新生成</Button>
+          <Button loading={saving} icon={<Sparkles size={16} />} onClick={() => void handleRegenerate()}>重新生成</Button>
           <Button type="primary" loading={saving} icon={<Send size={16} />} onClick={handleConfirm}>人工确认发送</Button>
         </Space>
       </div>
@@ -198,6 +211,7 @@ export function NurtureTaskDetailPage() {
                   <Descriptions.Item label="客户分层">{task.customer_tier}</Descriptions.Item>
                   <Descriptions.Item label="产品">{task.product}</Descriptions.Item>
                   <Descriptions.Item label="模型">{task.model_provider} / {task.model_version}</Descriptions.Item>
+                  <Descriptions.Item label="邮件目的"><Tag color="purple">Purpose: {task.email_purpose}</Tag></Descriptions.Item>
                   <Descriptions.Item label="写手">{task.writer_role_name} · {task.writer_role_style}</Descriptions.Item>
                 </Descriptions>
               ) : null}
@@ -205,11 +219,27 @@ export function NurtureTaskDetailPage() {
             </Card>
           </Col>
           <Col xs={24} lg={14}>
-            <Card title="再营销邮件正文" loading={loading}>
-              <Form.Item name="writerRoleKey" label="邮件写手角色" rules={[{ required: true }]}>
-                <Select options={writerRoles.map((writer) => ({ value: writer.key, label: `${writer.name} / ${writer.display_name} · ${writer.style}` }))} placeholder="选择写邮件的人物风格" />
+            <Card title={<Space>再营销邮件正文<Tag color="purple">Purpose: {emailPurpose || task?.email_purpose || "Customer reply follow-up"}</Tag></Space>} loading={loading}>
+              <Form.Item name="emailPurpose" label="邮件目的" rules={[{ required: true, min: 2 }]}>
+                <Select
+                  showSearch
+                  options={emailPurposeOptions}
+                  placeholder="选择本次发邮件目的"
+                  onChange={(value) => void handleRegenerate({ emailPurpose: value })}
+                />
               </Form.Item>
-              {selectedWriter ? (<Tooltip title={`技能：${selectedWriter.skills.join("、")}；适用：${selectedWriter.best_for}`}><Button style={{ marginBottom: 12 }}>{selectedWriter.display_name}：{selectedWriter.style}</Button></Tooltip>) : null}
+              <Form.Item name="writerRoleKey" label="邮件写手角色" rules={[{ required: true }]}>
+                <Select
+                  options={writerRoles.map((writer) => ({ value: writer.key, label: `${writer.name} · ${writer.style}` }))}
+                  placeholder="选择写邮件角色"
+                  onChange={(value) => void handleRegenerate({ writerRoleKey: value })}
+                />
+              </Form.Item>
+              {selectedWriter ? (
+                <Tooltip title={`Goal: ${selectedWriter.role_goal || selectedWriter.best_for}; Capabilities: ${selectedWriter.capabilities || "Not configured"}; Skills: ${selectedWriter.skills.join(", ")}; Tags: ${(selectedWriter.tags ?? []).join(", ") || "None"}`}>
+                  <Button style={{ marginBottom: 12 }}>{selectedWriter.name}: {selectedWriter.style}</Button>
+                </Tooltip>
+              ) : null}
               <Form.Item name="draftContent" label="正文" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={8} /></Form.Item>
               <div className="nurture-prompt-panel">
                 <Form.Item name="generationPrompt" label="生成提示词 / 补充指令"><Input.TextArea rows={4} /></Form.Item>
@@ -224,7 +254,7 @@ export function NurtureTaskDetailPage() {
               </Space>
               <Space wrap style={{ marginTop: 16 }}>
                 <Button htmlType="submit" loading={saving} icon={<Save size={16} />}>保存修正</Button>
-                <Button loading={saving} icon={<Sparkles size={16} />} onClick={handleRegenerate}>重新生成</Button>
+                <Button loading={saving} icon={<Sparkles size={16} />} onClick={() => void handleRegenerate()}>重新生成</Button>
                 <Button type="primary" loading={saving} icon={<Send size={16} />} onClick={handleConfirm}>人工确认发送</Button>
               </Space>
             </Card>

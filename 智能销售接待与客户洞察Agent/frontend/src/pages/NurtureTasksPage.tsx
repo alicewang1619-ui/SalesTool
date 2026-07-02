@@ -342,7 +342,7 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
               <Select
                 allowClear
                 placeholder="选择邮件写手"
-                options={writerRoles.map((role) => ({ value: role.key, label: role.display_name || role.name }))}
+                options={writerRoles.map((role) => ({ value: role.key, label: `${role.name} · ${role.style}` }))}
               />
             </Form.Item>
           </Col>

@@ -2153,25 +2153,33 @@ def test_settings_ai_model_scenarios_and_email_writers_can_be_saved(client: Test
             },
             "email_writers": [
                 {
-                    "key": "doraemon",
-                    "name": "Doraemon",
-                    "display_name": "哆啦A梦",
-                    "style": "温暖、可靠、什么都能帮你",
-                    "skills": ["万能助手", "日常回复", "客户维护"],
-                    "best_for": "万能助手、日常回复、客户维护",
+                    "key": "reply_mirror",
+                    "name": "ReplyMirror",
+                    "display_name": "ReplyMirror",
+                    "style": "Reflective, precise, customer-led",
+                    "skills": ["Customer email reply", "Intent reflection", "Follow-up CTA"],
+                    "best_for": "Replying to existing inquiries",
+                    "capabilities": "Mirror customer intent and turn scattered inquiry context into a clear response.",
+                    "role_goal": "Write a natural reply that clarifies the next step.",
+                    "background": "Best for customer replies after an inquiry or follow-up.",
+                    "tags": ["reply", "mirror-customer-intent"],
                     "status": "enabled",
                 },
                 {
                     "key": "baymax",
                     "name": "Baymax",
-                    "display_name": "大白",
-                    "style": "稳重、专业、可靠",
-                    "skills": ["正式邮件", "医疗客户", "技术沟通"],
-                    "best_for": "正式邮件、医疗客户、技术沟通",
+                    "display_name": "Baymax",
+                    "style": "Steady, professional, reliable",
+                    "skills": ["Formal email", "Medical customer communication", "Technical explanation"],
+                    "best_for": "Formal medical customer communication",
+                    "capabilities": "Turn technical points into credible commercial language.",
+                    "role_goal": "Provide a reliable reply with compliance boundaries.",
+                    "background": "Best for hospitals and technical discussions.",
+                    "tags": ["formal", "medical", "technical"],
                     "status": "enabled",
                 },
             ],
-            "default_email_writer": "baymax",
+            "default_email_writer": "reply_mirror",
         },
         headers=headers,
     )
@@ -2180,14 +2188,17 @@ def test_settings_ai_model_scenarios_and_email_writers_can_be_saved(client: Test
     body = response.json()
     assert body["use_case_bindings"]["pricing_followup"] == "codex"
     assert any(use_case["key"] == "pricing_followup" for use_case in body["use_cases"])
-    baymax = next(writer for writer in body["email_writers"] if writer["key"] == "baymax")
-    assert baymax["style"] == "稳重、专业、可靠"
-    assert baymax["skills"] == ["正式邮件", "医疗客户", "技术沟通"]
-    assert body["default_email_writer"] == "baymax"
+    reply_mirror = next(writer for writer in body["email_writers"] if writer["key"] == "reply_mirror")
+    assert reply_mirror["name"] == "ReplyMirror"
+    assert reply_mirror["display_name"] == "ReplyMirror"
+    assert reply_mirror["capabilities"].startswith("Mirror customer intent")
+    assert reply_mirror["role_goal"].startswith("Write a natural reply")
+    assert "mirror-customer-intent" in reply_mirror["tags"]
+    assert body["default_email_writer"] == "reply_mirror"
 
     writers = client.get("/api/ai/email-writers", headers=headers)
     assert writers.status_code == 200
-    assert any(writer["key"] == "doraemon" for writer in writers.json()["items"])
+    assert any(writer["key"] == "reply_mirror" and writer["name"] == "ReplyMirror" for writer in writers.json()["items"])
 
 
 def test_settings_ai_model_custom_items_can_be_removed(client: TestClient) -> None:
@@ -2210,10 +2221,14 @@ def test_settings_ai_model_custom_items_can_be_removed(client: TestClient) -> No
     custom_writer = {
         "key": f"writer_{uuid4().hex[:6]}",
         "name": "Campaign Writer",
-        "display_name": "活动写手",
-        "style": "简洁、有行动号召",
-        "skills": ["促销邮件", "批量触达"],
-        "best_for": "促销邮件、批量触达",
+        "display_name": "Campaign Writer",
+        "style": "Concise and action-oriented",
+        "skills": ["Campaign email", "Bulk outreach"],
+        "best_for": "Campaign email and bulk outreach",
+        "capabilities": "Create focused campaign drafts for selected customer groups.",
+        "role_goal": "Make the campaign easy to review before sending.",
+        "background": "Used for admin or ops bulk email campaigns.",
+        "tags": ["campaign", "bulk-email"],
         "status": "enabled",
     }
     saved = client.put(
@@ -2837,25 +2852,33 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
             "use_case_bindings": {"email_draft": "claude-sonnet", "customer_research": "deepseek-chat"},
             "email_writers": [
                 {
-                    "key": "mario",
-                    "name": "Mario",
-                    "display_name": "超级马里奥",
-                    "style": "积极、行动派、有冲劲",
-                    "skills": ["销售跟进", "催单", "推动决策"],
-                    "best_for": "销售跟进、催单、推动决策",
+                    "key": "reply_mirror",
+                    "name": "ReplyMirror",
+                    "display_name": "ReplyMirror",
+                    "style": "Reflective, precise, customer-led",
+                    "skills": ["Customer email reply", "Intent reflection", "Follow-up CTA"],
+                    "best_for": "Replying to existing inquiries",
+                    "capabilities": "Mirror customer intent and turn scattered inquiry context into a clear response.",
+                    "role_goal": "Write a natural reply that clarifies the next step.",
+                    "background": "Best for customer replies after an inquiry or follow-up.",
+                    "tags": ["reply", "mirror-customer-intent"],
                     "status": "enabled",
                 },
                 {
                     "key": "baymax",
                     "name": "Baymax",
-                    "display_name": "大白",
-                    "style": "稳重、专业、可靠",
-                    "skills": ["正式邮件", "医疗客户", "技术沟通"],
-                    "best_for": "正式邮件、医疗客户、技术沟通",
+                    "display_name": "Baymax",
+                    "style": "Steady, professional, reliable",
+                    "skills": ["Formal email", "Medical customer communication", "Technical explanation"],
+                    "best_for": "Formal medical customer communication",
+                    "capabilities": "Turn technical points into credible commercial language.",
+                    "role_goal": "Provide a reliable reply with compliance boundaries.",
+                    "background": "Best for hospitals and technical discussions.",
+                    "tags": ["formal", "medical", "technical"],
                     "status": "enabled",
                 },
             ],
-            "default_email_writer": "baymax",
+            "default_email_writer": "reply_mirror",
         },
         headers=headers,
     )
@@ -2869,28 +2892,64 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
             "nurture_reason": "客户已报价未回复且官网显示新增分部，需要温和跟进。",
             "draft_content": "Hi Carlos, I can share a concise portable ultrasound comparison for your clinic network.",
             "generation_prompt": "请积极推动客户确认下一步会议。",
-            "writer_role_key": "mario",
+            "email_purpose": "Customer reply follow-up",
+            "writer_role_key": "reply_mirror",
         },
         headers=headers,
     )
 
     assert saved.status_code == 200
-    assert saved.json()["writer_role_key"] == "mario"
+    assert saved.json()["writer_role_key"] == "reply_mirror"
     regenerated = client.post(
         f"/api/nurture-tasks/{task['id']}/regenerate",
-        json={"generation_prompt": "沿用当前写手角色，语气更积极。", "writer_role_key": "mario"},
+        json={
+            "generation_prompt": "Use the configured role profile and write a sendable English reply.",
+            "email_purpose": "Customer reply follow-up",
+            "writer_role_key": "reply_mirror",
+        },
         headers=headers,
     )
 
     assert regenerated.status_code == 200
     body = regenerated.json()
-    assert body["writer_role_key"] == "mario"
-    assert body["writer_role_name"] == "超级马里奥"
-    assert body["writer_role_style"] == "积极、行动派、有冲劲"
-    assert "推动决策" in body["writer_role_skills"]
-    assert "超级马里奥" in body["prompt_context_snapshot"]["rendered_prompt"]
-    assert "推动决策" in body["prompt_context_snapshot"]["rendered_prompt"]
+    assert body["writer_role_key"] == "reply_mirror"
+    assert body["email_purpose"] == "Customer reply follow-up"
+    assert body["writer_role_name"] == "ReplyMirror"
+    assert body["writer_role_style"] == "Reflective, precise, customer-led"
+    assert "Intent reflection" in body["writer_role_skills"]
+    assert body["writer_role_capabilities"].startswith("Mirror customer intent")
+    assert body["writer_role_goal"].startswith("Write a natural reply")
+    assert "mirror-customer-intent" in body["writer_role_tags"]
+    snapshot = body["prompt_context_snapshot"]
+    assert snapshot["email_purpose"] == "Customer reply follow-up"
+    assert snapshot["writer_role_name"] == "ReplyMirror"
+    assert snapshot["writer_role_capabilities"].startswith("Mirror customer intent")
+    assert snapshot["writer_role_goal"].startswith("Write a natural reply")
+    assert "Best for customer replies" in snapshot["writer_role_background"]
+    assert "mirror-customer-intent" in snapshot["writer_role_tags"]
+    assert "Email purpose: Customer reply follow-up" in snapshot["rendered_prompt"]
+    assert "Writer capabilities: Mirror customer intent" in snapshot["rendered_prompt"]
     assert_english_email_body(body["draft_content"])
+
+    changed = client.post(
+        f"/api/nurture-tasks/{task['id']}/regenerate",
+        json={
+            "generation_prompt": "Use the configured role profile and write a sendable English reply.",
+            "email_purpose": "Technical comparison",
+            "writer_role_key": "baymax",
+        },
+        headers=headers,
+    )
+    assert changed.status_code == 200
+    changed_body = changed.json()
+    assert changed_body["writer_role_key"] == "baymax"
+    assert changed_body["email_purpose"] == "Technical comparison"
+    assert changed_body["writer_role_name"] == "Baymax"
+    assert "technical" in [tag.lower() for tag in changed_body["writer_role_tags"]]
+    assert changed_body["prompt_context_snapshot"]["email_purpose"] == "Technical comparison"
+    assert "Writer role goal: Provide a reliable reply" in changed_body["prompt_context_snapshot"]["rendered_prompt"]
+    assert changed_body["draft_content"] != body["draft_content"]
+    assert_english_email_body(changed_body["draft_content"])
 
 
 def test_nurture_regeneration_returns_english_template_without_chinese_leakage(client: TestClient) -> None:
@@ -2923,7 +2982,7 @@ def test_nurture_regeneration_returns_english_template_without_chinese_leakage(c
     assert regenerated.status_code == 200
     body = regenerated.json()
     assert "结合写手技能" in body["prompt_context_snapshot"]["rendered_prompt"]
-    assert "推动决策" in body["prompt_context_snapshot"]["rendered_prompt"]
+    assert "Decision push" in body["prompt_context_snapshot"]["rendered_prompt"]
     assert_english_email_body(body["draft_content"])
     assert "Portable Ultrasound" in body["draft_content"]
 

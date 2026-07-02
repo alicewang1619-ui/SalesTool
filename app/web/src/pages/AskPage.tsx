@@ -18,6 +18,9 @@ interface AiMsg {
 }
 type Msg = UserMsg | AiMsg;
 
+/** 对话历史持久化 key（issue #10）。 */
+const CHAT_KEY = 'zkb-ask-conversation';
+
 /** 渲染答案：Markdown + LaTeX 公式（复用 MarkdownView），并把 [n] 渲染为可点击来源角标。 */
 function renderAnswer(text: string, sources: AnswerResult['sources']) {
   const byIndex = new Map(sources.map((s) => [s.index, s]));
@@ -58,6 +61,27 @@ export function AskPage() {
     const q = params.get('q');
     if (q) setInput(q);
   }, [params]);
+
+  // 恢复上次对话（issue #10：刷新/离开再回来保留历史问答）。丢弃未完成的「思考中」气泡。
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_KEY);
+      if (!saved) return;
+      const restored = (JSON.parse(saved) as Msg[]).filter(
+        (mm) => mm.role === 'user' || (mm.role === 'ai' && mm.status !== 'thinking'),
+      );
+      if (restored.length) setMsgs(restored);
+    } catch {
+      /* 忽略损坏的历史 */
+    }
+  }, []);
+
+  // 持久化对话（仅落已完成的消息，避免把「思考中」存进去）。
+  useEffect(() => {
+    const settled = msgs.filter((mm) => mm.role === 'user' || (mm.role === 'ai' && mm.status !== 'thinking'));
+    if (settled.length) localStorage.setItem(CHAT_KEY, JSON.stringify(settled));
+    else localStorage.removeItem(CHAT_KEY);
+  }, [msgs]);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight });
@@ -107,6 +131,19 @@ export function AskPage() {
       <header className="topbar ask-topbar">
         <h1 className="topbar-title">问答</h1>
         <span className="model" data-testid="model-badge">{model}</span>
+        {msgs.length > 0 && (
+          <button
+            className="btn btn-sm"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => {
+              setMsgs([]);
+              localStorage.removeItem(CHAT_KEY);
+            }}
+            data-testid="new-chat"
+          >
+            🗑️ 新对话
+          </button>
+        )}
       </header>
 
       <div className="chat" ref={chatRef}>

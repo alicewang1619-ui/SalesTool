@@ -26,6 +26,7 @@ function renderPage() {
 
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
+  localStorage.clear();
   m.getModel.mockResolvedValue({ provider: 'local', chatModel: 'llama3.1:8b', embedModel: 'nomic', cloudBaseUrl: '', cloudApiKeyMasked: '', hasCloudApiKey: false });
 });
 
@@ -109,6 +110,26 @@ describe('C-QA-08 多轮历史（issue #10）', () => {
       { role: 'user', content: '缓存穿透是什么' },
       { role: 'assistant', content: answer().answer },
     ]);
+  });
+});
+
+describe('C-QA-09 对话持久化（issue #10：刷新后保留历史问答）', () => {
+  it('问答后重新挂载页面，历史对话仍在；点「新对话」清空', async () => {
+    m.ask.mockResolvedValue(answer());
+    const { unmount } = renderPage();
+    await userEvent.type(screen.getByLabelText('提问'), '缓存穿透是什么');
+    await userEvent.click(screen.getByRole('button', { name: '发送' }));
+    await screen.findByTestId('answer');
+    // 模拟刷新/离开再回来：卸载后重新渲染
+    unmount();
+    renderPage();
+    // 历史问答仍在（用户问题气泡 + 答案）
+    expect(await screen.findByText('缓存穿透是什么')).toBeInTheDocument();
+    expect(screen.getByTestId('answer')).toBeInTheDocument();
+    // 新对话清空并持久化清除
+    await userEvent.click(screen.getByTestId('new-chat'));
+    expect(screen.getByTestId('ask-empty')).toBeInTheDocument();
+    expect(localStorage.getItem('zkb-ask-conversation')).toBeNull();
   });
 });
 

@@ -303,6 +303,7 @@ export function SettingsPage() {
   const selectedBindingValue = selectedUseCase ? aiModelBindings[selectedUseCase.key] ?? aiModelDraft : aiModelDraft;
   const selectedBindingModel = modelOptions.find((item) => item.value === selectedBindingValue) ?? selectedAIModel;
   const selectedModelForDetails = modelOptions.find((item) => item.value === selectedModelValue) ?? modelOptions[0];
+  const selectedModelIndex = modelOptions.findIndex((item) => item.value === selectedModelValue);
   const selectedWriterForDetails = emailWriters.find((writer) => writer.key === selectedWriterKey) ?? enabledEmailWriters[0] ?? emailWriters[0];
   const selectedWriterIndex = emailWriters.findIndex((writer) => writer.key === selectedWriterKey);
   const enabledWriterSelectOptions = useMemo(
@@ -1002,7 +1003,7 @@ export function SettingsPage() {
               </Col>
             </Row>
           </Card>
-          <Card title="大模型连接配置" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateModel}>添加大模型</Button><Button onClick={() => { const index = modelOptions.findIndex((item) => item.value === selectedModelValue); if (index >= 0) openEditModel(index); }}>编辑所选模型</Button><Button danger icon={<Trash2 size={16} />} onClick={deleteSelectedModel}>删除所选模型</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存模型库</Button></Space>}>
+          <Card title="大模型连接配置" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateModel}>添加大模型</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存模型库</Button></Space>}>
             <Row gutter={[16, 16]}>
               <Col xs={24} md={10}>
                 <Typography.Text className="field-label">模型库下拉菜单</Typography.Text>
@@ -1020,6 +1021,10 @@ export function SettingsPage() {
                   </Space>
                   <Typography.Paragraph className="muted">API：{selectedModelForDetails?.api_base_url || "未配置"}{selectedModelForDetails?.endpoint_path || ""}</Typography.Paragraph>
                   <Typography.Paragraph className="muted">能力：{selectedModelForDetails?.capability}</Typography.Paragraph>
+                  <Space wrap style={{ marginTop: 12 }}>
+                    <Button size="small" disabled={selectedModelIndex < 0} onClick={() => selectedModelIndex >= 0 && openEditModel(selectedModelIndex)}>编辑</Button>
+                    <Button size="small" danger disabled={selectedModelIndex < 0} onClick={deleteSelectedModel}>删除</Button>
+                  </Space>
                 </div>
               </Col>
             </Row>

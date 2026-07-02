@@ -14,6 +14,7 @@ export type Banner = {
 
 export type Lead = {
   id: number;
+  customer_id: number | null;
   customer_name: string;
   email: string;
   organization: string;
@@ -458,7 +459,7 @@ export type Customer = {
     happened_at: string;
   }>;
   signals: CustomerSignal[];
-  score_summary: ScoreSummary;
+  score_summary?: ScoreSummary | null;
 };
 
 export type CustomerListItem = {
@@ -750,6 +751,7 @@ export type CountrySalesMappingPageResult = {
 
 export type ProductKnowledge = {
   id: number;
+  knowledge_base: string;
   product_type: string;
   model_name: string;
   application_scenario: string;
@@ -765,6 +767,7 @@ export type ProductKnowledgePageResult = {
   page_size: number;
   total: number;
   summary: Record<string, number>;
+  knowledge_bases?: string[];
   active_version: string;
   items: ProductKnowledge[];
   empty_state: {
@@ -788,6 +791,7 @@ export type ProductKnowledgeContext = {
   safety_boundary: string;
   knowledge_blocks: Array<{
     id: number;
+    knowledge_base: string;
     product_type: string;
     model_name: string;
     application_scenario: string;
@@ -1491,6 +1495,7 @@ export function saveCountrySalesMapping(payload: {
 
 export function fetchProductKnowledge(filters: {
   query?: string;
+  knowledgeBase?: string;
   productType?: string;
   status?: string;
   page?: number;
@@ -1501,12 +1506,14 @@ export function fetchProductKnowledge(filters: {
     page_size: String(filters.pageSize ?? 20)
   });
   if (filters.query) params.set("query", filters.query);
+  if (filters.knowledgeBase) params.set("knowledge_base", filters.knowledgeBase);
   if (filters.productType) params.set("product_type", filters.productType);
   if (filters.status) params.set("status", filters.status);
   return request<ProductKnowledgePageResult>(`/api/settings/product-knowledge?${params.toString()}`);
 }
 
 export function saveProductKnowledge(payload: {
+  knowledgeBase: string;
   productType: string;
   modelName: string;
   applicationScenario: string;
@@ -1516,6 +1523,7 @@ export function saveProductKnowledge(payload: {
   return request<ProductKnowledge>("/api/settings/product-knowledge", {
     method: "PUT",
     body: JSON.stringify({
+      knowledge_base: payload.knowledgeBase,
       product_type: payload.productType,
       model_name: payload.modelName,
       application_scenario: payload.applicationScenario,

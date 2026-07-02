@@ -17,7 +17,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { ArrowLeft, BookOpen, RefreshCw, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchProductKnowledge,
   fetchProductKnowledgeContext,
@@ -29,6 +29,7 @@ import {
 } from "../api";
 
 type ProductKnowledgeFormValues = {
+  knowledgeBase: string;
   productType: string;
   modelName: string;
   applicationScenario: string;
@@ -48,8 +49,19 @@ const statusLabel: Record<string, string> = {
   disabled: "停用"
 };
 
+const defaultKnowledgeBases = [
+  { value: "product", label: "产品知识库" },
+  { value: "competitor", label: "竞品知识库" },
+  { value: "market", label: "市场知识库" }
+];
+
+function knowledgeBaseLabel(value: string) {
+  return defaultKnowledgeBases.find((item) => item.value === value)?.label ?? value;
+}
+
 export function ProductKnowledgePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form] = Form.useForm<ProductKnowledgeFormValues>();
   const [data, setData] = useState<ProductKnowledgePageResult | null>(null);
   const [context, setContext] = useState<ProductKnowledgeContext | null>(null);
@@ -57,7 +69,7 @@ export function ProductKnowledgePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [filters, setFilters] = useState({ query: "", productType: "", status: "" });
+  const [filters, setFilters] = useState({ query: "", knowledgeBase: searchParams.get("knowledge_base") ?? "", productType: "", status: "" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -65,6 +77,10 @@ export function ProductKnowledgePage() {
     const values = new Set((data?.items ?? []).map((item) => item.product_type));
     ["Portable", "Handheld", "Trolley"].forEach((item) => values.add(item));
     return Array.from(values).map((value) => ({ value, label: value }));
+  }, [data]);
+  const knowledgeBaseOptions = useMemo(() => {
+    const values = new Set([...(data?.knowledge_bases ?? []), ...defaultKnowledgeBases.map((item) => item.value)]);
+    return Array.from(values).map((value) => ({ value, label: knowledgeBaseLabel(value) }));
   }, [data]);
 
   async function load() {
@@ -74,6 +90,7 @@ export function ProductKnowledgePage() {
       const [pageResult, contextResult] = await Promise.all([
         fetchProductKnowledge({
           query: filters.query.trim() || undefined,
+          knowledgeBase: filters.knowledgeBase || undefined,
           productType: filters.productType || undefined,
           status: filters.status || undefined,
           page,
@@ -92,7 +109,7 @@ export function ProductKnowledgePage() {
 
   useEffect(() => {
     void load();
-  }, [page, pageSize, filters.query, filters.productType, filters.status]);
+  }, [page, pageSize, filters.query, filters.knowledgeBase, filters.productType, filters.status]);
 
   async function submit(values: ProductKnowledgeFormValues) {
     setSaving(true);
@@ -100,7 +117,7 @@ export function ProductKnowledgePage() {
     setNotice(null);
     try {
       const saved = await saveProductKnowledge(values);
-      setNotice(`${saved.product_type} / ${saved.model_name} 已保存为 ${saved.version}，AI 接待上下文会读取启用版本`);
+      setNotice(`${knowledgeBaseLabel(saved.knowledge_base)} · ${saved.product_type} / ${saved.model_name} 已保存为 ${saved.version}，AI 接待上下文会读取启用版本`);
       setFilters((current) => ({ ...current, query: saved.model_name }));
       setPage(1);
       await load();
@@ -125,6 +142,7 @@ export function ProductKnowledgePage() {
 
   function edit(item: ProductKnowledge) {
     form.setFieldsValue({
+      knowledgeBase: item.knowledge_base,
       productType: item.product_type,
       modelName: item.model_name,
       applicationScenario: item.application_scenario,
@@ -134,7 +152,8 @@ export function ProductKnowledgePage() {
   }
 
   const columns: ColumnsType<ProductKnowledge> = [
-    { title: "产品类型", dataIndex: "product_type", fixed: "left", width: 130 },
+    { title: "知识库", dataIndex: "knowledge_base", fixed: "left", width: 130, render: (value: string) => <Tag color="purple">{knowledgeBaseLabel(value)}</Tag> },
+    { title: "产品类型", dataIndex: "product_type", width: 130 },
     { title: "型号", dataIndex: "model_name", width: 160 },
     {
       title: "应用场景",
@@ -183,9 +202,9 @@ export function ProductKnowledgePage() {
       <div className="page-heading">
         <div>
           <Typography.Text className="stage-label">阶段1(MVP) · 系统配置</Typography.Text>
-          <Typography.Title level={2}>产品知识库</Typography.Title>
+          <Typography.Title level={2}>知识库管理</Typography.Title>
           <Typography.Paragraph className="muted">
-            维护 ultrasound 产品类型、型号、应用场景和 AI 接待知识；启用版本进入 AI 上下文，停用版本保留审计和历史引用。
+            维护产品、竞品、市场等不同知识库板块；启用版本进入 AI 上下文，停用版本保留审计和历史引用。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -195,7 +214,7 @@ export function ProductKnowledgePage() {
           <Button icon={<RefreshCw size={16} />} onClick={() => void load()}>
             刷新
           </Button>
-          <Button icon={<ShieldCheck size={16} />} onClick={() => setFilters({ query: "", productType: "", status: "active" })}>
+          <Button icon={<ShieldCheck size={16} />} onClick={() => setFilters({ query: "", knowledgeBase: "", productType: "", status: "active" })}>
             只看启用
           </Button>
         </Space>
@@ -208,7 +227,7 @@ export function ProductKnowledgePage() {
         <Col xs={24} md={12} xl={6}>
           <Card loading={loading}>
             <Statistic title="知识条目" value={data?.summary.total_items ?? 0} prefix={<BookOpen size={18} />} />
-            <div className="metric-chip">产品类型/型号/场景</div>
+            <div className="metric-chip">产品/竞品/市场/自定义</div>
           </Card>
         </Col>
         <Col xs={24} md={12} xl={6}>
@@ -233,13 +252,16 @@ export function ProductKnowledgePage() {
 
       <Row gutter={[16, 16]} className="summary-grid">
         <Col xs={24} xl={8}>
-          <Card title="保存产品知识" className="knowledge-form-card">
+          <Card title="保存知识版本" className="knowledge-form-card">
             <Form<ProductKnowledgeFormValues>
               form={form}
               layout="vertical"
-              initialValues={{ productType: "Portable", status: "active" }}
+              initialValues={{ knowledgeBase: searchParams.get("knowledge_base") ?? "product", productType: "Portable", status: "active" }}
               onFinish={(values) => void submit(values)}
             >
+              <Form.Item name="knowledgeBase" label="所属知识库" rules={[{ required: true, min: 2 }]}>
+                <Input placeholder="product / competitor / market / 自定义知识库名称" />
+              </Form.Item>
               <Form.Item name="productType" label="产品类型" rules={[{ required: true, min: 2 }]}>
                 <Select options={productTypeOptions} showSearch />
               </Form.Item>
@@ -271,13 +293,24 @@ export function ProductKnowledgePage() {
           <Card title="知识库筛选">
             <Space wrap className="knowledge-filter-bar">
               <Input
-                placeholder="搜索型号/场景"
+                placeholder="搜索知识库/型号/场景"
                 value={filters.query}
                 onChange={(event) => {
                   setPage(1);
                   setFilters((current) => ({ ...current, query: event.target.value }));
                 }}
                 style={{ width: 220 }}
+              />
+              <Select
+                allowClear
+                placeholder="知识库板块"
+                value={filters.knowledgeBase || undefined}
+                onChange={(value) => {
+                  setPage(1);
+                  setFilters((current) => ({ ...current, knowledgeBase: value ?? "" }));
+                }}
+                options={knowledgeBaseOptions}
+                style={{ width: 170 }}
               />
               <Select
                 allowClear
@@ -315,7 +348,7 @@ export function ProductKnowledgePage() {
               locale={{
                 emptyText: (
                   <Empty description={data?.empty_state?.title ?? "暂无产品知识"}>
-                    <Button onClick={() => form.setFieldsValue({ productType: "Portable", status: "active" })}>新增知识</Button>
+                    <Button onClick={() => form.setFieldsValue({ knowledgeBase: "product", productType: "Portable", status: "active" })}>新增知识</Button>
                   </Empty>
                 )
               }}

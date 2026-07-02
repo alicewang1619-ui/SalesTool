@@ -1,8 +1,8 @@
-﻿import { Alert, Button, Card, Col, Empty, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Alert, App, Button, Card, Col, Empty, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
 import { Check, RefreshCw, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fetchDashboard, fetchLead, fetchLeads, fetchSourceDictionary, type Lead, type LeadFilters, type SourceOption } from "../api";
+import { createNurtureTask, fetchDashboard, fetchLead, fetchLeads, fetchSourceDictionary, type Lead, type LeadFilters, type SourceOption } from "../api";
 
 const scoreColor: Record<string, string> = {
   有效: "green",
@@ -46,6 +46,7 @@ function scopeLabel(scope?: string, date?: string): string {
 }
 
 export function LeadsPage() {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [source, setSource] = useState<string | undefined>(searchParams.get("source_category") ?? undefined);
@@ -60,6 +61,7 @@ export function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [metrics, setMetrics] = useState({ today_inquiries: 0, valid_leads: 0, unfeedback: 0, website_kpi: 0 });
   const [loading, setLoading] = useState(true);
+  const [sendingLeadId, setSendingLeadId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const sourceOptions = useMemo(() => uniqueCategories(sources), [sources]);
@@ -127,6 +129,28 @@ export function LeadsPage() {
     setScore(undefined);
     setPage(1);
     setSearchParams(new URLSearchParams());
+  };
+
+  const sendEmail = async (lead: Lead) => {
+    if (!lead.customer_id) {
+      const errorMessage = "当前线索还没有匹配到客户档案，请先查看详情或重新导入客户信息。";
+      setError(errorMessage);
+      message.error(errorMessage);
+      return;
+    }
+    setSendingLeadId(lead.id);
+    setError(null);
+    try {
+      const task = await createNurtureTask(lead.customer_id);
+      message.success(`已为 ${lead.customer_name} 打开再营销邮件草稿`);
+      navigate(task.detail_path);
+    } catch (failure) {
+      const errorMessage = failure instanceof Error ? failure.message : "创建再营销邮件失败";
+      setError(errorMessage);
+      message.error(errorMessage);
+    } finally {
+      setSendingLeadId(null);
+    }
   };
 
   return (
@@ -300,8 +324,13 @@ export function LeadsPage() {
             {
               title: "动作",
               fixed: "right",
-              width: 120,
-              render: (_, lead) => <Button onClick={() => navigate(`/admin/leads/${lead.id}`)}>查看详情</Button>
+              width: 220,
+              render: (_, lead) => (
+                <Space wrap>
+                  <Button onClick={() => navigate(`/admin/leads/${lead.id}`)}>查看详情</Button>
+                  <Button type="primary" loading={sendingLeadId === lead.id} onClick={() => void sendEmail(lead)}>发邮件</Button>
+                </Space>
+              )
             }
           ]}
         />

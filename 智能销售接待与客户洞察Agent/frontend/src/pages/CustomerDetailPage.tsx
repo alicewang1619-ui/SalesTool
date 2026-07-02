@@ -8,6 +8,7 @@ import {
   fetchNurtureTasks,
   updateCustomerBackground,
   type Customer,
+  type ScoreSummary,
   type NurtureTask
 } from "../api";
 
@@ -25,6 +26,19 @@ const fallbackBackground: Customer["background"] = {
   confidence: "待复核",
   updated_by: "系统",
   updated_at: ""
+};
+
+const fallbackScore: ScoreSummary = {
+  total: 0,
+  max_score: 5,
+  label: "待评分",
+  dimensions: [
+    { key: "information_completeness", label: "信息完整性", earned: false, point: 1, reason: "暂无足够信息，等待补全。" },
+    { key: "industry_relevance", label: "行业相关", earned: false, point: 1, reason: "暂无足够信息，等待补全。" },
+    { key: "clear_need", label: "明确需求", earned: false, point: 1, reason: "暂无足够信息，等待补全。" },
+    { key: "customer_qualification", label: "客户资质与采购能力", earned: false, point: 1, reason: "暂无足够信息，等待补全。" },
+    { key: "reachable_next_step", label: "触达与推进可行性", earned: false, point: 1, reason: "暂无足够信息，等待补全。" }
+  ]
 };
 
 export function CustomerDetailPage() {
@@ -92,7 +106,8 @@ export function CustomerDetailPage() {
   const timeline = customer.timeline ?? [];
   const signals = customer.signals ?? [];
   const canEditBackground = Boolean(customer.can_edit_background);
-  const score = customer.score_summary;
+  const score = customer.score_summary ?? fallbackScore;
+  const scoreDimensions = score.dimensions?.length ? score.dimensions : fallbackScore.dimensions;
 
   return (
     <section>
@@ -140,7 +155,7 @@ export function CustomerDetailPage() {
 
       <Card title="AI 五星评分" style={{ marginTop: 16 }}>
         <Space wrap align="center">
-          <Rate disabled count={score.max_score} value={score.total} />
+          <Rate disabled count={score.max_score || fallbackScore.max_score} value={score.total} />
           <Tag color={score.total >= 4 ? "green" : score.total >= 3 ? "purple" : "gold"}>{score.label}</Tag>
           <Typography.Text type="secondary">每个维度 1 分，用于运营判断询盘质量。</Typography.Text>
         </Space>
@@ -148,7 +163,7 @@ export function CustomerDetailPage() {
           rowKey="key"
           size="small"
           pagination={false}
-          dataSource={score.dimensions}
+          dataSource={scoreDimensions}
           style={{ marginTop: 12 }}
           columns={[
             { title: "评分维度", dataIndex: "label", width: 180 },

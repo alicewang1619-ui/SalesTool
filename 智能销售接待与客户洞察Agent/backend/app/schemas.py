@@ -24,6 +24,7 @@ class BannerOut(BaseModel):
 
 class LeadOut(BaseModel):
     id: int
+    customer_id: int | None = None
     customer_name: str
     email: str = ""
     organization: str = ""
@@ -994,6 +995,7 @@ class CountrySalesMappingUpdateRequest(BaseModel):
 
 class ProductKnowledgeOut(BaseModel):
     id: int
+    knowledge_base: str = "product"
     product_type: str
     model_name: str
     application_scenario: str
@@ -1009,6 +1011,7 @@ class ProductKnowledgePage(BaseModel):
     page_size: int
     total: int
     summary: dict[str, int]
+    knowledge_bases: list[str] = Field(default_factory=list)
     active_version: str
     items: list[ProductKnowledgeOut]
     empty_state: EmptyStateOut | None = None
@@ -1016,6 +1019,7 @@ class ProductKnowledgePage(BaseModel):
 
 
 class ProductKnowledgeUpdateRequest(BaseModel):
+    knowledge_base: str = Field(default="product", min_length=2, max_length=80)
     product_type: str = Field(min_length=2, max_length=80)
     model_name: str = Field(min_length=2, max_length=120)
     application_scenario: str = Field(min_length=2, max_length=500)
@@ -1029,6 +1033,7 @@ class ProductKnowledgeStatusRequest(BaseModel):
 
 class ProductKnowledgeBlockOut(BaseModel):
     id: int
+    knowledge_base: str = "product"
     product_type: str
     model_name: str
     application_scenario: str

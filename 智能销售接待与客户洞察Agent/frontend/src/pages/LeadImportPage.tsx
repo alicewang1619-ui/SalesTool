@@ -17,8 +17,10 @@ const reasonLabel: Record<string, string> = {
   DUPLICATE_CUSTOMER: "重复客户",
   MISSING_COUNTRY: "缺少国家",
   MISSING_CUSTOMER_NAME: "缺少客户名称",
+  MISSING_CUSTOMER_IDENTITY: "缺少客户名称或邮箱",
   SOURCE_DISABLED: "来源已停用",
-  COUNTRY_MAPPING_MISSING: "国家销售映射缺失"
+  COUNTRY_MAPPING_MISSING: "国家销售映射缺失",
+  IMPORT_PARSE_FAILED: "文件解析失败"
 };
 
 function downloadTextFile(filename: string, content: string, type = "text/csv;charset=utf-8") {
@@ -42,6 +44,11 @@ function isSupportedImportFile(filename: string) {
   return lower.endsWith(".csv") || lower.endsWith(".xlsx");
 }
 
+function importFailureLabel(reason: string) {
+  const [code, detail] = reason.split(/:\s*/, 2);
+  return `${reasonLabel[code] ?? code}${detail ? `：${detail}` : ""}`;
+}
+
 export function LeadImportPage() {
   const [job, setJob] = useState<ImportJob | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -58,6 +65,10 @@ export function LeadImportPage() {
         message.success(`导入完成：成功 ${latest.success_rows} 行，自动分配 ${latest.auto_assigned_rows} 行，待人工确认 ${latest.pending_assignment_rows} 行`);
         return;
       }
+      if (latest.status === "failed") {
+        setError("导入任务解析失败，请查看失败明细或更换为 CSV/XLSX 表格。");
+        return;
+      }
       await new Promise((resolve) => window.setTimeout(resolve, 1000));
     }
   };
@@ -72,7 +83,7 @@ export function LeadImportPage() {
         setSelectedFileName(null);
         return Upload.LIST_IGNORE;
       }
-      setSelectedFileName(`${file.name} · ${formatFileSize(file.size)} · 格式校验通过`);
+      setSelectedFileName(`${file.name} · ${formatFileSize(file.size)} · 文件类型通过，入库校验以任务明细为准`);
       setUploading(true);
       setError(null);
       try {
@@ -131,7 +142,7 @@ export function LeadImportPage() {
           <Typography.Text className="eyebrow">阶段 1 (MVP) · 线索池</Typography.Text>
           <Typography.Title level={1}>客户信息导入</Typography.Title>
           <Typography.Paragraph type="secondary">
-            支持 CSV / Excel（.xlsx）文件。导入后系统按“国家销售映射”自动匹配负责人，你只需要确认异常和待分配结果。
+            支持 CSV / Excel（.xlsx）文件，可识别系统模板和常见中英文表头。导入后系统尽量入库，异常行和待分配结果会列出原因。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -156,7 +167,7 @@ export function LeadImportPage() {
         showIcon
         className="login-error"
         message={selectedFileName ? `已选择表格：${selectedFileName}` : "请上传 CSV 或 Excel 表格（.csv / .xlsx）"}
-        description="必填字段：customer_name、country、customer_type、product、source_category、source_label；建议字段：email、organization、raw_inquiry。country 用于自动分配销售，source_category/source_label 会按配置中心的客户来源字典校验。"
+        description="核心字段：客户名称或邮箱至少一个；建议字段：国家、客户类型、产品、来源、单位、询盘内容。国家用于自动分配销售，来源无法匹配时会回退到默认来源并保留导入记录。"
       />
 
       <Card size="small" className="settings-entry-card">
@@ -243,7 +254,7 @@ export function LeadImportPage() {
                 {
                   title: "失败原因",
                   dataIndex: "reason",
-                  render: (reason: string) => <Tag color="orange">{reasonLabel[reason] ?? reason}</Tag>
+                  render: (reason: string) => <Tag color="orange">{importFailureLabel(reason)}</Tag>
                 }
               ]}
             />

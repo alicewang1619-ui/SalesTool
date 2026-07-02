@@ -1,4 +1,4 @@
-﻿import { Alert, Button, Card, Col, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Input, Row, Select, Space, Statistic, Typography } from "antd";
 import { Check, RefreshCw, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,21 +13,12 @@ import {
   type SourceOption
 } from "../api";
 
-const scoreColor: Record<string, string> = {
-  有效: "green",
-  高意向: "purple",
-  待补全: "orange",
-  资料库: "gold"
-};
-
 const timeScopeOptions: Array<{ value: NonNullable<DashboardFilters["cycle"]>; label: string }> = [
   { value: "all", label: "全部历史" },
   { value: "today", label: "今日" },
   { value: "yesterday", label: "昨天" },
   { value: "date", label: "指定日期" }
 ];
-
-const pageSizeOptions = [5, 10, 20];
 
 function uniq(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter(Boolean) as string[]));
@@ -122,7 +113,7 @@ export function DashboardPage() {
           <Typography.Text className="stage-label">阶段 1 (MVP) · 工作台</Typography.Text>
           <Typography.Title level={2}>工作台首页</Typography.Title>
           <Typography.Paragraph className="muted">
-            统一查看总询盘、今日询盘、有效线索和待跟进任务；筛选区会影响下方统计与明细列表。
+            统一查看总询盘、今日询盘、有效线索和待跟进任务；明细请从指标卡或快捷入口进入专门列表页。
           </Typography.Paragraph>
         </div>
       </div>
@@ -267,55 +258,33 @@ export function DashboardPage() {
         </Col>
       </Row>
 
-      <Card className="table-card">
-        <Table<DashboardTodo>
-          rowKey="id"
-          loading={loading}
-          dataSource={dashboard?.items ?? []}
-          scroll={{ x: 1120 }}
-          pagination={{
-            current: dashboard?.page ?? filters.page ?? 1,
-            pageSize: dashboard?.page_size ?? filters.pageSize ?? 10,
-            total: dashboard?.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: pageSizeOptions.map(String),
-            onChange: (page, pageSize) => {
-              const nextFilters = { ...filters, page, pageSize };
-              setDraftFilters(nextFilters);
-              setFilters(nextFilters);
-            }
-          }}
-          columns={[
-            { title: "进入时间", dataIndex: "created_at", width: 180, render: formatDate },
-            { title: "客户", dataIndex: "customer_name", width: 180 },
-            { title: "国家", dataIndex: "country", width: 110 },
-            { title: "产品", dataIndex: "product", width: 180 },
-            {
-              title: "来源",
-              width: 180,
-              render: (_, record) => (
-                <Space>
-                  <Tag color="purple">{record.source_category}</Tag>
-                  <span>{record.source_label}</span>
-                </Space>
-              )
-            },
-            {
-              title: "评分",
-              dataIndex: "score_label",
-              width: 110,
-              render: (value: string) => <Tag color={scoreColor[value] ?? "default"}>{value}</Tag>
-            },
-            { title: "负责人", dataIndex: "owner_name", width: 140 },
-            { title: "反馈", dataIndex: "feedback_status", width: 120 },
-            {
-              title: "动作",
-              fixed: "right",
-              width: 120,
-              render: (_, record) => <Button onClick={() => navigate(record.detail_path)}>查看详情</Button>
-            }
-          ]}
-        />
+      <Card className="table-card" title="继续处理">
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={12} xl={6}>
+            <Card size="small" hoverable onClick={() => goMetric("total_inquiries", "/admin/leads?time_scope=all")}>
+              <Typography.Text strong>进入线索池</Typography.Text>
+              <Typography.Paragraph className="muted" style={{ marginBottom: 0, marginTop: 8 }}>查看当前筛选下的全部线索明细。</Typography.Paragraph>
+            </Card>
+          </Col>
+          <Col xs={24} md={12} xl={6}>
+            <Card size="small" hoverable onClick={() => navigate("/admin/customers")}>
+              <Typography.Text strong>进入客户池</Typography.Text>
+              <Typography.Paragraph className="muted" style={{ marginBottom: 0, marginTop: 8 }}>按客户维度查看资料和历史跟进。</Typography.Paragraph>
+            </Card>
+          </Col>
+          <Col xs={24} md={12} xl={6}>
+            <Card size="small" hoverable onClick={() => goMetric("unfeedback", "/admin/assignments/pending")}>
+              <Typography.Text strong>处理待分配</Typography.Text>
+              <Typography.Paragraph className="muted" style={{ marginBottom: 0, marginTop: 8 }}>把未分配线索交给对应销售。</Typography.Paragraph>
+            </Card>
+          </Col>
+          <Col xs={24} md={12} xl={6}>
+            <Card size="small" hoverable onClick={() => navigate("/admin/nurture")}>
+              <Typography.Text strong>再营销邮件</Typography.Text>
+              <Typography.Paragraph className="muted" style={{ marginBottom: 0, marginTop: 8 }}>继续编辑待确认邮件草稿。</Typography.Paragraph>
+            </Card>
+          </Col>
+        </Row>
       </Card>
     </section>
   );

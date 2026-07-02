@@ -69,6 +69,10 @@ def client() -> TestClient:
             "MedSupply Africa",
             "Clinica Andes",
             "Customer Empty Probe",
+            "Clinica Shanghai",
+            "重复客户",
+            "缺国家",
+            "停用来源客户",
         ]
         auto_assigned_customer_ids = [
             item.id for item in db.query(Customer).filter(Customer.name.like("Auto Assigned Peru %")).all()
@@ -81,7 +85,7 @@ def client() -> TestClient:
             db.query(Customer).filter(Customer.id.in_(test_customer_ids)).delete(synchronize_session=False)
         db.query(Lead).filter(
             Lead.customer_name.in_(
-                ["Clinica Shanghai", "重复客户", "Excel Clinic", "Clinica Browser Check", "Clinica Andes Pending"]
+                ["Clinica Shanghai", "重复客户", "缺国家", "停用来源客户", "Excel Clinic", "Clinica Browser Check", "Clinica Andes Pending"]
             )
         ).delete(synchronize_session=False)
         db.query(Lead).filter(Lead.customer_name.like("Auto Assigned Peru %")).delete(synchronize_session=False)
@@ -681,15 +685,14 @@ def test_channel_import_uploads_csv_to_task_and_persists_success_rows(client: Te
     assert body["status"] == "completed"
     assert body["total_rows"] == 5
     assert body["processed_rows"] == 5
-    assert body["success_rows"] == 2
-    assert body["failed_rows"] == 3
+    assert body["success_rows"] == 4
+    assert body["failed_rows"] == 1
+    assert body["pending_assignment_rows"] >= 1
     assert any(item["reason"] == "DUPLICATE_CUSTOMER" and item["customer_name"] == "重复客户" for item in body["failures"])
-    assert any(item["reason"] == "MISSING_COUNTRY" and item["row_number"] == 4 for item in body["failures"])
-    assert any(item["reason"] == "SOURCE_DISABLED" and item["customer_name"] == "停用来源客户" for item in body["failures"])
 
     leads = client.get("/api/leads", params={"page_size": 100}, headers=headers)
     names = {item["customer_name"] for item in leads.json()["items"]}
-    assert {"Clinica Shanghai", "重复客户"} <= names
+    assert {"Clinica Shanghai", "重复客户", "缺国家", "停用来源客户"} <= names
 
     audit = client.get("/api/audit-logs", headers=headers)
     assert any(event["action"] == "import_job_completed" and event["trace_id"] == "import-success-test" for event in audit.json()["items"])
@@ -806,8 +809,8 @@ def test_channel_import_failure_rows_are_downloadable_and_retry_is_idempotent(cl
     headers = auth_headers(client)
     csv_body = "\n".join(
         [
-            "customer_name,country,customer_type,product,source_category,source_label",
-            "无国家医院,,Hospital,Trolley Ultrasound,邮箱,官网邮箱",
+            "customer_name,email,organization,country,customer_type,product,source_category,source_label",
+            ",,,Peru,Hospital,Trolley Ultrasound,邮箱,官网邮箱",
         ]
     )
     created = client.post(
@@ -818,8 +821,7 @@ def test_channel_import_failure_rows_are_downloadable_and_retry_is_idempotent(cl
 
     download = client.get(f"/api/import-jobs/{created['task_id']}/failed-rows", headers=headers)
     assert download.status_code == 200
-    assert "无国家医院" in download.text
-    assert "MISSING_COUNTRY" in download.text
+    assert "MISSING_CUSTOMER_IDENTITY" in download.text
 
     retry = client.post(f"/api/import-jobs/{created['task_id']}/retry", headers=headers)
     assert retry.status_code == 200

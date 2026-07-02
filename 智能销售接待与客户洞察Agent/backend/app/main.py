@@ -252,6 +252,11 @@ def ensure_sqlite_compatibility() -> None:
                 connection.execute(text("ALTER TABLE import_jobs ADD COLUMN auto_assigned_rows INTEGER NOT NULL DEFAULT 0"))
             if "pending_assignment_rows" not in import_job_columns:
                 connection.execute(text("ALTER TABLE import_jobs ADD COLUMN pending_assignment_rows INTEGER NOT NULL DEFAULT 0"))
+    if "product_knowledge" in table_names:
+        product_knowledge_columns = {column["name"] for column in inspector.get_columns("product_knowledge")}
+        with engine.begin() as connection:
+            if "knowledge_base" not in product_knowledge_columns:
+                connection.execute(text("ALTER TABLE product_knowledge ADD COLUMN knowledge_base VARCHAR(80) NOT NULL DEFAULT 'product'"))
     if "customers" in table_names:
         customer_columns = {column["name"] for column in inspector.get_columns("customers")}
         with engine.begin() as connection:
@@ -313,18 +318,21 @@ def ensure_default_country_mappings(db: Session) -> None:
 
 DEFAULT_PRODUCT_KNOWLEDGE = [
     {
+        "knowledge_base": "product",
         "product_type": "Portable",
         "model_name": "SonoBook P3",
         "application_scenario": "Regional clinic, distributor demo, and outpatient screening",
         "ai_guidance": "Ask about clinic volume, battery use, probe mix, and distributor training needs.",
     },
     {
+        "knowledge_base": "product",
         "product_type": "Handheld",
         "model_name": "SonoEye H1",
         "application_scenario": "Mobile clinic, emergency triage, and bedside quick scan",
         "ai_guidance": "Ask about portability, phone/tablet workflow, target department, and probe requirements.",
     },
     {
+        "knowledge_base": "product",
         "product_type": "Trolley",
         "model_name": "SonoMax T8",
         "application_scenario": "Radiology, emergency department, and hospital room-based ultrasound",
@@ -338,6 +346,7 @@ def ensure_default_product_knowledge(db: Session) -> None:
     for item in DEFAULT_PRODUCT_KNOWLEDGE:
         existing = db.scalar(
             select(ProductKnowledge).where(
+                ProductKnowledge.knowledge_base == item["knowledge_base"],
                 ProductKnowledge.product_type == item["product_type"],
                 ProductKnowledge.model_name == item["model_name"],
             )
@@ -762,7 +771,11 @@ def lead_score_summary(lead: Lead) -> ScoreSummaryOut:
 
 def lead_out(db: Session, lead: Lead) -> LeadOut:
     owner = db.get(User, lead.owner_id) if lead.owner_id else None
+    customer_id = db.scalar(select(Customer.id).where(Customer.name == lead.customer_name))
+    if customer_id is None and lead.email:
+        customer_id = db.scalar(select(Customer.id).where(Customer.email == lead.email))
     data = LeadOut.model_validate(lead, from_attributes=True).model_dump()
+    data["customer_id"] = customer_id
     data["owner_name"] = owner.name if owner else "未分配"
     data["feedback_status"] = normalise_feedback_status(lead.feedback_status, owner is not None)
     return LeadOut(**data)
@@ -789,10 +802,63 @@ def import_job_out(job: ImportJob) -> ImportJobOut:
     )
 
 
+def import_header_key(value: str) -> str:
+    return value.strip().lower().replace(" ", "").replace("_", "").replace("-", "").replace("/", "")
+
+
+IMPORT_HEADER_ALIASES = {
+    **{import_header_key(item): "customer_name" for item in ["customer_name", "customer", "customername", "name", "客户", "客户名称", "客户姓名", "客户名", "公司名称", "医院名称", "诊所名称"]},
+    **{import_header_key(item): "email" for item in ["email", "mail", "邮箱", "客户邮箱", "联系人邮箱", "邮件", "电子邮箱"]},
+    **{import_header_key(item): "organization" for item in ["organization", "organisation", "company", "hospital", "clinic", "单位", "机构", "公司", "医院", "诊所", "组织"]},
+    **{import_header_key(item): "country" for item in ["country", "region", "国家", "地区", "国家地区", "国家/地区", "市场"]},
+    **{import_header_key(item): "customer_type" for item in ["customer_type", "customertype", "type", "客户类型", "客户类别", "客户性质", "类型"]},
+    **{import_header_key(item): "product" for item in ["product", "model", "产品", "产品兴趣", "意向产品", "型号", "需求产品"]},
+    **{import_header_key(item): "source_category" for item in ["source_category", "sourcecategory", "source", "来源", "来源类型", "来源分类", "渠道"]},
+    **{import_header_key(item): "source_label" for item in ["source_label", "sourcelabel", "channel", "来源标签", "来源渠道", "具体来源", "渠道名称"]},
+    **{import_header_key(item): "raw_inquiry" for item in ["raw_inquiry", "rawinquiry", "inquiry", "message", "需求", "客户需求", "询盘", "询盘内容", "备注", "说明"]},
+}
+
+
+def normalise_import_row(row: dict[str, str | None]) -> dict[str, str]:
+    normalised = {field: "" for field in IMPORT_TEMPLATE_FIELDS}
+    for header, value in row.items():
+        field = IMPORT_HEADER_ALIASES.get(import_header_key(header or ""))
+        if field:
+            normalised[field] = str(value or "").strip()
+    if normalised["source_category"] and not normalised["source_label"]:
+        normalised["source_label"] = normalised["source_category"]
+    if normalised["source_label"] and not normalised["source_category"]:
+        normalised["source_category"] = normalised["source_label"]
+    return normalised
+
+
+def xlsx_cell_index(ref: str) -> int | None:
+    letters = "".join(char for char in ref if char.isalpha()).upper()
+    if not letters:
+        return None
+    index = 0
+    for char in letters:
+        index = index * 26 + ord(char) - 64
+    return index - 1
+
+
+def parse_xlsx_shared_strings(workbook: zipfile.ZipFile, namespace: dict[str, str]) -> list[str]:
+    try:
+        shared_xml = workbook.read("xl/sharedStrings.xml")
+    except KeyError:
+        return []
+    root = ET.fromstring(shared_xml)
+    values: list[str] = []
+    for item in root.findall(".//m:si", namespace):
+        values.append("".join(text.text or "" for text in item.findall(".//m:t", namespace)))
+    return values
+
+
 def parse_xlsx_rows(content: bytes) -> list[dict[str, str]]:
     with zipfile.ZipFile(io.BytesIO(content)) as workbook:
+        namespace = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        shared_strings = parse_xlsx_shared_strings(workbook, namespace)
         sheet_xml = workbook.read("xl/worksheets/sheet1.xml")
-    namespace = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     root = ET.fromstring(sheet_xml)
     rows: list[list[str]] = []
     for row in root.findall(".//m:sheetData/m:row", namespace):
@@ -800,25 +866,46 @@ def parse_xlsx_rows(content: bytes) -> list[dict[str, str]]:
         for cell in row.findall("m:c", namespace):
             inline = cell.find("m:is/m:t", namespace)
             value = cell.find("m:v", namespace)
-            values.append((inline.text if inline is not None else value.text if value is not None else "") or "")
+            cell_text = (inline.text if inline is not None else value.text if value is not None else "") or ""
+            if cell.attrib.get("t") == "s" and cell_text.isdigit():
+                cell_text = shared_strings[int(cell_text)] if int(cell_text) < len(shared_strings) else ""
+            cell_index = xlsx_cell_index(cell.attrib.get("r", ""))
+            if cell_index is None:
+                values.append(cell_text)
+            else:
+                while len(values) <= cell_index:
+                    values.append("")
+                values[cell_index] = cell_text
         rows.append(values)
     if not rows:
         return []
     headers = [value.strip() for value in rows[0]]
-    return [{headers[index]: value for index, value in enumerate(row) if index < len(headers)} for row in rows[1:]]
+    return [normalise_import_row({headers[index]: value for index, value in enumerate(row) if index < len(headers)}) for row in rows[1:]]
 
 
 def parse_import_rows(job: ImportJob) -> list[dict[str, str]]:
     if job.filename.lower().endswith(".xlsx"):
         return parse_xlsx_rows(job.original_content.encode("latin1"))
-    return list(csv.DictReader(io.StringIO(job.original_content)))
+    return [normalise_import_row(row) for row in csv.DictReader(io.StringIO(job.original_content))]
+
+
+def resolve_import_source(clean: dict[str, str], enabled_sources: set[tuple[str, str]]) -> tuple[str, str]:
+    source_category = clean["source_category"] or "网站"
+    source_label = clean["source_label"] or "官网聊天"
+    if (source_category, source_label) in enabled_sources:
+        return source_category, source_label
+    for category, label in enabled_sources:
+        if source_label == label or source_category == label:
+            return category, label
+    if ("网站", "官网聊天") in enabled_sources:
+        return "网站", "官网聊天"
+    return next(iter(enabled_sources), (source_category, source_label))
 
 
 def process_import_job(db: Session, job: ImportJob) -> None:
     job.status = "processing"
     rows = parse_import_rows(job)
-    required_fields = ["customer_name", "country", "customer_type", "product", "source_category", "source_label"]
-    optional_fields = ["email", "organization", "raw_inquiry"]
+    import_fields = ["customer_name", "email", "organization", "country", "customer_type", "product", "source_category", "source_label", "raw_inquiry"]
     failures: list[dict[str, object]] = []
     success_rows = 0
     auto_assigned_rows = 0
@@ -843,17 +930,17 @@ def process_import_job(db: Session, job: ImportJob) -> None:
 
     for row_number, row in enumerate(rows, start=1):
         job.processed_rows = row_number
-        clean = {field: (row.get(field) or "").strip() for field in required_fields}
-        optional = {field: (row.get(field) or "").strip() for field in optional_fields}
-        customer_name = clean["customer_name"]
+        clean = {field: (row.get(field) or "").strip() for field in import_fields}
+        customer_name = clean["customer_name"] or clean["organization"] or (clean["email"].split("@")[0] if clean["email"] else "")
+        clean["customer_name"] = customer_name
+        clean["country"] = clean["country"] or "待确认"
+        clean["customer_type"] = clean["customer_type"] or "待确认"
+        clean["product"] = clean["product"] or "待确认"
+        clean["source_category"], clean["source_label"] = resolve_import_source(clean, enabled_sources)
         reason = ""
-        if not customer_name:
-            reason = "MISSING_CUSTOMER_NAME"
-        elif not clean["country"]:
-            reason = "MISSING_COUNTRY"
-        elif (clean["source_category"], clean["source_label"]) not in enabled_sources:
-            reason = "SOURCE_DISABLED"
-        elif customer_name in seen_names or db.scalar(select(Lead.id).where(Lead.customer_name == customer_name)):
+        if not customer_name and not clean["email"]:
+            reason = "MISSING_CUSTOMER_IDENTITY"
+        elif customer_name in seen_names or db.scalar(select(Lead.id).where(Lead.customer_name == customer_name)) or (clean["email"] and db.scalar(select(Lead.id).where(Lead.email == clean["email"]))):
             reason = "DUPLICATE_CUSTOMER"
 
         if reason:
@@ -867,11 +954,11 @@ def process_import_job(db: Session, job: ImportJob) -> None:
         else:
             pending_assignment_rows += 1
         created_at = datetime.utcnow()
-        raw_inquiry = optional["raw_inquiry"] or f"Import source: {clean['source_category']} / {clean['source_label']}"
+        raw_inquiry = clean["raw_inquiry"] or f"Import source: {clean['source_category']} / {clean['source_label']}"
         lead = Lead(
             customer_name=customer_name,
-            email=optional["email"],
-            organization=optional["organization"],
+            email=clean["email"],
+            organization=clean["organization"],
             country=clean["country"],
             customer_type=clean["customer_type"] or "pending",
             product=clean["product"] or "pending",
@@ -889,8 +976,8 @@ def process_import_job(db: Session, job: ImportJob) -> None:
         if not customer:
             customer = Customer(
                 name=customer_name,
-                email=optional["email"],
-                organization=optional["organization"] or customer_name,
+                email=clean["email"],
+                organization=clean["organization"] or customer_name,
                 country=clean["country"],
                 customer_type=clean["customer_type"] or "pending",
                 product=clean["product"] or "pending",
@@ -907,13 +994,13 @@ def process_import_job(db: Session, job: ImportJob) -> None:
                     customer_id=customer.id,
                     auto_summary=f"{customer_name} 来自 {clean['source_category']} / {clean['source_label']}，需求：{raw_inquiry}",
                     manual_summary=None,
-                    evidence=f"导入文件：{job.filename}；国家：{clean['country']}；邮箱：{optional['email'] or '未提供'}",
+                    evidence=f"导入文件：{job.filename}；国家：{clean['country']}；邮箱：{clean['email'] or '未提供'}",
                     confidence="待复核",
                 )
             )
         else:
-            customer.email = customer.email or optional["email"]
-            customer.organization = customer.organization or optional["organization"] or customer_name
+            customer.email = customer.email or clean["email"]
+            customer.organization = customer.organization or clean["organization"] or customer_name
             customer.demand_summary = customer.demand_summary or raw_inquiry
             customer.source_summary = customer.source_summary or f"{clean['source_category']} / {clean['source_label']}"
             customer.owner_id = customer.owner_id or (owner.id if owner else None)
@@ -933,12 +1020,21 @@ def process_import_job_task(task_id: str, trace_id: str, actor_id: int) -> None:
         job = db.scalar(select(ImportJob).where(ImportJob.task_id == task_id))
         if not job:
             return
-        process_import_job(db, job)
+        try:
+            process_import_job(db, job)
+            audit_action = "import_job_completed"
+            audit_detail = f"Import job {job.task_id} completed: {job.success_rows} success, {job.failed_rows} failed."
+        except Exception as exc:
+            job.status = "failed"
+            job.failed_rows = max(job.total_rows, 1)
+            job.failures_json = json.dumps([{"row_number": 0, "customer_name": "", "reason": f"IMPORT_PARSE_FAILED: {exc}"}], ensure_ascii=False)
+            audit_action = "import_job_failed"
+            audit_detail = f"Import job {job.task_id} failed: {exc}"
         add_audit(
             db,
             trace_id,
-            "import_job_completed",
-            f"Import job {job.task_id} completed: {job.success_rows} success, {job.failed_rows} failed.",
+            audit_action,
+            audit_detail,
             actor_id=actor_id,
             target_type="import_job",
             target_id=job.id,
@@ -1158,7 +1254,19 @@ async def create_import_job(
             detail=error_detail("INVALID_IMPORT_FILE", "Only CSV/XLSX files up to 5MB are supported"),
         )
 
-    text_content = content.decode("latin1") if filename.lower().endswith(".xlsx") else content.decode("utf-8-sig")
+    if filename.lower().endswith(".xlsx"):
+        text_content = content.decode("latin1")
+    else:
+        try:
+            text_content = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            try:
+                text_content = content.decode("gb18030")
+            except UnicodeDecodeError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error_detail("IMPORT_ENCODING_UNSUPPORTED", f"CSV 文件编码无法识别：{exc}"),
+                ) from exc
     job = ImportJob(task_id=uuid4().hex, filename=filename, status="queued", original_content=text_content, created_by=user.id)
     db.add(job)
     db.flush()
@@ -1670,7 +1778,6 @@ def build_lead_detail(db: Session, lead: Lead) -> LeadDetailOut:
         background_summary=background_summary,
         background_confidence=background.confidence if background else "pending",
         background_updated_at=background.updated_at if background else None,
-        customer_id=customer.id if customer else None,
         assignment=LeadAssignmentOut(
             owner_id=owner.id if owner else None,
             owner_name=owner.name if owner else "未分配",
@@ -3533,6 +3640,7 @@ def render_product_knowledge_prompt(items: list[ProductKnowledge]) -> str:
         lines.append(
             "\n".join(
                 [
+                    f"Knowledge Base: {item.knowledge_base}",
                     f"Product Type: {item.product_type}",
                     f"Model: {item.model_name}",
                     f"Application Scenario: {item.application_scenario}",
@@ -3850,6 +3958,8 @@ def normalise_ai_model_options(raw_options: list[object] | None = None) -> list[
         scenario = str(item.get("scenario", "")).strip()
         capability = str(item.get("capability", "")).strip()
         status_value = str(item.get("status", "available")).strip() or "available"
+        if status_value not in {"available", "disabled"}:
+            status_value = "available"
         api_base_url = str(item.get("api_base_url", "")).strip()
         endpoint_path = str(item.get("endpoint_path", "")).strip()
         auth_type = str(item.get("auth_type", "bearer")).strip() or "bearer"
@@ -3898,9 +4008,10 @@ def normalise_ai_model_bindings(
     options: list[dict[str, str]],
     use_cases: list[dict[str, str]],
 ) -> dict[str, str]:
-    option_values = {item["value"] for item in options}
+    option_values = {item["value"] for item in options if item.get("status") != "disabled"}
+    fallback_model = selected_model if selected_model in option_values else next(iter(option_values), "ug-balanced-v1")
     bindings = dict(AI_MODEL_DEFAULT_BINDINGS)
-    bindings["default"] = selected_model if selected_model in option_values else AI_MODEL_DEFAULT_BINDINGS["default"]
+    bindings["default"] = fallback_model
     for use_case in use_cases:
         key = use_case["key"]
         candidate = raw_bindings.get(key) if raw_bindings else None
@@ -3908,7 +4019,7 @@ def normalise_ai_model_bindings(
             bindings[key] = candidate
     for key, value in list(bindings.items()):
         if value not in option_values:
-            bindings[key] = selected_model if selected_model in option_values else "ug-balanced-v1"
+            bindings[key] = fallback_model
     return bindings
 
 
@@ -3976,10 +4087,10 @@ def stored_ai_model_config(
             raw = {}
     raw_options = raw.get("options") if isinstance(raw.get("options"), list) else None
     options = normalise_ai_model_options(raw_options)
-    option_values = {item["value"] for item in options}
+    option_values = {item["value"] for item in options if item.get("status") != "disabled"}
     selected_model = raw.get("selected_model") if isinstance(raw.get("selected_model"), str) else "ug-balanced-v1"
     if selected_model not in option_values:
-        selected_model = "ug-balanced-v1"
+        selected_model = "ug-balanced-v1" if "ug-balanced-v1" in option_values else next(iter(option_values), options[0]["value"])
     raw_use_cases = raw.get("use_cases") if isinstance(raw.get("use_cases"), list) else None
     use_cases = normalise_ai_model_use_cases(raw_use_cases)
     raw_bindings = raw.get("use_case_bindings") if isinstance(raw.get("use_case_bindings"), dict) else None
@@ -4016,7 +4127,9 @@ def ai_model_config(db: Session) -> AIModelConfigOut:
 def ai_model_for_use_case(db: Session, use_case: str) -> AIModelOptionOut:
     config = ai_model_config(db)
     model_value = config.use_case_bindings.get(use_case, config.selected_model)
-    return next((item for item in config.options if item.value == model_value), config.options[0])
+    enabled_options = [item for item in config.options if item.status != "disabled"]
+    fallback = enabled_options[0] if enabled_options else config.options[0]
+    return next((item for item in enabled_options if item.value == model_value), fallback)
 
 
 def email_writer_roles(db: Session) -> tuple[list[EmailWriterRoleOut], str]:
@@ -4207,6 +4320,7 @@ def save_country_sales_mapping(
 @app.get("/api/settings/product-knowledge", response_model=ProductKnowledgePage)
 def product_knowledge_page(
     query: str | None = None,
+    knowledge_base: str | None = None,
     product_type: str | None = None,
     status_filter: str | None = Query(default=None, alias="status"),
     page: int = Query(1, ge=1),
@@ -4214,7 +4328,7 @@ def product_knowledge_page(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ops),
 ) -> ProductKnowledgePage:
-    rows = db.scalars(select(ProductKnowledge).order_by(ProductKnowledge.product_type, ProductKnowledge.model_name)).all()
+    rows = db.scalars(select(ProductKnowledge).order_by(ProductKnowledge.knowledge_base, ProductKnowledge.product_type, ProductKnowledge.model_name)).all()
     filtered = rows
     if query:
         needle = query.strip().lower()
@@ -4222,9 +4336,12 @@ def product_knowledge_page(
             item
             for item in filtered
             if needle in item.model_name.lower()
+            or needle in item.knowledge_base.lower()
             or needle in item.product_type.lower()
             or needle in item.application_scenario.lower()
         ]
+    if knowledge_base:
+        filtered = [item for item in filtered if item.knowledge_base == knowledge_base]
     if product_type:
         filtered = [item for item in filtered if item.product_type == product_type]
     if status_filter:
@@ -4246,6 +4363,7 @@ def product_knowledge_page(
             "draft_items": len([item for item in rows if item.status == "draft"]),
             "disabled_items": len([item for item in rows if item.status == "disabled"]),
         },
+        knowledge_bases=sorted({item.knowledge_base for item in rows} | {"product", "competitor", "market"}),
         active_version=product_knowledge_active_version(rows),
         items=[ProductKnowledgeOut.model_validate(item, from_attributes=True) for item in filtered[start : start + page_size]],
         empty_state=EmptyStateOut(title="暂无产品知识", action_label="新增产品知识", action_path="/admin/settings/product-knowledge") if not filtered else None,
@@ -4260,10 +4378,12 @@ def save_product_knowledge(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ops),
 ) -> ProductKnowledgeOut:
+    knowledge_base = payload.knowledge_base.strip() or "product"
     product_type = payload.product_type.strip()
     model_name = payload.model_name.strip()
     existing = db.scalar(
         select(ProductKnowledge).where(
+            ProductKnowledge.knowledge_base == knowledge_base,
             ProductKnowledge.product_type == product_type,
             ProductKnowledge.model_name == model_name,
         )
@@ -4277,6 +4397,7 @@ def save_product_knowledge(
         item = existing
     else:
         item = ProductKnowledge(
+            knowledge_base=knowledge_base,
             product_type=product_type,
             model_name=model_name,
             application_scenario=payload.application_scenario.strip(),
@@ -4291,7 +4412,7 @@ def save_product_knowledge(
         db,
         request.state.trace_id,
         "settings_product_knowledge_saved",
-        f"Product knowledge saved: {product_type} / {model_name} / {item.version}.",
+        f"Product knowledge saved: {knowledge_base} / {product_type} / {model_name} / {item.version}.",
         actor_id=user.id,
         target_type="product_knowledge",
         target_id=item.id,
@@ -4337,7 +4458,7 @@ def product_knowledge_context(
     rows = db.scalars(
         select(ProductKnowledge)
         .where(ProductKnowledge.status == "active")
-        .order_by(ProductKnowledge.product_type, ProductKnowledge.model_name)
+        .order_by(ProductKnowledge.knowledge_base, ProductKnowledge.product_type, ProductKnowledge.model_name)
     ).all()
     return ProductKnowledgeContextOut(
         active_version=product_knowledge_active_version(rows),
@@ -4555,9 +4676,10 @@ def update_settings_ai_model(
         if payload.options is not None
         else current_options
     )
-    allowed_models = {item["value"] for item in options}
-    if payload.selected_model not in allowed_models:
-        raise HTTPException(status_code=422, detail=error_detail("AI_MODEL_UNSUPPORTED", "Selected AI model is not available"))
+    allowed_models = [item["value"] for item in options if item.get("status") != "disabled"]
+    if not allowed_models:
+        raise HTTPException(status_code=422, detail=error_detail("AI_MODEL_UNSUPPORTED", "At least one enabled AI model is required"))
+    selected_model = payload.selected_model if payload.selected_model in allowed_models else allowed_models[0]
     use_cases = normalise_ai_model_use_cases(
         [item.model_dump() for item in payload.use_cases]
         if payload.use_cases is not None
@@ -4565,7 +4687,7 @@ def update_settings_ai_model(
     )
     bindings = normalise_ai_model_bindings(
         payload.use_case_bindings if payload.use_case_bindings is not None else current_config.use_case_bindings,
-        payload.selected_model,
+        selected_model,
         options,
         use_cases,
     )
@@ -4581,7 +4703,7 @@ def update_settings_ai_model(
         db.add(setting)
     setting.value = json.dumps(
         {
-            "selected_model": payload.selected_model,
+            "selected_model": selected_model,
             "options": options,
             "use_cases": use_cases,
             "use_case_bindings": bindings,
@@ -4595,7 +4717,7 @@ def update_settings_ai_model(
         db,
         request.state.trace_id,
         "settings_ai_model_updated",
-        f"Settings AI model updated: {payload.selected_model}; bindings={bindings}; default_writer={default_writer}",
+        f"Settings AI model updated: {selected_model}; bindings={bindings}; default_writer={default_writer}",
         actor_id=user.id,
         target_type="settings",
     )

@@ -110,6 +110,12 @@ const fallbackWriters: EmailWriterRole[] = [
   { key: "nemo", name: "Nemo", display_name: "海底总动员", style: "好奇、探索、愿意沟通", skills: ["陌生开发", "破冰邮件"], best_for: "陌生开发、初次接触、破冰邮件", status: "enabled" }
 ];
 
+const knowledgeBaseLinks = [
+  { key: "product", label: "产品知识库", description: "维护型号、应用场景和 AI 接待知识。" },
+  { key: "competitor", label: "竞品知识库", description: "沉淀竞品对比、优势差异和销售话术。" },
+  { key: "market", label: "市场知识库", description: "整理国家市场、渠道趋势和区域策略。" }
+];
+
 const fallbackAIModelConfig: AIModelConfig = {
   selected_model: "ug-balanced-v1",
   selected_label: "平衡模型（推荐）",
@@ -261,6 +267,14 @@ export function SettingsPage() {
   );
   const modelSelectOptions = useMemo(
     () => modelOptions.map((item) => ({ value: item.value, label: `${item.label || item.value} · ${item.provider || "未填供应商"}` })),
+    [modelOptions]
+  );
+  const availableModelSelectOptions = useMemo(
+    () => modelOptions.map((item) => ({
+      value: item.value,
+      label: `${item.label || item.value} · ${item.provider || "未填供应商"}${item.status === "disabled" ? "（已停用）" : ""}`,
+      disabled: item.status === "disabled"
+    })),
     [modelOptions]
   );
   const selectedUseCase = useMemo(
@@ -422,6 +436,29 @@ export function SettingsPage() {
     setModelModalOpen(false);
   }
 
+  function firstAvailableModelValue(rows = modelOptions) {
+    return rows.find((item) => item.status !== "disabled")?.value ?? rows[0]?.value ?? "";
+  }
+
+  function toggleSelectedModel(checked: boolean) {
+    const target = selectedModelForDetails;
+    if (!target) return;
+    if (!checked && modelOptions.filter((item) => item.status !== "disabled").length <= 1) {
+      setError(new Error("至少需要保留一个启用的大模型。"));
+      return;
+    }
+    const nextModels = modelOptions.map((item) => item.value === target.value ? { ...item, status: checked ? "available" : "disabled" } : item);
+    const fallbackValue = firstAvailableModelValue(nextModels);
+    setModelOptions(nextModels);
+    if (!checked) {
+      setAIModelDraft((current) => current === target.value ? fallbackValue : current);
+      setAIModelBindings((bindings) => Object.fromEntries(Object.entries(bindings).map(([key, value]) => [key, value === target.value ? fallbackValue : value])));
+    } else {
+      setSelectedModelValue(target.value);
+    }
+    setNotice(checked ? "大模型已在当前草稿中开启，请点击保存模型库生效。" : "大模型已在当前草稿中停用，相关场景已自动回退，请点击保存模型库生效。");
+  }
+
   function openCreateWriter() {
     setEditingWriterIndex(null);
     writerForm.setFieldsValue({
@@ -578,13 +615,18 @@ export function SettingsPage() {
     setError(null);
     try {
       const cleanModels = modelOptions.filter((item) => item.value.trim() && item.label.trim() && item.provider.trim());
+      const availableModels = cleanModels.filter((item) => item.status !== "disabled");
+      if (!availableModels.length) throw new Error("至少需要保留一个启用的大模型。");
+      const safeDefaultModel = availableModels.some((item) => item.value === aiModelDraft) ? aiModelDraft : availableModels[0].value;
+      const availableValues = new Set(availableModels.map((item) => item.value));
+      const safeBindings = Object.fromEntries(Object.entries(aiModelBindings).map(([key, value]) => [key, availableValues.has(value) ? value : safeDefaultModel]));
       const cleanUseCases = aiModelUseCases.filter((item) => item.key.trim() && item.label.trim());
       const cleanWriters = emailWriters.filter((item) => item.key.trim() && item.name.trim() && item.display_name.trim());
       const saved = await updateSettingsAIModel({
-        selectedModel: aiModelDraft,
+        selectedModel: safeDefaultModel,
         options: cleanModels,
         useCases: cleanUseCases,
-        useCaseBindings: { ...aiModelBindings, default: aiModelDraft },
+        useCaseBindings: { ...safeBindings, default: safeDefaultModel },
         emailWriters: cleanWriters,
         defaultEmailWriter
       });
@@ -737,19 +779,7 @@ export function SettingsPage() {
             <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="国家销售映射" value={overview?.summary.country_mappings ?? 0} /><div className="metric-chip amber">导入时自动分配销售</div></Card></Col>
             <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="邮件接口" value={overview?.summary.mail_configured ? "已配置" : "未配置"} /><div className="metric-chip">再营销发信读取这里的主邮箱</div></Card></Col>
           </Row>
-          <Alert showIcon type="info" className="login-error" message="配置中心不再一次性堆叠所有入口" description="请先在顶部选择配置菜单，再在下方编辑对应内容。账号导入/新增只放在账号权限内，Banner 管理只放在全局 Banner 内。" />
-          <Card title="配置菜单总览" className="settings-section" loading={loading}>
-            <Row gutter={[16, 16]}>
-              {settingsMenuItems.filter((item) => item.key !== "overview").map((item) => (
-                <Col xs={24} md={12} xl={6} key={item.key}>
-                  <Card size="small" className="settings-entry-card" hoverable onClick={() => setActiveMenu(item.key)}>
-                    <Typography.Text strong>{item.label}</Typography.Text>
-                    <Typography.Paragraph className="muted" style={{ marginTop: 8, marginBottom: 0 }}>点击后只显示该分组下的设置项。</Typography.Paragraph>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          </Card>
+          <Alert showIcon type="info" className="login-error" message="配置中心不再重复展示入口" description="请使用顶部菜单切换配置分组，下方只展示当前分组的真实配置内容。" />
         </>
       ) : null}
 
@@ -910,7 +940,7 @@ export function SettingsPage() {
               </Col>
               <Col xs={24} md={14}>
                 <Typography.Text className="field-label">再为该场景选择大模型</Typography.Text>
-                <Select value={selectedBindingValue} options={modelSelectOptions} onChange={(value) => selectedUseCase && setAIModelBindings((bindings) => ({ ...bindings, [selectedUseCase.key]: value }))} style={{ width: "100%" }} />
+                <Select value={selectedBindingValue} options={availableModelSelectOptions} onChange={(value) => selectedUseCase && setAIModelBindings((bindings) => ({ ...bindings, [selectedUseCase.key]: value }))} style={{ width: "100%" }} />
                 <div className="config-detail-card">
                   <Tag color="purple">当前绑定：{selectedBindingModel?.label}</Tag>
                   <Tag color={selectedBindingModel?.api_key_configured ? "green" : "gold"}>{selectedBindingModel?.api_key_configured ? "API Key 已配置" : "API Key 未配置"}</Tag>
@@ -932,6 +962,8 @@ export function SettingsPage() {
                     <Tag color={selectedModelForDetails?.status === "available" ? "green" : "default"}>{selectedModelForDetails?.status === "available" ? "可用" : "停用"}</Tag>
                     <Tag color={selectedModelForDetails?.api_key_configured ? "green" : "gold"}>{selectedModelForDetails?.api_key_configured ? "API Key 已配置" : "API Key 未配置"}</Tag>
                     <Tag>{selectedModelForDetails?.auth_type || "bearer"}</Tag>
+                    <Switch checked={selectedModelForDetails?.status !== "disabled"} onChange={toggleSelectedModel} />
+                    <Typography.Text>{selectedModelForDetails?.status === "disabled" ? "已关闭" : "已开启"}</Typography.Text>
                   </Space>
                   <Typography.Paragraph className="muted">API：{selectedModelForDetails?.api_base_url || "未配置"}{selectedModelForDetails?.endpoint_path || ""}</Typography.Paragraph>
                   <Typography.Paragraph className="muted">能力：{selectedModelForDetails?.capability}</Typography.Paragraph>
@@ -958,7 +990,25 @@ export function SettingsPage() {
               </Col>
             </Row>
           </Card>
-          <Card title="产品与 AI 配置入口"><Link to="/admin/settings/product-knowledge"><Button>进入产品知识库</Button></Link></Card>
+          <Card title="产品与 AI 配置入口">
+            <Row gutter={[16, 16]}>
+              {knowledgeBaseLinks.map((item) => (
+                <Col xs={24} md={8} key={item.key}>
+                  <Link to={`/admin/settings/product-knowledge?knowledge_base=${item.key}`}>
+                    <Card size="small" hoverable className="settings-entry-card">
+                      <Typography.Text strong>{item.label}</Typography.Text>
+                      <Typography.Paragraph className="muted" style={{ marginTop: 8, marginBottom: 0 }}>{item.description}</Typography.Paragraph>
+                    </Card>
+                  </Link>
+                </Col>
+              ))}
+              <Col xs={24}>
+                <Link to="/admin/settings/product-knowledge">
+                  <Button icon={<Plus size={16} />}>新增自定义知识库板块</Button>
+                </Link>
+              </Col>
+            </Row>
+          </Card>
         </Space>
       ) : null}
 

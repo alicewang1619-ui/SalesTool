@@ -82,9 +82,10 @@ class CountrySalesMapping(Base):
 
 class ProductKnowledge(Base):
     __tablename__ = "product_knowledge"
-    __table_args__ = (UniqueConstraint("product_type", "model_name", name="uq_product_type_model"),)
+    __table_args__ = (UniqueConstraint("knowledge_base", "product_type", "model_name", name="uq_product_knowledge_base_type_model"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    knowledge_base: Mapped[str] = mapped_column(String(80), nullable=False, default="product")
     product_type: Mapped[str] = mapped_column(String(80), nullable=False)
     model_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     application_scenario: Mapped[str] = mapped_column(String(500), nullable=False)

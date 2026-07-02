@@ -423,6 +423,27 @@ body {
   margin-top: 0;
 }
 
+.subtle-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  color: #172033;
+  border: 1px solid #e6eaf3;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.subtle-note .ant-typography {
+  margin-bottom: 0;
+}
+
+.page-context-note,
+.selected-record,
+.settings-section-note {
+  margin-bottom: 16px;
+}
+
 .permission-checkbox-group {
   display: grid;
   gap: 8px;

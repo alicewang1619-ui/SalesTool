@@ -180,13 +180,10 @@ export function LeadsPage() {
       ) : null}
 
       {selectedLead ? (
-        <Alert
-          className="selected-record"
-          showIcon
-          type="info"
-          message={`已选中线索：${selectedLead.customer_name}`}
-          description={`${selectedLead.country} · ${selectedLead.customer_type} · ${selectedLead.product}`}
-        />
+        <div className="subtle-note selected-record">
+          <Typography.Text strong>{`已选中线索：${selectedLead.customer_name}`}</Typography.Text>
+          <Typography.Text className="muted">{`${selectedLead.country} · ${selectedLead.customer_type} · ${selectedLead.product}`}</Typography.Text>
+        </div>
       ) : null}
 
       <Row gutter={[16, 16]} className="metric-row">

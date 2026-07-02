@@ -184,13 +184,10 @@ export function ReportsPeriodPage() {
         />
       ) : null}
 
-      <Alert
-        showIcon
-        type="info"
-        className="login-error"
-        message={`当前报表周期：${data?.period_label ?? periodOptions.find((item) => item.value === period)?.label ?? period}`}
-        description={`统计粒度：${data?.period_granularity ?? "—"}；数据范围：${formatDate(data?.query_window.start_at)} 至 ${formatDate(data?.query_window.end_at)}`}
-      />
+      <div className="subtle-note page-context-note">
+        <Typography.Text strong>{`当前报表周期：${data?.period_label ?? periodOptions.find((item) => item.value === period)?.label ?? period}`}</Typography.Text>
+        <Typography.Text className="muted">{`统计粒度：${data?.period_granularity ?? "—"}；数据范围：${formatDate(data?.query_window.start_at)} 至 ${formatDate(data?.query_window.end_at)}`}</Typography.Text>
+      </div>
 
       <Row gutter={[16, 16]} className="metric-row">
         {metricCards.map((metric) => (

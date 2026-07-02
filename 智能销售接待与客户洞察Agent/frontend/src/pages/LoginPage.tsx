@@ -51,7 +51,7 @@ export function LoginPage() {
           {errorMessage ? (
             <Alert className="login-error" type="error" showIcon message={errorMessage} role="alert" aria-live="assertive" />
           ) : (
-            <Alert className="login-error" type="info" showIcon message="请输入后台账号和密码，登录后才会显示左侧菜单。" />
+            <Typography.Paragraph className="login-error-placeholder">请输入后台账号和密码，登录后才会显示左侧菜单。</Typography.Paragraph>
           )}
 
           <Form<LoginForm>

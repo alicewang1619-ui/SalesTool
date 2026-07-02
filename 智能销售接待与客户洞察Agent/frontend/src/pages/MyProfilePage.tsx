@@ -115,13 +115,10 @@ export function MyProfilePage() {
                 <Descriptions.Item label="数据范围">{profile.data_scope || "全部"}</Descriptions.Item>
               </Descriptions>
             ) : null}
-            <Alert
-              type="info"
-              showIcon
-              className="login-error"
-              message="权限说明"
-              description="销售账号的客户与再营销范围由配置页的国家销售映射决定；后端仍会拦截越权访问。"
-            />
+            <div className="subtle-note">
+              <Typography.Text strong>权限说明</Typography.Text>
+              <Typography.Text className="muted">销售账号的客户与再营销范围由配置页的国家销售映射决定；后端仍会拦截越权访问。</Typography.Text>
+            </div>
           </Card>
         </Col>
         <Col xs={24} lg={14}>

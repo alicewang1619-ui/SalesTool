@@ -132,14 +132,6 @@ export function DashboardPage() {
         />
       ) : null}
 
-      <Alert
-        showIcon
-        type="info"
-        className="login-error"
-        message={`当前时间范围：${timeScopeLabel}`}
-        description={timeScope?.start_at ? `${formatDate(timeScope.start_at)} 至 ${formatDate(timeScope.end_at)}` : "展示当前权限范围内的全部历史询盘。"}
-      />
-
       <Card id="dashboard-filters" className="dashboard-toolbar">
         <Space wrap size="middle">
           <Select

@@ -1,4 +1,4 @@
-import { Alert, App, Button, Card, Col, Descriptions, Empty, Form, Input, Rate, Row, Space, Table, Tag, Timeline, Typography } from "antd";
+import { App, Button, Card, Col, Descriptions, Empty, Form, Input, Rate, Row, Space, Table, Tag, Timeline, Typography } from "antd";
 import { ArrowLeft, FileText, Save, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -145,10 +145,16 @@ export function CustomerDetailPage() {
         </Descriptions>
         <Row gutter={[16, 16]} style={{ marginTop: 12 }}>
           <Col xs={24} lg={12}>
-            <Alert type="info" showIcon message="询盘要求 / 客户需求" description={customer.demand_summary || "暂无需求摘要"} />
+            <div className="config-detail-card compact">
+              <Typography.Text strong>询盘要求 / 客户需求</Typography.Text>
+              <Typography.Paragraph className="muted">{customer.demand_summary || "暂无需求摘要"}</Typography.Paragraph>
+            </div>
           </Col>
           <Col xs={24} lg={12}>
-            <Alert type="success" showIcon message="客户背景调查摘要" description={background.current_summary} />
+            <div className="config-detail-card compact">
+              <Typography.Text strong>客户背景调查摘要</Typography.Text>
+              <Typography.Paragraph className="muted">{background.current_summary}</Typography.Paragraph>
+            </div>
           </Col>
         </Row>
       </Card>
@@ -183,7 +189,10 @@ export function CustomerDetailPage() {
       <Card title="建议动作与主动再营销" style={{ marginTop: 16 }}>
         {nurtureTask ? (
           <Space direction="vertical" size={12} style={{ width: "100%" }}>
-            <Alert type="info" showIcon message={nurtureTask.recommended_next_action} description={nurtureTask.customer_note} />
+            <div className="subtle-note">
+              <Typography.Text strong>{nurtureTask.recommended_next_action}</Typography.Text>
+              <Typography.Text className="muted">{nurtureTask.customer_note}</Typography.Text>
+            </div>
             <Space wrap>
               <Tag color="purple">{nurtureTask.approval_status === "pending" ? "待确认" : nurtureTask.approval_status}</Tag>
               <Tag>{nurtureTask.email_status === "sent" ? "已发送" : "邮件草稿"}</Tag>
@@ -206,7 +215,7 @@ export function CustomerDetailPage() {
         <Col xs={24} lg={14}>
           <Card title={<Space><ShieldCheck size={18} />客户背景调查</Space>}>
             <Typography.Paragraph>{background.auto_summary}</Typography.Paragraph>
-            <Alert type="info" showIcon className="login-error" message={`最近更新：${formatDate(background.updated_at)} · ${background.updated_by}`} />
+            <Typography.Paragraph className="muted">最近更新：{formatDate(background.updated_at)} · {background.updated_by}</Typography.Paragraph>
             <Form key={customer.id} form={form} layout="vertical" initialValues={{ manualSummary: background.current_summary }} onFinish={(values) => void saveBackground(values)}>
               <Form.Item name="manualSummary" label="人工修订内容" rules={[{ required: true, min: 10 }]}>
                 <Input.TextArea rows={8} disabled={!canEditBackground} />

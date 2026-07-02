@@ -258,12 +258,10 @@ export function ReportsExportPage() {
         maskClosable
       >
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
-          <Alert
-            showIcon
-            type="info"
-            message={`将导出 ${periodLabels[context?.period ?? filters.period]}，预估 ${context?.estimated_rows ?? 0} 条记录`}
-            description={context?.desensitization ?? "导出客户联系信息时按角色权限脱敏"}
-          />
+          <div className="subtle-note">
+            <Typography.Text strong>{`将导出 ${periodLabels[context?.period ?? filters.period]}，预估 ${context?.estimated_rows ?? 0} 条记录`}</Typography.Text>
+            <Typography.Text className="muted">{context?.desensitization ?? "导出客户联系信息时按角色权限脱敏"}</Typography.Text>
+          </div>
           <List
             size="small"
             header={<Typography.Text strong>导出字段</Typography.Text>}

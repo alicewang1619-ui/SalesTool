@@ -828,7 +828,7 @@ export function SettingsPage() {
             <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="国家销售映射" value={overview?.summary.country_mappings ?? 0} /><div className="metric-chip amber">导入时自动分配销售</div></Card></Col>
             <Col xs={24} md={12} xl={6}><Card loading={loading}><Statistic title="邮件接口" value={overview?.summary.mail_configured ? "已配置" : "未配置"} /><div className="metric-chip">再营销发信读取这里的主邮箱</div></Card></Col>
           </Row>
-          <Alert showIcon type="info" className="login-error" message="配置中心不再重复展示入口" description="请使用顶部菜单切换配置分组，下方只展示当前分组的真实配置内容。" />
+          <Typography.Paragraph className="muted settings-section-note">请使用顶部菜单切换配置分组，下方只展示当前分组的真实配置内容。</Typography.Paragraph>
         </>
       ) : null}
 
@@ -869,7 +869,10 @@ export function SettingsPage() {
           <Row gutter={[24, 24]}>
             <Col xs={24} xl={10}>
               <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <Alert type="info" showIcon message="Banner 图片建议" description="推荐尺寸 1920×360，支持 PNG/JPG/WebP；建议原图不超过 2MB。上传后会自动裁切压缩为横幅比例，避免发布失败。" />
+                <div className="subtle-note">
+                  <Typography.Text strong>Banner 图片建议</Typography.Text>
+                  <Typography.Text className="muted">推荐尺寸 1920×360，支持 PNG/JPG/WebP；建议原图不超过 2MB。上传后会自动裁切压缩为横幅比例，避免发布失败。</Typography.Text>
+                </div>
                 <Upload accept="image/png,image/jpeg,image/webp" maxCount={1} showUploadList={false} beforeUpload={async (file) => { try { const result = await readBannerImage(file); setBannerDraft((draft) => ({ ...draft, imageUrl: result.url })); setBannerImageMeta(result.meta); message.success("Banner 图片已载入预览，点击发布后同步到全部页面"); } catch (failure) { setError(asError(failure)); } return Upload.LIST_IGNORE; }}>
                   <Button icon={<ImageUp size={16} />}>上传 Banner 图片</Button>
                 </Upload>
@@ -893,7 +896,10 @@ export function SettingsPage() {
           <Card title="国家区域销售映射" extra={<Link to="/admin/settings/country-sales"><Button>进入映射配置</Button></Link>}><Typography.Text className="muted">一个销售可以负责多个国家；客户导入时会按国家自动分配销售，你只需要确认异常结果。</Typography.Text></Card>
           <Card id="sources" title="客户来源字典" extra={<Space><Button icon={<Plus size={16} />} onClick={addSourceForSelectedCategory}>在当前类型新增来源</Button><Button type="primary" loading={savingRouting} onClick={() => void saveRouting("source")}>保存来源</Button></Space>}>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
-              <Alert type="info" showIcon message="先选择来源类型，再维护该类型下的来源" description="默认不铺开全部来源。切换下拉菜单后，只编辑当前类型的来源项；保存后会同步影响线索池筛选和导入校验。" />
+              <div className="subtle-note">
+                <Typography.Text strong>先选择来源类型，再维护该类型下的来源</Typography.Text>
+                <Typography.Text className="muted">默认不铺开全部来源。切换下拉菜单后，只编辑当前类型的来源项；保存后会同步影响线索池筛选和导入校验。</Typography.Text>
+              </div>
               <Row gutter={[16, 12]} align="middle">
                 <Col xs={24} md={10}>
                   <Typography.Text className="field-label">来源类型下拉菜单</Typography.Text>
@@ -963,7 +969,12 @@ export function SettingsPage() {
       {activeMenu === "mail" ? (
         <Card id="mail" title="邮件接口配置" loading={loading}>
           <Row gutter={[24, 16]}>
-            <Col xs={24} xl={10}><Alert type="info" showIcon message="发信邮箱用途" description="管理员和运营可使用全局主邮箱给潜在客户发邮件；销售也可以在“我的”里配置个人邮箱，用于给自己负责的客户发邮件。" /></Col>
+            <Col xs={24} xl={10}>
+              <div className="subtle-note">
+                <Typography.Text strong>发信邮箱用途</Typography.Text>
+                <Typography.Text className="muted">管理员和运营可使用全局主邮箱给潜在客户发邮件；销售也可以在“我的”里配置个人邮箱，用于给自己负责的客户发邮件。</Typography.Text>
+              </div>
+            </Col>
             <Col xs={24} xl={14}>
               <Space direction="vertical" size={12} style={{ width: "100%" }}>
                 <Form layout="vertical" className="settings-inline-form">
@@ -990,7 +1001,12 @@ export function SettingsPage() {
               <Col xs={24} md={10}>
                 <Typography.Text className="field-label">先选择模型场景</Typography.Text>
                 <Select value={selectedUseCaseKey} options={aiModelUseCases.map((item) => ({ value: item.key, label: `${item.label} · ${item.key}` }))} onChange={setSelectedUseCaseKey} style={{ width: "100%" }} />
-                {selectedUseCase ? <Alert type="info" showIcon className="login-error" message={selectedUseCase.label} description={selectedUseCase.description} /> : null}
+                {selectedUseCase ? (
+                  <div className="subtle-note settings-section-note">
+                    <Typography.Text strong>{selectedUseCase.label}</Typography.Text>
+                    <Typography.Text className="muted">{selectedUseCase.description}</Typography.Text>
+                  </div>
+                ) : null}
               </Col>
               <Col xs={24} md={14}>
                 <Typography.Text className="field-label">再为该场景选择大模型</Typography.Text>

@@ -162,13 +162,10 @@ export function LeadImportPage() {
 
       {error ? <Alert type="error" showIcon message={error} /> : null}
 
-      <Alert
-        type="info"
-        showIcon
-        className="login-error"
-        message={selectedFileName ? `已选择表格：${selectedFileName}` : "请上传 CSV 或 Excel 表格（.csv / .xlsx）"}
-        description="核心字段：客户名称或邮箱至少一个；建议字段：国家、客户类型、产品、来源、单位、询盘内容。国家用于自动分配销售，来源无法匹配时会回退到默认来源并保留导入记录。"
-      />
+      <div className="subtle-note">
+        <Typography.Text strong>{selectedFileName ? `已选择表格：${selectedFileName}` : "请上传 CSV 或 Excel 表格（.csv / .xlsx）"}</Typography.Text>
+        <Typography.Text className="muted">核心字段：客户名称或邮箱至少一个；建议字段：国家、客户类型、产品、来源、单位、询盘内容。国家用于自动分配销售，来源无法匹配时会回退到默认来源并保留导入记录。</Typography.Text>
+      </div>
 
       <Card size="small" className="settings-entry-card">
         <Space direction="vertical" size={8}>

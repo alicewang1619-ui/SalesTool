@@ -547,6 +547,29 @@ body {
   padding: 18px 20px 20px !important;
 }
 
+.collapse-toggle-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 72px;
+  justify-content: center;
+  padding: 6px 12px;
+  border: 1px solid #d8d3ff;
+  border-radius: 999px;
+  color: #5b4be8;
+  background: #fbfaff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.collapse-toggle-hint.is-open {
+  color: #374151;
+  border-color: #e2e6ef;
+  background: #ffffff;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;

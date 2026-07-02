@@ -1,5 +1,5 @@
 import { App, Button, Card, Col, Collapse, Descriptions, Empty, Form, Input, Rate, Row, Space, Table, Tag, Timeline, Typography } from "antd";
-import { ArrowLeft, FileText, Save, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, FileText, Save, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -41,6 +41,8 @@ const fallbackScore: ScoreSummary = {
   ]
 };
 
+type CustomerDetailPanelKey = "score" | "nurture" | "background" | "signals" | "history";
+
 export function CustomerDetailPage() {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -50,6 +52,7 @@ export function CustomerDetailPage() {
   const [nurtureTask, setNurtureTask] = useState<NurtureTask | null>(null);
   const [saving, setSaving] = useState(false);
   const [creatingNurture, setCreatingNurture] = useState(false);
+  const [activePanelKeys, setActivePanelKeys] = useState<CustomerDetailPanelKey[]>(["score", "nurture"]);
   const [form] = Form.useForm<{ manualSummary: string }>();
 
   useEffect(() => {
@@ -113,6 +116,16 @@ export function CustomerDetailPage() {
   const sourceLead = sourceLeadId ? leadHistory.find((lead) => lead.id === sourceLeadId) : null;
   const returnPath = sourceLeadId ? `/admin/leads?recordId=${sourceLeadId}` : "/admin/customers";
   const returnLabel = sourceLeadId ? "返回线索池" : "返回客户池";
+  const panelToggleHint = (panelKey: CustomerDetailPanelKey) => {
+    const isOpen = activePanelKeys.includes(panelKey);
+    const Icon = isOpen ? ChevronUp : ChevronDown;
+    return (
+      <span className={`collapse-toggle-hint${isOpen ? " is-open" : ""}`}>
+        <Icon size={14} />
+        {isOpen ? "收起" : "展开"}
+      </span>
+    );
+  };
 
   return (
     <section className="customer-detail-page">
@@ -170,11 +183,14 @@ export function CustomerDetailPage() {
 
       <Collapse
         className="customer-detail-collapse"
-        defaultActiveKey={["score", "nurture"]}
+        activeKey={activePanelKeys}
+        onChange={(keys) => setActivePanelKeys((Array.isArray(keys) ? keys : [keys]).map(String) as CustomerDetailPanelKey[])}
+        expandIcon={() => null}
         expandIconPosition="end"
         items={[
           {
             key: "score",
+            extra: panelToggleHint("score"),
             label: (
               <Space wrap>
                 <Typography.Text strong>AI 五星评分</Typography.Text>
@@ -206,6 +222,7 @@ export function CustomerDetailPage() {
           },
           {
             key: "nurture",
+            extra: panelToggleHint("nurture"),
             label: (
               <Space wrap>
                 <Typography.Text strong>建议动作与主动再营销</Typography.Text>
@@ -237,6 +254,7 @@ export function CustomerDetailPage() {
           },
           {
             key: "background",
+            extra: panelToggleHint("background"),
             label: (
               <Space wrap>
                 <Typography.Text strong>客户背景调查</Typography.Text>
@@ -280,6 +298,7 @@ export function CustomerDetailPage() {
           },
           {
             key: "signals",
+            extra: panelToggleHint("signals"),
             label: (
               <Space wrap>
                 <Typography.Text strong>客户态势信号</Typography.Text>
@@ -303,6 +322,7 @@ export function CustomerDetailPage() {
           },
           {
             key: "history",
+            extra: panelToggleHint("history"),
             label: (
               <Space wrap>
                 <Typography.Text strong>历史记录</Typography.Text>

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client.ts';
 import type { AnswerResult } from '../api/types.ts';
+import { MarkdownView } from '../lib/MarkdownView.tsx';
 
 interface UserMsg { role: 'user'; text: string }
 interface AiMsg {
@@ -17,33 +18,24 @@ interface AiMsg {
 }
 type Msg = UserMsg | AiMsg;
 
-/** 把答案文本中的 [n] 渲染为可点击角标，链接到对应来源知识。 */
+/** 渲染答案：Markdown + LaTeX 公式（复用 MarkdownView），并把 [n] 渲染为可点击来源角标。 */
 function renderAnswer(text: string, sources: AnswerResult['sources']) {
   const byIndex = new Map(sources.map((s) => [s.index, s]));
-  const paragraphs = text.split(/\n{2,}/).filter((p) => p.trim());
-  return paragraphs.map((para, pi) => {
-    const parts = para.split(/(\[\d+\])/g);
-    return (
-      <p key={pi}>
-        {parts.map((part, i) => {
-          const match = part.match(/^\[(\d+)\]$/);
-          if (match) {
-            const n = Number(match[1]);
-            const src = byIndex.get(n);
-            if (src) {
-              return (
-                <Link className="cite" to={`/k/${src.knowledge_id}`} key={i} data-testid="cite">
-                  {n}
-                </Link>
-              );
-            }
-            return <span className="cite" key={i}>{n}</span>;
-          }
-          return <span key={i}>{part}</span>;
-        })}
-      </p>
-    );
-  });
+  return (
+    <MarkdownView
+      content={text}
+      renderCitation={(n) => {
+        const src = byIndex.get(n);
+        return src ? (
+          <Link className="cite" to={`/k/${src.knowledge_id}`} data-testid="cite">
+            {n}
+          </Link>
+        ) : (
+          <span className="cite">{n}</span>
+        );
+      }}
+    />
+  );
 }
 
 export function AskPage() {

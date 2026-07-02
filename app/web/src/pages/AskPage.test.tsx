@@ -71,6 +71,26 @@ describe('C-QA-02 / C-QA-03 答案带来源且可点', () => {
   });
 });
 
+describe('C-QA-07 答案中的 LaTeX 公式渲染（issue #6）', () => {
+  it('答案里的行内 $…$ 与块级 $$…$$ 渲染为 KaTeX，且 [n] 角标仍可点', async () => {
+    m.ask.mockResolvedValue({
+      answer: '逻辑回归用 sigmoid：$\\sigma(x)$，完整式如下[1]：\n\n$$\\hat{y} = \\sigma(wx + b)$$',
+      sources: [{ index: 1, knowledge_id: 'k1', title: '逻辑回归', relevance: 88 }],
+      hasContext: true,
+    });
+    renderPage();
+    await userEvent.type(screen.getByLabelText('提问'), '逻辑回归公式');
+    await userEvent.click(screen.getByRole('button', { name: '发送' }));
+    const ans = await screen.findByTestId('answer');
+    await waitFor(() => expect(ans.querySelector('.katex')).not.toBeNull());
+    expect(ans.querySelector('.math-block .katex-display')).not.toBeNull();
+    expect(ans.textContent).not.toContain('$$');
+    // 角标仍渲染且可点
+    const cites = within(ans).getAllByTestId('cite');
+    expect(cites[0]).toHaveAttribute('href', '/k/k1');
+  });
+});
+
 describe('C-QA-04 无相关提示', () => {
   it('hasContext=false 显示无相关内容提示，不编造答案', async () => {
     m.ask.mockResolvedValue({ answer: '', sources: [], hasContext: false });

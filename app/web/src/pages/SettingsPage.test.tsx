@@ -62,6 +62,19 @@ describe('C-SET-01 / C-SET-03 模型切换与 Key 脱敏', () => {
     const keyInput = await screen.findByLabelText(/API Key/);
     expect(keyInput).toHaveAttribute('type', 'password');
   });
+
+  it('选 Google AI Studio 预设自动回填 baseUrl 与模型名（issue #7）', async () => {
+    m.updateModel.mockResolvedValue({ ...localModel, provider: 'cloud' });
+    renderPage();
+    await waitFor(() => expect((screen.getByLabelText('本地模型') as HTMLSelectElement).value).toBe('llama3.1:8b'));
+    await userEvent.click(screen.getByTestId('opt-cloud'));
+    await screen.findByLabelText(/API Key/);
+    await userEvent.selectOptions(screen.getByLabelText('云端服务商'), 'google');
+    expect((screen.getByLabelText('接口地址（baseUrl）') as HTMLInputElement).value).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/openai',
+    );
+    expect((screen.getByLabelText('模型名') as HTMLInputElement).value).toBe('gemini-2.0-flash');
+  });
 });
 
 describe('本地模型下拉切换', () => {

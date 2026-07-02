@@ -42,10 +42,19 @@ function MathBlock({ tex }: { tex: string }) {
   return <Math tex={tex} display />;
 }
 
-function renderInline(text: string, highlight?: string): ReactNode[] {
-  // 先按 **bold** / `code` / $行内公式$ 切分；再对纯文本片段做高亮。
+interface InlineOpts {
+  highlight?: string;
+  /** 把答案里的 [n] 渲染成来源角标（问答页用）；不传则 [n] 按普通文本处理。 */
+  renderCitation?: (n: number) => ReactNode;
+}
+
+function renderInline(text: string, opts: InlineOpts = {}): ReactNode[] {
+  const { highlight, renderCitation } = opts;
+  // 先按 **bold** / `code` / $行内公式$ /（可选）[n] 引用角标 切分；再对纯文本片段做高亮。
   const nodes: ReactNode[] = [];
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\$(?!\s)[^$\n]+?(?<!\s)\$)/g;
+  const regex = renderCitation
+    ? /(\*\*[^*]+\*\*|`[^`]+`|\$(?!\s)[^$\n]+?(?<!\s)\$|\[\d+\])/g
+    : /(\*\*[^*]+\*\*|`[^`]+`|\$(?!\s)[^$\n]+?(?<!\s)\$)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let key = 0;
@@ -73,7 +82,8 @@ function renderInline(text: string, highlight?: string): ReactNode[] {
     const tok = m[0];
     if (tok.startsWith('**')) nodes.push(<strong key={key++}>{tok.slice(2, -2)}</strong>);
     else if (tok.startsWith('`')) nodes.push(<code key={key++} className="md-code">{tok.slice(1, -1)}</code>);
-    else nodes.push(<MathInline key={key++} tex={tok.slice(1, -1)} />);
+    else if (tok.startsWith('$')) nodes.push(<MathInline key={key++} tex={tok.slice(1, -1)} />);
+    else nodes.push(<Fragment key={key++}>{renderCitation!(Number(tok.slice(1, -1)))}</Fragment>);
     last = m.index + tok.length;
   }
   pushText(text.slice(last));
@@ -81,7 +91,7 @@ function renderInline(text: string, highlight?: string): ReactNode[] {
 }
 
 /** 渲染不含块级公式的一段文本（标题/列表/段落）。 */
-function renderTextBlocks(content: string, highlight: string | undefined, startKey: number): ReactNode[] {
+function renderTextBlocks(content: string, opts: InlineOpts, startKey: number): ReactNode[] {
   const lines = content.split('\n');
   const blocks: ReactNode[] = [];
   let listBuf: string[] = [];
@@ -91,7 +101,7 @@ function renderTextBlocks(content: string, highlight: string | undefined, startK
       blocks.push(
         <ul key={key++} className="md-ul">
           {listBuf.map((li, i) => (
-            <li key={i}>{renderInline(li, highlight)}</li>
+            <li key={i}>{renderInline(li, opts)}</li>
           ))}
         </ul>,
       );
@@ -110,21 +120,30 @@ function renderTextBlocks(content: string, highlight: string | undefined, startK
       const txt = line.replace(/^#+\s+/, '');
       const cls = `md-h${level}`;
       blocks.push(
-        level === 1 ? <h2 key={key++} className={cls}>{renderInline(txt, highlight)}</h2>
-        : level === 2 ? <h3 key={key++} className={cls}>{renderInline(txt, highlight)}</h3>
-        : <h4 key={key++} className={cls}>{renderInline(txt, highlight)}</h4>,
+        level === 1 ? <h2 key={key++} className={cls}>{renderInline(txt, opts)}</h2>
+        : level === 2 ? <h3 key={key++} className={cls}>{renderInline(txt, opts)}</h3>
+        : <h4 key={key++} className={cls}>{renderInline(txt, opts)}</h4>,
       );
     } else if (line.trim() === '') {
       blocks.push(<div key={key++} className="md-gap" />);
     } else {
-      blocks.push(<p key={key++} className="md-p">{renderInline(line, highlight)}</p>);
+      blocks.push(<p key={key++} className="md-p">{renderInline(line, opts)}</p>);
     }
   }
   flushList();
   return blocks;
 }
 
-export function MarkdownView({ content, highlight }: { content: string; highlight?: string }) {
+export function MarkdownView({
+  content,
+  highlight,
+  renderCitation,
+}: {
+  content: string;
+  highlight?: string;
+  renderCitation?: (n: number) => ReactNode;
+}) {
+  const opts: InlineOpts = { highlight, renderCitation };
   // 先抽出块级公式 $$…$$（可跨行），其余文本按普通 Markdown 渲染。
   const segments = (content ?? '').split(/\$\$([\s\S]*?)\$\$/);
   const blocks: ReactNode[] = [];
@@ -133,7 +152,7 @@ export function MarkdownView({ content, highlight }: { content: string; highligh
       const tex = seg.trim();
       if (tex) blocks.push(<MathBlock key={`m${i}`} tex={tex} />);
     } else if (seg) {
-      blocks.push(...renderTextBlocks(seg, highlight, i * 1000));
+      blocks.push(...renderTextBlocks(seg, opts, i * 1000));
     }
   });
   return <div className="markdown">{blocks}</div>;

@@ -91,6 +91,27 @@ describe('C-QA-07 答案中的 LaTeX 公式渲染（issue #6）', () => {
   });
 });
 
+describe('C-QA-08 多轮历史（issue #10）', () => {
+  it('第二次提问带上前一轮问答历史', async () => {
+    m.ask.mockResolvedValue(answer());
+    renderPage();
+    // 第一问
+    await userEvent.type(screen.getByLabelText('提问'), '缓存穿透是什么');
+    await userEvent.click(screen.getByRole('button', { name: '发送' }));
+    await screen.findByTestId('answer');
+    // 第二问
+    await userEvent.type(screen.getByLabelText('提问'), '它怎么解决');
+    await userEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(m.ask).toHaveBeenCalledTimes(2));
+    const [q2, history] = m.ask.mock.calls[1];
+    expect(q2).toBe('它怎么解决');
+    expect(history).toEqual([
+      { role: 'user', content: '缓存穿透是什么' },
+      { role: 'assistant', content: answer().answer },
+    ]);
+  });
+});
+
 describe('C-QA-04 无相关提示', () => {
   it('hasContext=false 显示无相关内容提示，不编造答案', async () => {
     m.ask.mockResolvedValue({ answer: '', sources: [], hasContext: false });

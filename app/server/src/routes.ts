@@ -64,7 +64,14 @@ const updateSchema = z.object({
   summary: z.string().optional(),
 });
 const tagsSchema = z.object({ tags: z.array(z.string()).max(20) });
-const askSchema = z.object({ question: z.string().min(1, '问题不能为空') });
+const askSchema = z.object({
+  question: z.string().min(1, '问题不能为空'),
+  // 多轮历史（issue #10）：前几轮对话，供模型理解指代。上限防止上下文超长。
+  history: z
+    .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(4000) }))
+    .max(12)
+    .optional(),
+});
 const modelSchema = z.object({
   provider: z.enum(['local', 'cloud']).optional(),
   chatModel: z.string().optional(),
@@ -270,7 +277,9 @@ export function buildRouter(ctx: RouteCtx): Router {
     wrap(async (req, res) => {
       const parsed = askSchema.safeParse(req.body);
       if (!parsed.success) throw badRequest(parsed.error.issues[0]?.message ?? '问题非法');
-      const result = await answerQuestion(ctx.db, ctx.getProvider(), parsed.data.question);
+      const result = await answerQuestion(ctx.db, ctx.getProvider(), parsed.data.question, {
+        history: parsed.data.history,
+      });
       res.json(result);
     }),
   );

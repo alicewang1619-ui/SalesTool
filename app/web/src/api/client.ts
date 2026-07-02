@@ -86,7 +86,8 @@ export const api = {
     if (topK) p.set('topK', String(topK));
     return req<SearchResult>(`/search?${p.toString()}`);
   },
-  ask: (question: string) => req<AnswerResult>('/ask', { method: 'POST', body: JSON.stringify({ question }) }),
+  ask: (question: string, history?: { role: 'user' | 'assistant'; content: string }[]) =>
+    req<AnswerResult>('/ask', { method: 'POST', body: JSON.stringify({ question, history }) }),
 
   listTags: () => req<{ items: TagCount[] }>('/tags'),
   byTag: (name: string, page = 1, pageSize = 20) =>

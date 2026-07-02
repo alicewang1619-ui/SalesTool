@@ -144,16 +144,39 @@ export function MarkdownView({
   renderCitation?: (n: number) => ReactNode;
 }) {
   const opts: InlineOpts = { highlight, renderCitation };
-  // 先抽出块级公式 $$…$$（可跨行），其余文本按普通 Markdown 渲染。
-  const segments = (content ?? '').split(/\$\$([\s\S]*?)\$\$/);
+  const src = content ?? '';
   const blocks: ReactNode[] = [];
-  segments.forEach((seg, i) => {
-    if (i % 2 === 1) {
-      const tex = seg.trim();
-      if (tex) blocks.push(<MathBlock key={`m${i}`} tex={tex} />);
-    } else if (seg) {
-      blocks.push(...renderTextBlocks(seg, opts, i * 1000));
-    }
-  });
+  let base = 0;
+
+  // 非代码段：先抽块级公式 $$…$$（可跨行），其余按普通 Markdown 渲染。
+  const renderText = (text: string) => {
+    const segs = text.split(/\$\$([\s\S]*?)\$\$/);
+    segs.forEach((seg, i) => {
+      if (i % 2 === 1) {
+        const tex = seg.trim();
+        if (tex) blocks.push(<MathBlock key={`m${base}-${i}`} tex={tex} />);
+      } else if (seg) {
+        blocks.push(...renderTextBlocks(seg, opts, base * 100000 + i * 1000));
+      }
+    });
+    base += 1;
+  };
+
+  // 先抽出围栏代码块 ```lang\n…\n```：原样渲染，不参与 Markdown/公式解析（issue #11 Python 代码显示错乱）。
+  const fence = /```[^\n]*\n([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let codeKey = 0;
+  while ((m = fence.exec(src)) !== null) {
+    if (m.index > last) renderText(src.slice(last, m.index));
+    blocks.push(
+      <pre key={`code-${codeKey++}`} className="md-pre">
+        <code>{m[1].replace(/\n$/, '')}</code>
+      </pre>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < src.length) renderText(src.slice(last));
+
   return <div className="markdown">{blocks}</div>;
 }

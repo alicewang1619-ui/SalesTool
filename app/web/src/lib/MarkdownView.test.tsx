@@ -29,6 +29,18 @@ describe('MarkdownView 数学公式渲染（issue #7）', () => {
     expect(container.querySelectorAll('.md-ul li').length).toBe(2);
   });
 
+  it('围栏代码块 ```…``` 原样渲染，不被当作 Markdown/公式（issue #11）', () => {
+    const code = '这是说明：\n\n```python\ndef f(x):\n    return x**2  # $ 不是公式\n```\n\n结束';
+    const { container } = render(<MarkdownView content={code} />);
+    const pre = container.querySelector('pre.md-pre code');
+    expect(pre).not.toBeNull();
+    // 保留缩进、** 与 $ 原样，不渲染成 strong/katex
+    expect(pre!.textContent).toContain('    return x**2');
+    expect(pre!.querySelector('strong')).toBeNull();
+    expect(container.querySelector('pre .katex')).toBeNull();
+    expect(container.textContent).toContain('结束');
+  });
+
   it('普通文本里的孤立 $ 不误判为公式', () => {
     const { container } = render(<MarkdownView content={'价格是 5 元，不是 $ 符号问题'} />);
     expect(container.querySelector('.katex')).toBeNull();

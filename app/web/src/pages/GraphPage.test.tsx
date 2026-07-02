@@ -69,4 +69,18 @@ describe('知识图谱页', () => {
     renderPage();
     expect(await screen.findByTestId('empty-state')).toBeInTheDocument();
   });
+
+  it('知识变多（>40 节点）时节点名仍显示（issue #12）', async () => {
+    const big: Graph = {
+      nodes: Array.from({ length: 60 }, (_, i) => ({ id: `k${i}`, title: `知识条目${i}`, tags: [], degree: 1 })),
+      edges: [],
+    };
+    mGraph.mockResolvedValue(big);
+    const { container } = renderPage();
+    await screen.findByTestId('graph-svg');
+    // 每个节点都应渲染出标题 <text>（修复前 >40 时会隐藏）
+    const texts = Array.from(container.querySelectorAll('svg text')).map((t) => t.textContent);
+    expect(texts.some((t) => t?.includes('知识条目0'))).toBe(true);
+    expect(texts.some((t) => t?.includes('知识条目59'))).toBe(true);
+  });
 });

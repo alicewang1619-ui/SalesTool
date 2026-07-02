@@ -67,11 +67,22 @@ export function AskPage() {
     e.preventDefault();
     const question = input.trim();
     if (!question || busy) return;
+    // 用当前对话构造多轮历史（只取已完成的问答对，最近若干条），供后端理解指代（issue #10）。
+    type Turn = { role: 'user' | 'assistant'; content: string };
+    const history: Turn[] = msgs
+      .flatMap((mm): Turn[] => {
+        if (mm.role === 'user') return [{ role: 'user', content: mm.text }];
+        if (mm.role === 'ai' && mm.status === 'answer' && mm.answer) {
+          return [{ role: 'assistant', content: mm.answer.answer }];
+        }
+        return [];
+      })
+      .slice(-6);
     setInput('');
     setBusy(true);
     setMsgs((prev) => [...prev, { role: 'user', text: question }, { role: 'ai', status: 'thinking' }]);
     try {
-      const res = await api.ask(question);
+      const res = await api.ask(question, history);
       setMsgs((prev) => {
         const next = [...prev];
         next[next.length - 1] = res.hasContext

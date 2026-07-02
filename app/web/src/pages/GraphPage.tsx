@@ -104,6 +104,11 @@ export function GraphPage() {
 
   const nodeRadius = (nd: GraphNode) => 6 + (nd.degree / maxDegree) * 12;
 
+  // 节点标签随数量自适应：越多越小、截断越短，保证始终可读又不拥挤（issue #12）。
+  const nodeCount = graph?.nodes.length ?? 0;
+  const labelFontSize = nodeCount > 120 ? 8 : nodeCount > 60 ? 9 : nodeCount > 30 ? 10 : 12;
+  const labelMaxLen = nodeCount > 120 ? 8 : nodeCount > 60 ? 10 : nodeCount > 30 ? 12 : 16;
+
   return (
     <>
       <SearchTopbar />
@@ -172,11 +177,20 @@ export function GraphPage() {
                     aria-label={nd.title}
                   >
                     <circle r={r} fill={active ? 'var(--accent)' : 'var(--accent-soft)'} stroke="var(--accent)" strokeWidth={1.5} />
-                    {(active || graph.nodes.length <= 40) && (
-                      <text x={r + 4} y={4} fontSize={12} fill="var(--text-body)" style={{ pointerEvents: 'none' }}>
-                        {nd.title.length > 16 ? nd.title.slice(0, 16) + '…' : nd.title}
-                      </text>
-                    )}
+                    {/* 节点名始终显示（issue #12）：节点越多字号越小、截断越短，避免拥挤；hover 时放大看全名。 */}
+                    <text
+                      x={r + 4}
+                      y={4}
+                      fontSize={active ? 13 : labelFontSize}
+                      fontWeight={active ? 600 : 400}
+                      fill="var(--text-body)"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {(() => {
+                        const max = active ? 24 : labelMaxLen;
+                        return nd.title.length > max ? nd.title.slice(0, max) + '…' : nd.title;
+                      })()}
+                    </text>
                   </g>
                 );
               })}

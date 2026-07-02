@@ -45,7 +45,7 @@ export async function answerQuestion(
   db: Db,
   provider: LlmProvider,
   question: string,
-  opts: { topK?: number } = {},
+  opts: { topK?: number; history?: ChatMessage[] } = {},
 ): Promise<RagAnswer> {
   const q = question.trim();
   if (!q) throw new Error('问题不能为空');
@@ -97,8 +97,11 @@ export async function answerQuestion(
     return { answer: '', sources: [], hasContext: false };
   }
 
+  // 多轮：在当前问题前插入历史对话，让模型理解「它」「上面那个」等指代（issue #10）。
+  const history = (opts.history ?? []).filter((h) => h.role === 'user' || h.role === 'assistant');
   const messages: ChatMessage[] = [
     { role: 'system', content: buildSystemPrompt(totalKnowledgeCount(db)) },
+    ...history,
     {
       role: 'user',
       content: `<<<DOCS>>>\n${context}<<<END>>>\n\n问题：${q}`,

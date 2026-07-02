@@ -53,6 +53,30 @@ describe('U-SR-07 RAG 收集来源', () => {
     expect(res.hasContext).toBe(false);
     expect(res.sources).toEqual([]);
   });
+
+  it('多轮历史按 system→历史→当前问题 顺序注入对话（issue #10）', async () => {
+    const db = memDb();
+    await seed(db, [{ title: '缓存穿透', content: '缓存穿透用布隆过滤器解决。' }]);
+    let roles: string[] = [];
+    let contents: string[] = [];
+    const recorder = new StubProvider({
+      chatFn: (m) => {
+        roles = m.map((x) => x.role);
+        contents = m.map((x) => x.content);
+        return '答案';
+      },
+    });
+    await answerQuestion(db, recorder, '它怎么解决', {
+      history: [
+        { role: 'user', content: '缓存穿透是什么' },
+        { role: 'assistant', content: '指查询不存在的 key 打穿缓存。' },
+      ],
+    });
+    expect(roles).toEqual(['system', 'user', 'assistant', 'user']);
+    expect(contents[1]).toBe('缓存穿透是什么');
+    expect(contents[2]).toContain('打穿缓存');
+    expect(contents[3]).toContain('它怎么解决');
+  });
 });
 
 describe('U-SR-08 超长上下文截断', () => {

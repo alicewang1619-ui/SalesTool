@@ -153,6 +153,14 @@ export function LeadsPage() {
     }
   };
 
+  const openCustomerDetail = (lead: Lead) => {
+    if (lead.customer_id) {
+      navigate(`/admin/customers/${lead.customer_id}?lead_id=${lead.id}`);
+      return;
+    }
+    navigate(`/admin/leads/${lead.id}`);
+  };
+
   return (
     <section className="leads-page">
       <div className="page-heading">
@@ -323,7 +331,7 @@ export function LeadsPage() {
               width: 220,
               render: (_, lead) => (
                 <Space wrap>
-                  <Button onClick={() => navigate(`/admin/leads/${lead.id}`)}>查看详情</Button>
+                  <Button onClick={() => openCustomerDetail(lead)}>查看详情</Button>
                   <Button type="primary" loading={sendingLeadId === lead.id} onClick={() => void sendEmail(lead)}>发邮件</Button>
                 </Space>
               )

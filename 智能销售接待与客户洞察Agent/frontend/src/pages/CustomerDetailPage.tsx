@@ -1,7 +1,7 @@
 import { App, Button, Card, Col, Descriptions, Empty, Form, Input, Rate, Row, Space, Table, Tag, Timeline, Typography } from "antd";
 import { ArrowLeft, FileText, Save, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   createNurtureTask,
   fetchCustomer,
@@ -45,6 +45,7 @@ export function CustomerDetailPage() {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const { customerId = "1" } = useParams();
+  const [searchParams] = useSearchParams();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [nurtureTask, setNurtureTask] = useState<NurtureTask | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,6 +109,10 @@ export function CustomerDetailPage() {
   const canEditBackground = Boolean(customer.can_edit_background);
   const score = customer.score_summary ?? fallbackScore;
   const scoreDimensions = score.dimensions?.length ? score.dimensions : fallbackScore.dimensions;
+  const sourceLeadId = Number(searchParams.get("lead_id") ?? 0) || null;
+  const sourceLead = sourceLeadId ? leadHistory.find((lead) => lead.id === sourceLeadId) : null;
+  const returnPath = sourceLeadId ? `/admin/leads?recordId=${sourceLeadId}` : "/admin/customers";
+  const returnLabel = sourceLeadId ? "返回线索池" : "返回客户池";
 
   return (
     <section>
@@ -117,10 +122,15 @@ export function CustomerDetailPage() {
           <Typography.Text type="secondary">
             {customer.country} · {customer.customer_type} · {customer.product}
           </Typography.Text>
+          {sourceLead ? (
+            <Typography.Paragraph className="muted">
+              来源线索：{sourceLead.source} · {sourceLead.feedback_status} · {formatDate(sourceLead.created_at)}
+            </Typography.Paragraph>
+          ) : null}
         </div>
         <Space wrap>
-          <Link to="/admin/customers">
-            <Button icon={<ArrowLeft size={16} />}>返回客户池</Button>
+          <Link to={returnPath}>
+            <Button icon={<ArrowLeft size={16} />}>{returnLabel}</Button>
           </Link>
           <Button type="primary" icon={<Send size={16} />} loading={creatingNurture} onClick={() => void launchNurture()}>
             发起再营销
@@ -264,6 +274,7 @@ export function CustomerDetailPage() {
               rowKey="id"
               pagination={false}
               dataSource={leadHistory}
+              rowClassName={(record) => (record.id === sourceLeadId ? "selected-customer-lead-row" : "")}
               columns={[
                 { title: "时间", dataIndex: "created_at", render: formatDate },
                 { title: "来源", dataIndex: "source" },

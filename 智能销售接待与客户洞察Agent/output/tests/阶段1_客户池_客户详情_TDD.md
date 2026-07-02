@@ -32,3 +32,4 @@
 | PAGE-CUSTOMER-DETAIL-08 | P0 | 当前客户没有待确认再营销任务 | 点击“发起再营销” | 后端创建当前客户再营销草稿并返回 `/admin/nurture/:id` 路径，页面跳转草稿详情 |
 | PAGE-CUSTOMER-DETAIL-09 | P0 | 当前客户有线索和 AI 背景调查 | 打开客户详情 | 展示五星评分维度：信息完整性、行业相关、明确需求、客户资质与采购能力、触达与推进可行性 |
 | PAGE-CUSTOMER-DETAIL-10 | P1 | 客户内容包含英文原文 | 打开客户详情 | 字段标题和标签为中文，英文只作为内容值展示 |
+| PAGE-CUSTOMER-DETAIL-11 | P0 | 线索池记录已绑定 `customer_id` | 点击线索池“查看详情”或直接访问旧线索详情 | 进入 `/admin/customers/:customerId?lead_id=:leadId` 同一客户详情页，页头显示来源线索且历史线索表高亮该记录 |

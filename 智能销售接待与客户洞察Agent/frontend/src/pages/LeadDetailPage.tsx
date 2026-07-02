@@ -55,6 +55,12 @@ export function LeadDetailPage() {
     loadDetail();
   }, [numericLeadId]);
 
+  useEffect(() => {
+    if (lead?.customer_id) {
+      navigate(`/admin/customers/${lead.customer_id}?lead_id=${lead.id}`, { replace: true });
+    }
+  }, [lead, navigate]);
+
   async function saveAssignment(values: { ownerId: number | null; feedbackStatus: string }) {
     if (!numericLeadId) return;
     setSaving(true);
@@ -89,6 +95,8 @@ export function LeadDetailPage() {
       />
     );
   }
+
+  if (lead.customer_id) return <Card loading />;
 
   return (
     <section className="lead-detail-page">

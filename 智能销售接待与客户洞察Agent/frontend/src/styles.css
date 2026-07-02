@@ -513,6 +513,10 @@ body {
   background: rgba(91, 75, 232, 0.1);
 }
 
+.selected-customer-lead-row > td {
+  background: #fbfaff !important;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;

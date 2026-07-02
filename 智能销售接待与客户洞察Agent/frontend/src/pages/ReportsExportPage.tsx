@@ -140,7 +140,6 @@ export function ReportsExportPage() {
     <section className="reports-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1(MVP) · 报表中心</Typography.Text>
           <Typography.Title level={2}>导出确认弹窗</Typography.Title>
           <Typography.Paragraph className="muted">
             确认导出周期、筛选范围、字段和脱敏策略后生成可审计导出任务。

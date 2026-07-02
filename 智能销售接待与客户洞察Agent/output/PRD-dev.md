@@ -253,3 +253,8 @@ assigned -> no_feedback -> manager_attention
 - 前端不得在业务页面继续使用 `Alert type="info"` 展示说明性文案、筛选摘要、用途说明、权限说明或选中态；应改为 `Typography.Text`、`Typography.Paragraph`、普通 `Card` 内容、`Tag`、`Tooltip` 或现有 `muted` 文案。
 - `Alert` 仅保留给 error、warning、success 等需要用户关注或处理的状态反馈，例如接口错误、发信邮箱未配置、导入/导出任务结果。
 - 清理范围覆盖所有 `frontend/src/pages`，修改后需通过前端构建并确认没有残留说明型 `type="info"`。
+
+## 2026-07-02 全站阶段标识清理开发口径
+- 所有 `frontend/src/pages` 的页面标题区不得渲染 `stage-label` / `eyebrow` 中的“阶段 1”“阶段 2”“MVP”等开发阶段文案。
+- 页面标题区保留 `Typography.Title` 和业务说明段落；不要用隐藏样式规避，应直接移除该段渲染，避免可访问性树和 DOM 中残留内部阶段信息。
+- 验收时需全局检索前端页面源码，确认运行态标题区没有“阶段 1 / 阶段1 / 阶段 2 / 阶段2”文案；构建必须通过。

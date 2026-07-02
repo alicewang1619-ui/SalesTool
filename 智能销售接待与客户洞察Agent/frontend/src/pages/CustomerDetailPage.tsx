@@ -113,7 +113,6 @@ export function CustomerDetailPage() {
     <section>
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 1 (MVP) · 客户池</Typography.Text>
           <Typography.Title level={2}>{customer.name}</Typography.Title>
           <Typography.Text type="secondary">
             {customer.country} · {customer.customer_type} · {customer.product}

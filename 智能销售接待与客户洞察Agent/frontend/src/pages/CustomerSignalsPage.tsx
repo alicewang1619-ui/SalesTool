@@ -108,7 +108,6 @@ export function CustomerSignalsPage() {
     <>
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 2 · 客户态势</Typography.Text>
           <Typography.Title level={2}>客户态势信号记录</Typography.Title>
           <Typography.Paragraph className="muted">
             记录官网公开信息、邮件互动、销售反馈和人工录入的机会信号，作为客户详情和后续再营销的可追溯依据。

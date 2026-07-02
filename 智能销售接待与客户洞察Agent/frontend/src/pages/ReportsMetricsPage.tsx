@@ -114,7 +114,6 @@ export function ReportsMetricsPage() {
     <section className="reports-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1(MVP) · 报表中心</Typography.Text>
           <Typography.Title level={2}>指标明细</Typography.Title>
           <Typography.Paragraph className="muted">
             查看官网渠道 KPI、未反馈、销售反馈和产品分类等指标明细。

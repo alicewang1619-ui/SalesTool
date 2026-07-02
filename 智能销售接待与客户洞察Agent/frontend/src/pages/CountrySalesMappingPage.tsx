@@ -210,7 +210,6 @@ export function CountrySalesMappingPage() {
     <section className="country-mapping-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1(MVP) · 系统配置</Typography.Text>
           <Typography.Title level={2}>国家区域销售映射</Typography.Title>
           <Typography.Paragraph className="muted">
             维护国家、区域和销售负责人的确定性分发规则；已有线索不会被静默重分发，待分配列表会展示建议负责人供人工确认。

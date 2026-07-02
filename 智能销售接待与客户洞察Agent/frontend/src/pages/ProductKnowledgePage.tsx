@@ -262,7 +262,6 @@ export function ProductKnowledgePage() {
     <section className="product-knowledge-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1(MVP) · 系统配置</Typography.Text>
           <Typography.Title level={2}>知识库管理</Typography.Title>
           <Typography.Paragraph className="muted">
             维护产品、竞品、市场等不同知识库板块；启用版本进入 AI 上下文，停用版本保留审计和历史引用。

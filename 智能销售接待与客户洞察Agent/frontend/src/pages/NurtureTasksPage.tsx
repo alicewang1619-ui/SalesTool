@@ -218,7 +218,6 @@ export function NurtureTasksPage() {
     <>
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 2 · 再营销</Typography.Text>
           <Typography.Title level={2}>再营销与邮件活动</Typography.Title>
           <Typography.Paragraph className="muted">
             再营销待办用于单个客户邮件草稿确认；群发邮件用于运营/管理员按客户类型或活动筛选批量触达。

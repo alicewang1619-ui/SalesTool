@@ -157,7 +157,6 @@ export function LeadsPage() {
     <section className="leads-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 1 (MVP) · 线索池</Typography.Text>
           <Typography.Title level={2}>线索池列表</Typography.Title>
           <Typography.Paragraph className="muted">
             展示官网、邮箱、社媒和线下展会导入的线索；筛选区贴近列表，负责时间范围、来源和评分过滤。

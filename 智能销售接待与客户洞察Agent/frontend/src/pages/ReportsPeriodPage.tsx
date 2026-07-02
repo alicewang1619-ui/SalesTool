@@ -112,7 +112,6 @@ export function ReportsPeriodPage() {
     <section className="reports-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 1 (MVP) · 报表中心</Typography.Text>
           <Typography.Title level={2}>周期报表视图</Typography.Title>
           <Typography.Paragraph className="muted">
             按日/月/季度/年查看询盘量、有效量、国家、渠道、产品和销售反馈，并明确展示当前数据对应的时间段。

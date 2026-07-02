@@ -195,7 +195,6 @@ export function PendingAssignmentsPage() {
     <section className="pending-assignments-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 1 (MVP) · 分发与反馈</Typography.Text>
           <Typography.Title level={2}>待分配列表</Typography.Title>
           <Typography.Paragraph className="muted">
             集中处理国家缺失、国家映射缺失或负责人缺失的线索；支持查看今日、昨天、指定日期和全部历史任务。

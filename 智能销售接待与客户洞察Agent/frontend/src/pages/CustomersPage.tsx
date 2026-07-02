@@ -79,7 +79,6 @@ export function CustomersPage() {
     <>
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 1 (MVP) · 客户池</Typography.Text>
           <Typography.Title level={2}>客户池列表</Typography.Title>
           <Typography.Paragraph className="muted">
             客户池是客户管理列表；态势、建议动作和再营销入口都放到客户详情里处理。

@@ -72,7 +72,6 @@ export function ReportsHomePage() {
     <section className="reports-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1(MVP) · 报表中心</Typography.Text>
           <Typography.Title level={2}>报表中心首页</Typography.Title>
           <Typography.Paragraph className="muted">展示日报、月报、季报、年报入口和非金额核心指标。</Typography.Paragraph>
         </div>

@@ -94,7 +94,6 @@ export function LeadDetailPage() {
     <section className="lead-detail-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段1 (MVP) · 线索池</Typography.Text>
           <Typography.Title level={2}>{lead.customer_name}</Typography.Title>
           <Typography.Paragraph className="muted">
             {lead.country} · {lead.customer_type} · {lead.product} · {lead.profile_summary.source}

@@ -810,7 +810,6 @@ export function SettingsPage() {
     <section className="settings-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 1 (MVP) · 系统配置</Typography.Text>
           <Typography.Title level={2}>配置中心</Typography.Title>
           <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、配置审计分组；点击菜单后只展示对应配置。</Typography.Paragraph>
         </div>

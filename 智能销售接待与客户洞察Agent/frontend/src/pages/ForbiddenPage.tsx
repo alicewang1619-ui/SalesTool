@@ -58,7 +58,6 @@ export function ForbiddenPage() {
             <ShieldOff size={36} />
           </div>
           <div>
-            <Typography.Text className="stage-label">阶段1(MVP) · 异常与权限</Typography.Text>
             <Typography.Title id="forbidden-title" level={2}>
               {context?.title || "无权限访问该页面"}
             </Typography.Title>

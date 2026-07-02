@@ -176,7 +176,6 @@ export function NurtureTaskDetailPage() {
     <>
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 2 · 再营销待办</Typography.Text>
           <Typography.Title level={2}>草稿详情确认发送</Typography.Title>
           <Typography.Paragraph className="muted">这里是邮件发送前的人工确认页：提示词和附件用于 AI 写邮件，发送前必须看清发件人、收件人、主题和正文。</Typography.Paragraph>
         </div>

@@ -110,7 +110,6 @@ export function DashboardPage() {
     <section className="dashboard-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="stage-label">阶段 1 (MVP) · 工作台</Typography.Text>
           <Typography.Title level={2}>工作台首页</Typography.Title>
           <Typography.Paragraph className="muted">
             统一查看总询盘、今日询盘、有效线索和待跟进任务；明细请从指标卡或快捷入口进入专门列表页。

@@ -139,7 +139,6 @@ export function LeadImportPage() {
     <section className="lead-import-page">
       <div className="page-heading">
         <div>
-          <Typography.Text className="eyebrow">阶段 1 (MVP) · 线索池</Typography.Text>
           <Typography.Title level={1}>客户信息导入</Typography.Title>
           <Typography.Paragraph type="secondary">
             支持 CSV / Excel（.xlsx）文件，可识别系统模板和常见中英文表头。导入后系统尽量入库，异常行和待分配结果会列出原因。

@@ -703,15 +703,25 @@ class BulkEmailPreviewOut(BaseModel):
 
 class BulkEmailCampaignRequest(BaseModel):
     filters: BulkEmailFiltersIn = Field(default_factory=BulkEmailFiltersIn)
+    purpose: str = Field(default="开发信", max_length=40)
     subject: str = Field(min_length=2, max_length=255)
     body: str = Field(min_length=10, max_length=8000)
+    generation_prompt: str = Field(default="", max_length=4000)
+    writer_role_key: str | None = Field(default=None, min_length=2, max_length=80)
+    reference_attachments: list[NurtureAttachmentOut] = Field(default_factory=list)
 
 
 class BulkEmailCampaignOut(BaseModel):
     campaign_id: str
     status: str
     target_count: int
+    purpose: str
     subject: str
+    body: str
+    generation_prompt: str
+    writer_role_key: str
+    writer_role_name: str
+    reference_attachments: list[NurtureAttachmentOut] = Field(default_factory=list)
     sender_email: str
     created_at: datetime
 
@@ -1029,6 +1039,11 @@ class ProductKnowledgeUpdateRequest(BaseModel):
 
 class ProductKnowledgeStatusRequest(BaseModel):
     status: str = Field(pattern="^(active|draft|disabled)$")
+
+
+class ProductKnowledgeBaseRequest(BaseModel):
+    current_key: str | None = Field(default=None, max_length=80)
+    next_key: str = Field(min_length=2, max_length=80)
 
 
 class ProductKnowledgeBlockOut(BaseModel):

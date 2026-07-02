@@ -534,7 +534,13 @@ export type BulkEmailCampaign = {
   campaign_id: string;
   status: string;
   target_count: number;
+  purpose: string;
   subject: string;
+  body: string;
+  generation_prompt: string;
+  writer_role_key: string;
+  writer_role_name: string;
+  reference_attachments: NurtureAttachment[];
   sender_email: string;
   created_at: string;
 };
@@ -1302,15 +1308,23 @@ export function previewBulkEmailCampaign(filters: BulkEmailFilters): Promise<Bul
 
 export function createBulkEmailCampaign(payload: {
   filters: BulkEmailFilters;
+  purpose: string;
   subject: string;
   body: string;
+  generationPrompt: string;
+  writerRoleKey?: string;
+  referenceAttachments?: NurtureAttachment[];
 }): Promise<BulkEmailCampaign> {
   return request<BulkEmailCampaign>("/api/email-campaigns", {
     method: "POST",
     body: JSON.stringify({
       filters: bulkEmailFiltersToApi(payload.filters),
+      purpose: payload.purpose,
       subject: payload.subject,
-      body: payload.body
+      body: payload.body,
+      generation_prompt: payload.generationPrompt,
+      writer_role_key: payload.writerRoleKey ?? null,
+      reference_attachments: payload.referenceAttachments ?? []
     })
   });
 }
@@ -1537,6 +1551,19 @@ export function updateProductKnowledgeStatus(id: number, status: string): Promis
   return request<ProductKnowledge>(`/api/settings/product-knowledge/${id}/status`, {
     method: "PUT",
     body: JSON.stringify({ status })
+  });
+}
+
+export function saveProductKnowledgeBase(payload: { currentKey?: string | null; nextKey: string }): Promise<string[]> {
+  return request<string[]>("/api/settings/product-knowledge/bases", {
+    method: "POST",
+    body: JSON.stringify({ current_key: payload.currentKey ?? null, next_key: payload.nextKey })
+  });
+}
+
+export function deleteProductKnowledgeBase(baseKey: string): Promise<string[]> {
+  return request<string[]>(`/api/settings/product-knowledge/bases/${encodeURIComponent(baseKey)}`, {
+    method: "DELETE"
   });
 }
 

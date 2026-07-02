@@ -238,26 +238,6 @@ export function DashboardPage() {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} className="summary-grid">
-        <Col xs={24} lg={12}>
-          <Card title="AI 摘要" loading={loading}>
-            <Typography.Paragraph>{dashboard?.ai_summary}</Typography.Paragraph>
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card title="分发与反馈" loading={loading}>
-            <div className="timeline-list">
-              {(dashboard?.assignment_timeline ?? []).map((item) => (
-                <div className="timeline-item" key={item.label}>
-                  <strong>{item.label}</strong>
-                  <span>{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
       <Card className="table-card" title="继续处理">
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12} xl={6}>

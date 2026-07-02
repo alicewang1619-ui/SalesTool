@@ -1,4 +1,4 @@
-﻿import { Alert, Button, Card, Col, Descriptions, Form, Input, Modal, Row, Select, Space, Tag, Typography, Upload, message } from "antd";
+﻿import { Alert, Button, Card, Col, Descriptions, Form, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography, Upload, message } from "antd";
 import { ArrowLeft, Mail, Paperclip, Save, Send, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -209,7 +209,7 @@ export function NurtureTaskDetailPage() {
               <Form.Item name="writerRoleKey" label="邮件写手角色" rules={[{ required: true }]}>
                 <Select options={writerRoles.map((writer) => ({ value: writer.key, label: `${writer.name} / ${writer.display_name} · ${writer.style}` }))} placeholder="选择写邮件的人物风格" />
               </Form.Item>
-              {selectedWriter ? <Alert showIcon type="info" className="login-error" message={`${selectedWriter.display_name}：${selectedWriter.style}`} description={`技能：${selectedWriter.skills.join("、")}；适用：${selectedWriter.best_for}`} /> : null}
+              {selectedWriter ? (<Tooltip title={`技能：${selectedWriter.skills.join("、")}；适用：${selectedWriter.best_for}`}><Button style={{ marginBottom: 12 }}>{selectedWriter.display_name}：{selectedWriter.style}</Button></Tooltip>) : null}
               <Form.Item name="draftContent" label="正文" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={8} /></Form.Item>
               <div className="nurture-prompt-panel">
                 <Form.Item name="generationPrompt" label="生成提示词 / 补充指令"><Input.TextArea rows={4} /></Form.Item>
@@ -217,7 +217,7 @@ export function NurtureTaskDetailPage() {
               </div>
               <div className="nurture-upload-panel">
                 <div><strong>参考附件</strong><Typography.Paragraph className="muted">上传产品彩页、型号对比表或应用案例，默认作为 AI 写信素材；是否随邮件发送需要后续人工确认。</Typography.Paragraph></div>
-                <Upload beforeUpload={(file) => handleUpload(file as File)} showUploadList={false}><Button icon={<Paperclip size={16} />}>上传参考附件</Button></Upload>
+                <Upload accept=".pdf,.doc,.docx,.xls,.xlsx" beforeUpload={(file) => handleUpload(file as File)} showUploadList={false}><Button icon={<Paperclip size={16} />}>上传 PDF / Word / Excel</Button></Upload>
               </div>
               <Space wrap className="tag-cluster">
                 {(task?.attachments ?? []).length ? task?.attachments.map((item) => <Tag key={`${item.filename}-${item.uploaded_at}`} color="blue">{item.filename} · {Math.max(1, Math.ceil(item.size / 1024))} KB</Tag>) : <Tag color="gold">暂无参考附件</Tag>}

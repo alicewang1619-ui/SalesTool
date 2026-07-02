@@ -1,13 +1,16 @@
-import { Alert, Button, Card, Col, Empty, Form, Input, Row, Select, Space, Statistic, Table, Tabs, Tag, Typography, message } from "antd";
-import { CheckCircle2, FileText, Filter, Mail } from "lucide-react";
+import { Alert, Button, Card, Col, Empty, Form, Input, Row, Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, Upload, message } from "antd";
+import { CheckCircle2, FileText, Filter, Mail, Paperclip } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   createBulkEmailCampaign,
+  fetchEmailWriterRoles,
   fetchNurtureTasks,
   previewBulkEmailCampaign,
   type BulkEmailFilters,
   type BulkEmailPreview,
+  type EmailWriterRole,
+  type NurtureAttachment,
   type NurtureTask,
   type NurtureTaskPageResult
 } from "../api";
@@ -31,8 +34,33 @@ const emailStatusLabels: Record<string, string> = {
 };
 
 type BulkEmailFormValues = BulkEmailFilters & {
+  purpose?: string;
   subject?: string;
   body?: string;
+  generationPrompt?: string;
+  writerRoleKey?: string;
+};
+
+const defaultBulkPurpose = "开发信";
+const promotionBulkPurpose = "活动推广";
+const customBulkPurpose = "自定义类型";
+
+const bulkPurposeTemplates: Record<string, { subject: string; body: string; generationPrompt: string }> = {
+  [defaultBulkPurpose]: {
+    subject: "Portable Ultrasound cooperation opportunity",
+    body: "Hi, we noticed your medical imaging business and would like to introduce CHISON portable ultrasound options for clinics and distributors.",
+    generationPrompt: "生成一封专业开发信，确认应用场景、采购窗口和下一步沟通，不承诺价格、独家代理或注册证。"
+  },
+  [promotionBulkPurpose]: {
+    subject: "Ultrasound campaign update for your market",
+    body: "Hi, we prepared a short campaign update and product material that may help your team evaluate upcoming ultrasound opportunities.",
+    generationPrompt: "生成一封活动推广邮件，突出资料价值，邀请客户查看材料或预约沟通，避免未经确认的折扣承诺。"
+  },
+  [customBulkPurpose]: {
+    subject: "Ultrasound follow-up",
+    body: "Hi, we prepared a short update and would like to confirm your current ultrasound needs.",
+    generationPrompt: "按运营自定义目的、筛选客户、邮件写手风格和参考附件生成邮件，避免未经支持的承诺。"
+  }
 };
 
 function compactFilters(values: BulkEmailFormValues): BulkEmailFilters {
@@ -47,12 +75,15 @@ function compactFilters(values: BulkEmailFormValues): BulkEmailFilters {
 }
 
 function initialBulkValues(searchParams: URLSearchParams): BulkEmailFormValues {
+  const template = bulkPurposeTemplates[defaultBulkPurpose];
   return {
     country: searchParams.get("country") || undefined,
     product: searchParams.get("product") || undefined,
     tier: searchParams.get("tier") || undefined,
-    subject: "Ultrasound product update",
-    body: "Hi, we prepared a short product update and would like to confirm your current ultrasound needs."
+    purpose: defaultBulkPurpose,
+    subject: template.subject,
+    body: template.body,
+    generationPrompt: template.generationPrompt
   };
 }
 
@@ -202,12 +233,56 @@ export function NurtureTasksPage() {
 function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues }) {
   const [form] = Form.useForm<BulkEmailFormValues>();
   const [preview, setPreview] = useState<BulkEmailPreview | null>(null);
+  const [writerRoles, setWriterRoles] = useState<EmailWriterRole[]>([]);
+  const [referenceAttachments, setReferenceAttachments] = useState<NurtureAttachment[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     form.setFieldsValue(initialValues);
   }, [form, initialValues]);
+
+  useEffect(() => {
+    fetchEmailWriterRoles()
+      .then((result) => {
+        setWriterRoles(result.items);
+        const defaultWriter = result.items.find((role) => role.key === result.default_email_writer) ?? result.items[0];
+        if (!form.getFieldValue("writerRoleKey") && defaultWriter) {
+          form.setFieldValue("writerRoleKey", defaultWriter.key);
+        }
+      })
+      .catch(() => setWriterRoles([]));
+  }, [form]);
+
+  function applyPurposeTemplate(purpose: string) {
+    const template = bulkPurposeTemplates[purpose] ?? bulkPurposeTemplates[customBulkPurpose];
+    form.setFieldsValue({
+      purpose,
+      subject: template.subject,
+      body: template.body,
+      generationPrompt: template.generationPrompt
+    });
+  }
+
+  function beforeReferenceUpload(file: File) {
+    const suffix = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!["pdf", "doc", "docx", "xls", "xlsx"].includes(suffix)) {
+      message.error("参考附件仅支持 PDF / Word / Excel");
+      return Upload.LIST_IGNORE;
+    }
+    setReferenceAttachments((current) => [
+      ...current,
+      {
+        filename: file.name,
+        content_type: file.type || "application/octet-stream",
+        size: file.size,
+        uploaded_by: "当前操作人",
+        uploaded_at: new Date().toISOString()
+      }
+    ]);
+    message.success(`${file.name} 已加入参考附件`);
+    return Upload.LIST_IGNORE;
+  }
 
   async function handlePreview() {
     const values = form.getFieldsValue();
@@ -226,10 +301,14 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
     try {
       const campaign = await createBulkEmailCampaign({
         filters: compactFilters(values),
+        purpose: values.purpose ?? defaultBulkPurpose,
         subject: values.subject ?? "",
-        body: values.body ?? ""
+        body: values.body ?? "",
+        generationPrompt: values.generationPrompt ?? "",
+        writerRoleKey: values.writerRoleKey,
+        referenceAttachments
       });
-      message.success(`群发邮件活动已创建，目标客户 ${campaign.target_count} 个`);
+      message.success(`群发邮件草稿已创建，目标客户 ${campaign.target_count} 个，等待邮箱配置和人工确认后再发送`);
       await handlePreview();
     } finally {
       setCreating(false);
@@ -237,16 +316,43 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
   }
 
   return (
-    <Card title="群发邮件 / 邮件活动" extra={<Button icon={<Mail size={16} />} loading={loadingPreview} onClick={() => void handlePreview()}>预览收件人</Button>}>
-      <Alert
-        type="info"
-        showIcon
-        className="login-error"
-        message="权限与用途"
-        description="群发邮件仅管理员和运营可用，用于新导入客户开发信、促销活动或指定客户类型批量触达；销售只处理自己负责客户的单客再营销。"
-      />
+    <Card
+      title="群发邮件 / 邮件活动"
+      extra={
+        <Space>
+          <Tooltip title="群发邮件仅管理员和运营可用；第一版只创建草稿、模板和预览，真正发送依赖邮箱接口配置成功后再执行。">
+            <Button icon={<Mail size={16} />}>群发规则说明</Button>
+          </Tooltip>
+          <Button icon={<Mail size={16} />} loading={loadingPreview} onClick={() => void handlePreview()}>预览收件人</Button>
+        </Space>
+      }
+    >
       <Form form={form} layout="vertical" initialValues={initialValues} onFinish={(values) => void handleCreate(values)}>
         <Row gutter={16}>
+          <Col xs={24} md={8}>
+            <Form.Item name="purpose" label="群发目的" rules={[{ required: true }]}>
+              <Select
+                options={[defaultBulkPurpose, promotionBulkPurpose, customBulkPurpose].map((item) => ({ value: item, label: item }))}
+                onChange={applyPurposeTemplate}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item name="writerRoleKey" label="邮件写手">
+              <Select
+                allowClear
+                placeholder="选择邮件写手"
+                options={writerRoles.map((role) => ({ value: role.key, label: role.display_name || role.name }))}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item label="参考附件">
+              <Upload beforeUpload={beforeReferenceUpload} showUploadList={false} accept=".pdf,.doc,.docx,.xls,.xlsx">
+                <Button icon={<Paperclip size={16} />}>上传 PDF / Word / Excel</Button>
+              </Upload>
+            </Form.Item>
+          </Col>
           <Col xs={24} md={8}><Form.Item name="country" label="国家"><Input placeholder="例如 Peru / China" /></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="product" label="产品"><Input placeholder="例如 Portable Ultrasound" /></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="tier" label="客户分层"><Select allowClear options={["高意向", "有效跟进", "资料库", "已转代理商", "无效", "撤单/流失"].map((item) => ({ value: item, label: item }))} /></Form.Item></Col>
@@ -259,10 +365,18 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
           </Col>
           <Col xs={24}><Form.Item name="subject" label="邮件主题" rules={[{ required: true, min: 2 }]}><Input /></Form.Item></Col>
           <Col xs={24}><Form.Item name="body" label="邮件正文" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={6} /></Form.Item></Col>
+          <Col xs={24}><Form.Item name="generationPrompt" label="生成 Prompt"><Input.TextArea rows={4} /></Form.Item></Col>
         </Row>
+        {referenceAttachments.length ? (
+          <Space wrap style={{ marginBottom: 16 }}>
+            {referenceAttachments.map((attachment) => (
+              <Tag key={`${attachment.filename}-${attachment.uploaded_at}`} color="blue">{attachment.filename}</Tag>
+            ))}
+          </Space>
+        ) : null}
         <Space wrap>
           <Button onClick={() => void handlePreview()} loading={loadingPreview}>预览收件人</Button>
-          <Button type="primary" htmlType="submit" loading={creating}>创建群发活动</Button>
+          <Button type="primary" htmlType="submit" loading={creating}>创建群发草稿</Button>
         </Space>
       </Form>
 

@@ -15,13 +15,15 @@ import {
   Typography
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ArrowLeft, BookOpen, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BookOpen, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchProductKnowledge,
   fetchProductKnowledgeContext,
+  deleteProductKnowledgeBase,
   saveProductKnowledge,
+  saveProductKnowledgeBase,
   updateProductKnowledgeStatus,
   type ProductKnowledge,
   type ProductKnowledgeContext,
@@ -54,6 +56,7 @@ const defaultKnowledgeBases = [
   { value: "competitor", label: "竞品知识库" },
   { value: "market", label: "市场知识库" }
 ];
+const defaultKnowledgeBaseKeys = new Set(defaultKnowledgeBases.map((item) => item.value));
 
 function knowledgeBaseLabel(value: string) {
   return defaultKnowledgeBases.find((item) => item.value === value)?.label ?? value;
@@ -70,8 +73,11 @@ export function ProductKnowledgePage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [filters, setFilters] = useState({ query: "", knowledgeBase: searchParams.get("knowledge_base") ?? "", productType: "", status: "" });
+  const [selectedBaseKey, setSelectedBaseKey] = useState(searchParams.get("knowledge_base") ?? "product");
+  const [baseDraft, setBaseDraft] = useState(searchParams.get("knowledge_base") ?? "");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const isSelectedDefaultBase = defaultKnowledgeBaseKeys.has(selectedBaseKey);
 
   const productTypeOptions = useMemo(() => {
     const values = new Set((data?.items ?? []).map((item) => item.product_type));
@@ -149,6 +155,61 @@ export function ProductKnowledgePage() {
       aiGuidance: item.ai_guidance,
       status: item.status
     });
+  }
+
+  async function addKnowledgeBaseCategory() {
+    const nextKey = baseDraft.trim();
+    if (!nextKey) {
+      setError("请输入要新增的知识库板块名称");
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    const bases = await saveProductKnowledgeBase({ nextKey });
+    setData((current) => (current ? { ...current, knowledge_bases: bases } : current));
+    setSelectedBaseKey(nextKey);
+    setBaseDraft("");
+    setNotice(`${knowledgeBaseLabel(nextKey)} 已加入知识库板块`);
+  }
+
+  async function renameKnowledgeBaseCategory() {
+    const nextKey = baseDraft.trim();
+    if (!selectedBaseKey || !nextKey) {
+      setError("请选择要重命名的自定义知识库，并填写新名称");
+      return;
+    }
+    if (isSelectedDefaultBase) {
+      setError("产品/竞品/市场属于默认板块，不建议重命名；可直接新增自定义知识库");
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    const bases = await saveProductKnowledgeBase({ currentKey: selectedBaseKey, nextKey });
+    setData((current) => (current ? { ...current, knowledge_bases: bases } : current));
+    setSelectedBaseKey(nextKey);
+    setBaseDraft(nextKey);
+    setNotice(`${selectedBaseKey} 已重命名为 ${nextKey}`);
+    await load();
+  }
+
+  async function removeKnowledgeBaseCategory() {
+    if (!selectedBaseKey) {
+      setError("请选择要删除的自定义知识库");
+      return;
+    }
+    if (isSelectedDefaultBase) {
+      setError("默认知识库板块不能删除");
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    const bases = await deleteProductKnowledgeBase(selectedBaseKey);
+    setData((current) => (current ? { ...current, knowledge_bases: bases } : current));
+    setFilters((current) => ({ ...current, knowledgeBase: current.knowledgeBase === selectedBaseKey ? "" : current.knowledgeBase }));
+    setSelectedBaseKey("product");
+    setBaseDraft("");
+    setNotice(`${selectedBaseKey} 已删除`);
+    await load();
   }
 
   const columns: ColumnsType<ProductKnowledge> = [
@@ -291,6 +352,27 @@ export function ProductKnowledgePage() {
         </Col>
         <Col xs={24} xl={16}>
           <Card title="知识库筛选">
+            <Space wrap className="knowledge-filter-bar">
+              <Select
+                placeholder="选择已有板块"
+                value={selectedBaseKey}
+                onChange={(value) => {
+                  setSelectedBaseKey(value);
+                  setBaseDraft(defaultKnowledgeBaseKeys.has(value) ? "" : value);
+                }}
+                options={knowledgeBaseOptions}
+                style={{ width: 180 }}
+              />
+              <Input
+                placeholder="新增自定义板块，如 regional_playbook"
+                value={baseDraft}
+                onChange={(event) => setBaseDraft(event.target.value)}
+                style={{ width: 260 }}
+              />
+              <Button icon={<Plus size={16} />} onClick={() => void addKnowledgeBaseCategory()}>新增板块</Button>
+              <Button disabled={isSelectedDefaultBase} onClick={() => void renameKnowledgeBaseCategory()}>重命名自定义板块</Button>
+              <Button danger disabled={isSelectedDefaultBase} icon={<Trash2 size={16} />} onClick={() => void removeKnowledgeBaseCategory()}>删除自定义板块</Button>
+            </Space>
             <Space wrap className="knowledge-filter-bar">
               <Input
                 placeholder="搜索知识库/型号/场景"

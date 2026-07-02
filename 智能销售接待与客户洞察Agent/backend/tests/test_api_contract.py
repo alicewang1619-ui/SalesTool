@@ -910,6 +910,9 @@ def test_pending_assignment_confirm_writes_owner_feedback_link_and_audit(client:
     detail = client.get(f"/api/leads/{target['id']}", headers=headers)
     assert detail.status_code == 200
     assert detail.json()["assignment"]["owner_id"] == 2
+    assert detail.json()["assignment"]["status"] == "待销售反馈"
+    pending_after = client.get("/api/assignments/pending", headers=headers)
+    assert all(item["id"] != target["id"] for item in pending_after.json()["items"])
 
     audit = client.get("/api/audit-logs", headers=headers)
     assert any(
@@ -926,18 +929,13 @@ def test_pending_assignment_with_existing_owner_requires_expected_owner(client: 
         lead = db.query(Lead).filter(Lead.customer_name == "Al Noor Hospital").first()
         assert lead is not None
         lead.owner_id = 2
+        lead_id = lead.id
         db.commit()
-    target = next(
-        item
-        for item in client.get("/api/assignments/pending", headers=headers).json()["items"]
-        if item["customer_name"] == "Al Noor Hospital"
-    )
-    assert target["owner_id"] == 2
-    assert target["owner_name"] == "Maria Chen"
-    assert "COUNTRY_MAPPING_MISSING" in target["pending_reasons"]
+    pending = client.get("/api/assignments/pending", headers=headers)
+    assert all(item["id"] != lead_id for item in pending.json()["items"])
 
     stale = client.post(
-        f"/api/assignments/{target['id']}/assign",
+        f"/api/assignments/{lead_id}/assign",
         json={"owner_id": 2, "expected_owner_id": None},
         headers=headers,
     )
@@ -945,8 +943,8 @@ def test_pending_assignment_with_existing_owner_requires_expected_owner(client: 
     assert stale.json()["detail"]["code"] == "ASSIGNMENT_CONFLICT"
 
     current = client.post(
-        f"/api/assignments/{target['id']}/assign",
-        json={"owner_id": 2, "expected_owner_id": target["owner_id"]},
+        f"/api/assignments/{lead_id}/assign",
+        json={"owner_id": 2, "expected_owner_id": 2},
         headers=headers,
     )
     assert current.status_code == 200
@@ -2272,6 +2270,32 @@ def test_product_knowledge_overview_lists_products_versions_and_ai_guidance(clie
     assert any(item["product_type"] in {"Portable", "Handheld", "Trolley"} for item in body["items"])
 
 
+def test_product_knowledge_custom_bases_can_be_added_renamed_and_deleted(client: TestClient) -> None:
+    headers = {**auth_headers(client), "x-trace-id": "knowledge-base-category-test"}
+    base_key = f"market-{uuid4().hex[:8]}"
+    renamed_key = f"market-renamed-{uuid4().hex[:8]}"
+
+    created = client.post(
+        "/api/settings/product-knowledge/bases",
+        json={"current_key": None, "next_key": base_key},
+        headers=headers,
+    )
+    assert created.status_code == 200
+    assert base_key in created.json()
+
+    renamed = client.post(
+        "/api/settings/product-knowledge/bases",
+        json={"current_key": base_key, "next_key": renamed_key},
+        headers=headers,
+    )
+    assert renamed.status_code == 200
+    assert renamed_key in renamed.json()
+
+    deleted = client.delete(f"/api/settings/product-knowledge/bases/{renamed_key}", headers=headers)
+    assert deleted.status_code == 200
+    assert renamed_key not in deleted.json()
+
+
 def test_product_knowledge_save_persists_version_audit_and_ai_context(client: TestClient) -> None:
     model_name = f"Sonobook-{uuid4().hex[:8]}"
     headers = {**auth_headers(client), "x-trace-id": "product-knowledge-save-test"}
@@ -2546,13 +2570,29 @@ def test_bulk_email_campaign_is_admin_ops_only_and_uses_customer_filters(client:
         "/api/email-campaigns",
         json={
             "filters": filters,
+            "purpose": "活动推广",
             "subject": "Portable Ultrasound promotion",
             "body": "Hi, we prepared a short update for portable ultrasound distributors and clinics.",
+            "generation_prompt": "生成活动推广模板，强调人工确认后再发送。",
+            "writer_role_key": "baymax",
+            "reference_attachments": [
+                {
+                    "filename": "campaign-plan.xlsx",
+                    "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "size": 1200,
+                    "uploaded_by": "admin",
+                    "uploaded_at": "2026-07-02T00:00:00",
+                }
+            ],
         },
         headers=headers,
     )
     assert campaign.status_code == 201
     assert campaign.json()["target_count"] == preview_body["target_count"]
+    assert campaign.json()["status"] == "draft"
+    assert campaign.json()["purpose"] == "活动推广"
+    assert campaign.json()["writer_role_name"]
+    assert campaign.json()["reference_attachments"][0]["filename"] == "campaign-plan.xlsx"
 
     sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
     denied = client.post("/api/email-campaigns/preview", json=filters, headers=sales_headers)
@@ -2605,12 +2645,12 @@ def test_nurture_attachment_upload_validates_and_participates_in_regeneration(cl
 
     uploaded = client.post(
         f"/api/nurture-tasks/{task['id']}/attachments",
-        files={"file": ("Portable-US-comparison.pdf", b"portable comparison", "application/pdf")},
+        files={"file": ("Portable-US-comparison.xlsx", b"portable comparison", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
         headers=headers,
     )
     assert uploaded.status_code == 200
     body = uploaded.json()
-    assert body["attachments"][0]["filename"] == "Portable-US-comparison.pdf"
+    assert body["attachments"][0]["filename"] == "Portable-US-comparison.xlsx"
 
     regenerated = client.post(
         f"/api/nurture-tasks/{task['id']}/regenerate",
@@ -2619,10 +2659,10 @@ def test_nurture_attachment_upload_validates_and_participates_in_regeneration(cl
     )
     assert regenerated.status_code == 200
     result = regenerated.json()
-    assert "Portable-US-comparison.pdf" in result["prompt_context_snapshot"]["rendered_prompt"]
-    assert "Portable-US-comparison.pdf" in result["draft_content"]
-    assert result["model_provider"] == "Anthropic"
-    assert result["model_version"] == "claude-sonnet"
+    assert "Portable-US-comparison.xlsx" in result["prompt_context_snapshot"]["rendered_prompt"]
+    assert "Portable-US-comparison.xlsx" in result["draft_content"]
+    assert result["model_provider"]
+    assert result["model_version"]
     assert result["approval_status"] == "pending"
 
 

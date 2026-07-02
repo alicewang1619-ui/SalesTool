@@ -140,6 +140,7 @@ from .schemas import (
     ProductKnowledgeContextOut,
     ProductKnowledgeOut,
     ProductKnowledgePage,
+    ProductKnowledgeBaseRequest,
     ProductKnowledgeStatusRequest,
     ProductKnowledgeUpdateRequest,
     SalesUserCreateRequest,
@@ -676,12 +677,16 @@ def email_settings_for_user(db: Session, user: User) -> dict[str, object]:
     return {"sender_email": user.email, "sender_name": user.name, "smtp_host": "", "configured": False}
 
 
+PENDING_SALES_FEEDBACK_STATUS = "待销售反馈"
 SALES_FEEDBACK_STATUS_OPTIONS = ["无效", "跟进中", "已报价", "已签单", "已付款", "价格流失", "撤单"]
 SALES_FEEDBACK_JUDGEMENT_OPTIONS = ["真实需求，继续推进", "资料不足，先补充", "预算或价格不匹配", "客户取消或撤单", "无效客户"]
 FEEDBACK_STATUS_ALIASES = {
-    "unfeedback": "跟进中",
-    "未反馈": "跟进中",
-    "需跟进": "跟进中",
+    "unfeedback": PENDING_SALES_FEEDBACK_STATUS,
+    "未反馈": PENDING_SALES_FEEDBACK_STATUS,
+    "需跟进": PENDING_SALES_FEEDBACK_STATUS,
+    "待反馈": PENDING_SALES_FEEDBACK_STATUS,
+    "已分配": PENDING_SALES_FEEDBACK_STATUS,
+    "已分配 / 待销售反馈": PENDING_SALES_FEEDBACK_STATUS,
     "已联系": "跟进中",
     "有效跟进": "跟进中",
     "已成交": "已签单",
@@ -695,7 +700,9 @@ def normalise_feedback_status(raw_status: str | None, assigned: bool) -> str:
         return "未分配"
     status_value = (raw_status or "").strip()
     status_value = FEEDBACK_STATUS_ALIASES.get(status_value, status_value)
-    return status_value if status_value in SALES_FEEDBACK_STATUS_OPTIONS else "跟进中"
+    if status_value == PENDING_SALES_FEEDBACK_STATUS:
+        return PENDING_SALES_FEEDBACK_STATUS
+    return status_value if status_value in SALES_FEEDBACK_STATUS_OPTIONS else PENDING_SALES_FEEDBACK_STATUS
 
 
 SCORE_DIMENSION_CONFIG = [
@@ -965,7 +972,7 @@ def process_import_job(db: Session, job: ImportJob) -> None:
             source_category=clean["source_category"],
             source_label=clean["source_label"],
             score_label="pending",
-            feedback_status="跟进中" if owner else "未分配",
+            feedback_status=PENDING_SALES_FEEDBACK_STATUS if owner else "未分配",
             raw_inquiry=raw_inquiry,
             conversation_history="[]",
             owner_id=owner.id if owner else None,
@@ -1316,6 +1323,8 @@ def retry_import_job(
 
 
 def pending_reasons_for_lead(lead: Lead, mapped_countries: set[str]) -> list[str]:
+    if lead.owner_id is not None:
+        return []
     reasons: list[str] = []
     if not lead.country.strip():
         reasons.append("COUNTRY_MISSING")
@@ -1661,7 +1670,7 @@ def confirm_pending_assignment(
         )
 
     lead.owner_id = owner.id
-    lead.feedback_status = "跟进中"
+    lead.feedback_status = PENDING_SALES_FEEDBACK_STATUS
     db.query(SalesFeedbackLink).filter(
         SalesFeedbackLink.lead_id == lead.id,
         SalesFeedbackLink.active.is_(True),
@@ -1810,7 +1819,7 @@ def update_lead_assignment(
     else:
         lead.owner_id = None
     lead.feedback_status = normalise_feedback_status(payload.feedback_status, lead.owner_id is not None)
-    if lead.owner_id is not None and lead.feedback_status not in FEEDBACK_STATUS_OPTIONS:
+    if lead.owner_id is not None and lead.feedback_status not in [*FEEDBACK_STATUS_OPTIONS, PENDING_SALES_FEEDBACK_STATUS]:
         raise HTTPException(status_code=422, detail=error_detail("INVALID_FEEDBACK_STATUS", "Feedback status is not supported."))
     add_audit(
         db,
@@ -1884,7 +1893,7 @@ def dashboard(
         metrics=DashboardMetrics(
             today_inquiries=scoped_count(Lead.created_at >= today_start),
             valid_leads=scoped_count(Lead.score_label.in_(["有效", "鏈夋晥", "valid"])),
-            unfeedback=scoped_count(Lead.feedback_status.in_(["未分配", "跟进中", "未反馈", "鏈弽棣?", "unfeedback", "unassigned"])),
+            unfeedback=scoped_count(Lead.feedback_status.in_(["未分配", PENDING_SALES_FEEDBACK_STATUS, "跟进中", "未反馈", "鏈弽棣?", "unfeedback", "unassigned"])),
             website_kpi=round((website_total / total) * 100) if total else 0,
         ),
         time_scope=time_scope_detail(resolved_scope, start_at, end_at, scope_label),
@@ -1911,7 +1920,7 @@ def dashboard(
 
 
 VALID_SCORE_LABELS = ["有效", "鏈夋晥", "valid", "高意向", "高意向"]
-UNFEEDBACK_LABELS = ["未分配", "跟进中", "未反馈", "鏈弽棣?", "unfeedback", "unassigned"]
+UNFEEDBACK_LABELS = ["未分配", PENDING_SALES_FEEDBACK_STATUS, "跟进中", "未反馈", "鏈弽棣?", "unfeedback", "unassigned"]
 WEBSITE_SOURCE_LABELS = ["网站", "缃戠珯", "website", "官网"]
 
 
@@ -3353,21 +3362,28 @@ def create_email_campaign(
 ) -> BulkEmailCampaignOut:
     preview = bulk_email_preview(db, user, payload.filters)
     mail_settings = global_email_settings(db)
+    writer = email_writer_for_key(db, payload.writer_role_key)
     campaign_id = uuid4().hex
     add_audit(
         db,
         request.state.trace_id,
         "bulk_email_campaign_created",
-        f"Bulk email campaign created: {payload.subject}; targets={preview.target_count}",
+        f"Bulk email campaign draft created: {payload.purpose}; {payload.subject}; targets={preview.target_count}; writer={writer.key}; attachments={len(payload.reference_attachments)}",
         actor_id=user.id,
         target_type="email_campaign",
     )
     db.commit()
     return BulkEmailCampaignOut(
         campaign_id=campaign_id,
-        status="created",
+        status="draft",
         target_count=preview.target_count,
+        purpose=payload.purpose,
         subject=payload.subject,
+        body=payload.body,
+        generation_prompt=payload.generation_prompt,
+        writer_role_key=writer.key,
+        writer_role_name=writer.display_name,
+        reference_attachments=payload.reference_attachments,
         sender_email=mail_settings.sender_email or user.email,
         created_at=datetime.utcnow(),
     )
@@ -3433,7 +3449,7 @@ async def upload_nurture_attachment(
     require_nurture_scope(db, request, user, task)
     filename = file.filename or "attachment"
     suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if suffix not in {"pdf", "doc", "docx", "txt", "png", "jpg", "jpeg"}:
+    if suffix not in {"pdf", "doc", "docx", "xls", "xlsx", "txt", "png", "jpg", "jpeg"}:
         raise HTTPException(
             status_code=400,
             detail=error_detail("NURTURE_ATTACHMENT_UNSUPPORTED", "Unsupported attachment type"),
@@ -3673,6 +3689,8 @@ def settings_entries() -> list[SettingsEntryOut]:
 MAIL_SETTING_KEY = "mail:global"
 CHANNEL_CONFIG_SETTING_KEY = "channels:config"
 REMINDER_RULE_SETTING_KEY = "reminders:rules"
+PRODUCT_KNOWLEDGE_BASES_SETTING_KEY = "product_knowledge:bases"
+DEFAULT_KNOWLEDGE_BASES = ["product", "competitor", "market"]
 DEFAULT_CHANNEL_CONFIGS = [
     {
         "key": "website_chat",
@@ -3728,6 +3746,31 @@ def write_json_setting(db: Session, key: str, value: object, user_id: int) -> Sy
     setting.value = json.dumps(value, ensure_ascii=False)
     setting.updated_by = user_id
     return setting
+
+
+def clean_knowledge_base_key(value: str) -> str:
+    return value.strip()
+
+
+def merge_knowledge_bases(*groups: list[str] | set[str]) -> list[str]:
+    ordered: list[str] = []
+    for group in groups:
+        for value in group:
+            key = clean_knowledge_base_key(value)
+            if key and key not in ordered:
+                ordered.append(key)
+    return ordered
+
+
+def product_knowledge_bases(db: Session) -> list[str]:
+    loaded = load_json_setting(db, PRODUCT_KNOWLEDGE_BASES_SETTING_KEY, DEFAULT_KNOWLEDGE_BASES)
+    configured = [str(item) for item in loaded] if isinstance(loaded, list) else DEFAULT_KNOWLEDGE_BASES
+    item_bases = {
+        item
+        for item in db.scalars(select(ProductKnowledge.knowledge_base)).all()
+        if item
+    }
+    return merge_knowledge_bases(DEFAULT_KNOWLEDGE_BASES, configured, item_bases)
 
 
 def source_dictionary_rows(db: Session) -> list[SourceDictionaryOut]:
@@ -4363,7 +4406,7 @@ def product_knowledge_page(
             "draft_items": len([item for item in rows if item.status == "draft"]),
             "disabled_items": len([item for item in rows if item.status == "disabled"]),
         },
-        knowledge_bases=sorted({item.knowledge_base for item in rows} | {"product", "competitor", "market"}),
+        knowledge_bases=product_knowledge_bases(db),
         active_version=product_knowledge_active_version(rows),
         items=[ProductKnowledgeOut.model_validate(item, from_attributes=True) for item in filtered[start : start + page_size]],
         empty_state=EmptyStateOut(title="暂无产品知识", action_label="新增产品知识", action_path="/admin/settings/product-knowledge") if not filtered else None,
@@ -4420,6 +4463,68 @@ def save_product_knowledge(
     db.commit()
     db.refresh(item)
     return ProductKnowledgeOut.model_validate(item, from_attributes=True)
+
+
+@app.post("/api/settings/product-knowledge/bases", response_model=list[str])
+def save_product_knowledge_base(
+    payload: ProductKnowledgeBaseRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[str]:
+    next_key = clean_knowledge_base_key(payload.next_key)
+    current_key = clean_knowledge_base_key(payload.current_key or "")
+    if not next_key:
+        raise HTTPException(status_code=422, detail=error_detail("KNOWLEDGE_BASE_REQUIRED", "Knowledge base name is required."))
+    bases = product_knowledge_bases(db)
+    if current_key and current_key != next_key and next_key in bases:
+        raise HTTPException(status_code=409, detail=error_detail("KNOWLEDGE_BASE_EXISTS", "Knowledge base already exists."))
+    if current_key and current_key != next_key:
+        db.query(ProductKnowledge).filter(ProductKnowledge.knowledge_base == current_key).update(
+            {"knowledge_base": next_key},
+            synchronize_session=False,
+        )
+        bases = [next_key if item == current_key else item for item in bases]
+    if next_key not in bases:
+        bases.append(next_key)
+    bases = merge_knowledge_bases(DEFAULT_KNOWLEDGE_BASES, bases)
+    write_json_setting(db, PRODUCT_KNOWLEDGE_BASES_SETTING_KEY, bases, user.id)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_product_knowledge_base_saved",
+        f"Product knowledge base saved: {current_key or '(new)'} -> {next_key}.",
+        actor_id=user.id,
+        target_type="product_knowledge_base",
+    )
+    db.commit()
+    return product_knowledge_bases(db)
+
+
+@app.delete("/api/settings/product-knowledge/bases/{base_key}", response_model=list[str])
+def delete_product_knowledge_base(
+    base_key: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> list[str]:
+    key = clean_knowledge_base_key(base_key)
+    if key in DEFAULT_KNOWLEDGE_BASES:
+        raise HTTPException(status_code=422, detail=error_detail("KNOWLEDGE_BASE_DEFAULT_PROTECTED", "Default knowledge bases cannot be deleted."))
+    if db.scalar(select(ProductKnowledge.id).where(ProductKnowledge.knowledge_base == key)):
+        raise HTTPException(status_code=422, detail=error_detail("KNOWLEDGE_BASE_IN_USE", "Move or disable existing knowledge items before deleting this base."))
+    bases = [item for item in product_knowledge_bases(db) if item != key]
+    write_json_setting(db, PRODUCT_KNOWLEDGE_BASES_SETTING_KEY, bases, user.id)
+    add_audit(
+        db,
+        request.state.trace_id,
+        "settings_product_knowledge_base_deleted",
+        f"Product knowledge base deleted: {key}.",
+        actor_id=user.id,
+        target_type="product_knowledge_base",
+    )
+    db.commit()
+    return product_knowledge_bases(db)
 
 
 @app.put("/api/settings/product-knowledge/{knowledge_id}/status", response_model=ProductKnowledgeOut)

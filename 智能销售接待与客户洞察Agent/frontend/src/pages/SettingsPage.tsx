@@ -338,6 +338,13 @@ export function SettingsPage() {
     setSourceRows((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
   }
 
+  function removeSourceRow(index: number) {
+    setSourceRows((rows) => rows.flatMap((row, rowIndex) => {
+      if (rowIndex !== index) return [row];
+      return row.id ? [{ ...row, enabled: false }] : [];
+    }));
+  }
+
   function updateChannelRow(index: number, patch: Partial<ChannelConfig>) {
     setChannelRows((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
   }
@@ -877,6 +884,11 @@ export function SettingsPage() {
                     <Col xs={24} md={6}>
                       <Typography.Text className="field-label">是否启用</Typography.Text>
                       <Space><Switch checked={row.enabled} onChange={(enabled) => updateSourceRow(index, { enabled })} /><Typography.Text>{row.enabled ? "启用" : "停用"}</Typography.Text></Space>
+                    </Col>
+                    <Col xs={24}>
+                      <Button danger icon={<Trash2 size={16} />} onClick={() => removeSourceRow(index)}>
+                        {row.id ? "删除/停用来源" : "删除未保存来源"}
+                      </Button>
                     </Col>
                   </Row>
                 ))}

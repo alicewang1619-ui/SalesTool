@@ -2163,6 +2163,7 @@ def test_settings_ai_model_scenarios_and_email_writers_can_be_saved(client: Test
                     "role_goal": "Write a natural reply that clarifies the next step.",
                     "background": "Best for customer replies after an inquiry or follow-up.",
                     "tags": ["reply", "mirror-customer-intent"],
+                    "prompt_directive": "Write as ReplyMirror. Mirror the customer's implied need before asking one narrow confirmation question.",
                     "status": "enabled",
                 },
                 {
@@ -2176,6 +2177,7 @@ def test_settings_ai_model_scenarios_and_email_writers_can_be_saved(client: Test
                     "role_goal": "Provide a reliable reply with compliance boundaries.",
                     "background": "Best for hospitals and technical discussions.",
                     "tags": ["formal", "medical", "technical"],
+                    "prompt_directive": "Write as Baymax. Focus on clinical workflow and compliance-safe technical fit.",
                     "status": "enabled",
                 },
             ],
@@ -2194,6 +2196,7 @@ def test_settings_ai_model_scenarios_and_email_writers_can_be_saved(client: Test
     assert reply_mirror["capabilities"].startswith("Mirror customer intent")
     assert reply_mirror["role_goal"].startswith("Write a natural reply")
     assert "mirror-customer-intent" in reply_mirror["tags"]
+    assert reply_mirror["prompt_directive"].startswith("Write as ReplyMirror")
     assert body["default_email_writer"] == "reply_mirror"
 
     writers = client.get("/api/ai/email-writers", headers=headers)
@@ -2843,8 +2846,12 @@ def test_nurture_attachment_upload_validates_and_participates_in_regeneration(cl
     assert result["approval_status"] == "pending"
 
 
-def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient) -> None:
+def test_nurture_regeneration_uses_selected_email_writer_role(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     headers = {**auth_headers(client), "x-trace-id": "nurture-writer-test"}
+    monkeypatch.setattr(main_module, "call_nurture_email_model", lambda model, context: "")
     client.put(
         "/api/settings/ai-model",
         json={
@@ -2862,6 +2869,7 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
                     "role_goal": "Write a natural reply that clarifies the next step.",
                     "background": "Best for customer replies after an inquiry or follow-up.",
                     "tags": ["reply", "mirror-customer-intent"],
+                    "prompt_directive": "Write as ReplyMirror. Mirror the customer's implied need first, then answer calmly, then ask one narrow confirmation question.",
                     "status": "enabled",
                 },
                 {
@@ -2875,6 +2883,7 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
                     "role_goal": "Provide a reliable reply with compliance boundaries.",
                     "background": "Best for hospitals and technical discussions.",
                     "tags": ["formal", "medical", "technical"],
+                    "prompt_directive": "Write as Baymax. Use a professional medical-device structure, focus on clinical workflow and technical fit, and keep compliance-safe boundaries.",
                     "status": "enabled",
                 },
             ],
@@ -2920,6 +2929,7 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
     assert body["writer_role_capabilities"].startswith("Mirror customer intent")
     assert body["writer_role_goal"].startswith("Write a natural reply")
     assert "mirror-customer-intent" in body["writer_role_tags"]
+    assert body["writer_role_prompt_directive"].startswith("Write as ReplyMirror")
     snapshot = body["prompt_context_snapshot"]
     assert snapshot["email_purpose"] == "Customer reply follow-up"
     assert snapshot["writer_role_name"] == "ReplyMirror"
@@ -2927,9 +2937,12 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
     assert snapshot["writer_role_goal"].startswith("Write a natural reply")
     assert "Best for customer replies" in snapshot["writer_role_background"]
     assert "mirror-customer-intent" in snapshot["writer_role_tags"]
+    assert snapshot["writer_role_prompt_directive"].startswith("Write as ReplyMirror")
     assert "Email purpose: Customer reply follow-up" in snapshot["rendered_prompt"]
     assert "Writer capabilities: Mirror customer intent" in snapshot["rendered_prompt"]
+    assert "Writer execution prompt: Write as ReplyMirror" in snapshot["rendered_prompt"]
     assert_english_email_body(body["draft_content"])
+    assert "reflect what I understood" in body["draft_content"]
 
     changed = client.post(
         f"/api/nurture-tasks/{task['id']}/regenerate",
@@ -2948,6 +2961,8 @@ def test_nurture_regeneration_uses_selected_email_writer_role(client: TestClient
     assert "technical" in [tag.lower() for tag in changed_body["writer_role_tags"]]
     assert changed_body["prompt_context_snapshot"]["email_purpose"] == "Technical comparison"
     assert "Writer role goal: Provide a reliable reply" in changed_body["prompt_context_snapshot"]["rendered_prompt"]
+    assert "Writer execution prompt: Write as Baymax" in changed_body["prompt_context_snapshot"]["rendered_prompt"]
+    assert "clinical workflow" in changed_body["draft_content"]
     assert changed_body["draft_content"] != body["draft_content"]
     assert_english_email_body(changed_body["draft_content"])
 

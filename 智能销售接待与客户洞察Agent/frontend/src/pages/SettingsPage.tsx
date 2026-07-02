@@ -103,9 +103,9 @@ const fallbackUseCases: AIModelUseCase[] = [
 ];
 
 const fallbackWriters: EmailWriterRole[] = [
-  { key: "reply_mirror", name: "ReplyMirror", display_name: "ReplyMirror", style: "Reflective, precise, customer-led", skills: ["Customer email reply", "Intent reflection", "Follow-up CTA"], best_for: "Replying to existing inquiries", capabilities: "Mirror customer intent and turn scattered inquiry context into a clear response.", role_goal: "Write a natural reply that clarifies the next step.", background: "Best for customer replies after an inquiry or follow-up.", tags: ["reply", "mirror-customer-intent"], status: "enabled" },
-  { key: "mario", name: "Mario", display_name: "Mario", style: "Energetic, direct, momentum-building", skills: ["Sales follow-up", "Decision push"], best_for: "Active follow-up and decision momentum", capabilities: "Move a conversation toward a clear next step.", role_goal: "Help the customer make a concrete decision.", background: "Best for stalled deals after quote or product comparison.", tags: ["action", "sales-follow-up"], status: "enabled" },
-  { key: "baymax", name: "Baymax", display_name: "Baymax", style: "Steady, professional, reliable", skills: ["Formal email", "Medical customer communication", "Technical explanation"], best_for: "Formal medical customer communication", capabilities: "Turn technical points into credible commercial language.", role_goal: "Provide a reliable reply with compliance boundaries.", background: "Best for hospitals and technical discussions.", tags: ["formal", "medical", "technical"], status: "enabled" }
+  { key: "reply_mirror", name: "ReplyMirror", display_name: "ReplyMirror", style: "Reflective, precise, customer-led", skills: ["Customer email reply", "Intent reflection", "Follow-up CTA"], best_for: "Replying to existing inquiries", capabilities: "Mirror customer intent and turn scattered inquiry context into a clear response.", role_goal: "Write a natural reply that clarifies the next step.", background: "Best for customer replies after an inquiry or follow-up.", tags: ["reply", "mirror-customer-intent"], prompt_directive: "Write as ReplyMirror. First mirror the customer's implied need, then answer calmly, then ask one narrow confirmation question.", status: "enabled" },
+  { key: "mario", name: "Mario", display_name: "Mario", style: "Energetic, direct, momentum-building", skills: ["Sales follow-up", "Decision push"], best_for: "Active follow-up and decision momentum", capabilities: "Move a conversation toward a clear next step.", role_goal: "Help the customer make a concrete decision.", background: "Best for stalled deals after quote or product comparison.", tags: ["action", "sales-follow-up"], prompt_directive: "Write as Mario. Be energetic and direct, summarize the decision path, and end with a decisive next-step CTA.", status: "enabled" },
+  { key: "baymax", name: "Baymax", display_name: "Baymax", style: "Steady, professional, reliable", skills: ["Formal email", "Medical customer communication", "Technical explanation"], best_for: "Formal medical customer communication", capabilities: "Turn technical points into credible commercial language.", role_goal: "Provide a reliable reply with compliance boundaries.", background: "Best for hospitals and technical discussions.", tags: ["formal", "medical", "technical"], prompt_directive: "Write as Baymax. Use a professional medical-device structure, focus on workflow and technical fit, and keep compliance-safe boundaries.", status: "enabled" }
 ];
 
 const knowledgeBaseLinks = [
@@ -150,6 +150,7 @@ function writerTooltipTitle(writer: EmailWriterRole) {
       <div>Skills: {writer.skills?.join(", ") || "Not configured"}</div>
       <div>Background: {writer.background || "Not configured"}</div>
       <div>Tags: {(writer.tags ?? []).join(", ") || "None"}</div>
+      <div>Prompt: {writer.prompt_directive || "Not configured"}</div>
     </div>
   );
 }
@@ -506,6 +507,7 @@ export function SettingsPage() {
       role_goal: "",
       background: "",
       tagsText: "",
+      prompt_directive: "",
       best_for: "",
       status: "enabled"
     });
@@ -538,6 +540,7 @@ export function SettingsPage() {
       role_goal: (values.role_goal ?? "").trim(),
       background: (values.background ?? "").trim(),
       tags,
+      prompt_directive: (values.prompt_directive ?? "").trim(),
       best_for: values.best_for.trim(),
       status: values.status || "enabled"
     };
@@ -1059,6 +1062,7 @@ export function SettingsPage() {
                   <strong>{selectedWriterForDetails?.name}</strong>
                   <Typography.Paragraph className="muted">{selectedWriterForDetails?.role_goal || selectedWriterForDetails?.best_for}</Typography.Paragraph>
                   <Typography.Paragraph className="muted">{selectedWriterForDetails?.capabilities || selectedWriterForDetails?.style}</Typography.Paragraph>
+                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.prompt_directive}</Typography.Paragraph>
                   <Space wrap>{selectedWriterForDetails?.skills.map((skill) => <Tag key={skill}>{skill}</Tag>)}</Space>
                   <Space wrap style={{ marginTop: 8 }}>{(selectedWriterForDetails?.tags ?? []).map((tag) => <Tag color="purple" key={tag}>{tag}</Tag>)}</Space>
                   <Space wrap style={{ marginTop: 12 }}>
@@ -1153,6 +1157,7 @@ export function SettingsPage() {
           <Form.Item name="skillsText" label="相关技能（用逗号或换行分隔）" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={3} placeholder="Customer email reply&#10;Intent reflection&#10;Follow-up CTA" /></Form.Item>
           <Form.Item name="background" label="其他背景定义" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={3} placeholder="Best for customer replies after an inquiry or follow-up." /></Form.Item>
           <Form.Item name="tagsText" label="角色定义标签（用逗号或换行分隔）"><Input.TextArea rows={2} placeholder="reply, mirror-customer-intent, compliance" /></Form.Item>
+          <Form.Item name="prompt_directive" label="后台执行提示词" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={4} placeholder="Write as ReplyMirror. First mirror the customer's implied need, then answer calmly, then ask one narrow confirmation question." /></Form.Item>
           <Form.Item name="style" label="风格" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={2} placeholder="Reflective, precise, customer-led" /></Form.Item>
           <Form.Item name="best_for" label="适用场景" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={2} /></Form.Item>
           <Form.Item name="status" label="状态" rules={[{ required: true }]}><Select options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} /></Form.Item>

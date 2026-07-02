@@ -623,6 +623,7 @@ class NurturePromptContextOut(BaseModel):
     writer_role_goal: str = ""
     writer_role_background: str = ""
     writer_role_tags: list[str] = Field(default_factory=list)
+    writer_role_prompt_directive: str = ""
     attachments: list[NurtureAttachmentOut]
     rendered_prompt: str
 
@@ -655,6 +656,7 @@ class NurtureTaskOut(BaseModel):
     writer_role_goal: str
     writer_role_background: str
     writer_role_tags: list[str]
+    writer_role_prompt_directive: str
     email_status: str
     approval_status: str
     detail_path: str
@@ -829,6 +831,7 @@ class EmailWriterRoleOut(BaseModel):
     role_goal: str = ""
     background: str = ""
     tags: list[str] = Field(default_factory=list)
+    prompt_directive: str = ""
 
 
 class AIModelConfigOut(BaseModel):

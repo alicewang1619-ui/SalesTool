@@ -652,6 +652,7 @@ export type EmailWriterRole = {
   role_goal?: string;
   background?: string;
   tags?: string[];
+  prompt_directive?: string;
 };
 
 export type AIModelConfig = {
@@ -845,6 +846,7 @@ export type NurturePromptContext = {
   writer_role_goal: string;
   writer_role_background: string;
   writer_role_tags: string[];
+  writer_role_prompt_directive: string;
   attachments: NurtureAttachment[];
   rendered_prompt: string;
 };
@@ -877,6 +879,7 @@ export type NurtureTask = {
   writer_role_goal: string;
   writer_role_background: string;
   writer_role_tags: string[];
+  writer_role_prompt_directive: string;
   email_status: string;
   approval_status: "pending" | "confirmed" | "cancelled";
   detail_path: string;

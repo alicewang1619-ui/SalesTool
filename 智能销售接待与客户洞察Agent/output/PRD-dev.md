@@ -244,6 +244,8 @@ assigned -> no_feedback -> manager_attention
 - `SettingsPage` 的邮件写手 Select 选项标签只显示 `writer.name`，不得拼接 `style`、`skills` 或 `tags`。
 - 角色说明通过 `Tooltip` / `Popover` 展示，内容包含角色目标、能力与技能方向、相关技能、背景定义和角色标签。
 - 编辑/删除所选写手不再放在 Card 顶部 `extra`，应渲染到选中写手详情卡片底部，按钮文案为“编辑”“删除”。
+- 每个邮件写手必须有独立的后台执行提示词 `prompt_directive`，与角色目标、能力方向、技能、背景和标签共同进入大模型上下文；切换写手后重新生成必须让正文结构、语气、CTA 和客户承接方式产生可见差异，不得只替换角色名或生成相同模板。
+- 默认写手的 `prompt_directive` 必须全部使用英文配置，不使用中文角色名；`ReplyMirror` 专注回邮镜像客户意图，`Mario` 专注推进下一步，`Doraemon` 专注温和帮助，`Pikachu` 专注轻量友好，`Totoro` 专注长期关系，`Baymax` 专注专业合规，`Nemo` 专注探索式发现。
 
 ## 2026-07-02 大模型连接配置 UI 补充
 - `SettingsPage` 的“大模型连接配置”Card 顶部 `extra` 只保留添加和保存动作。

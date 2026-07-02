@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { extractArticle, fetchAndExtract, FetchError } from '../../src/services/extract.ts';
+import { extractArticle, fetchAndExtract, FetchError, isChallengePage } from '../../src/services/extract.ts';
 
 const longPara = (s: string) => `<p>${s.repeat(8)}</p>`;
 
@@ -123,5 +123,17 @@ describe('U-ING-03 抓取失败判定', () => {
 
   it('FetchError 是可被识别的错误类型', () => {
     expect(new FetchError('x', 'network') instanceof FetchError).toBe(true);
+  });
+
+  it('人机验证/验证码页识别并给可操作回退提示（issue #18）', () => {
+    const cf = '<html><head><title>Just a moment...</title></head><body>Checking your browser before accessing kaggle.com. Enable JavaScript and cookies to continue</body></html>';
+    expect(isChallengePage(cf)).toBe(true);
+    expect(() => extractArticle(cf, 'https://www.kaggle.com/x')).toThrow(/剪藏扩展|粘贴文本/);
+  });
+
+  it('正文里提到验证码的正常文章不被误判', () => {
+    const article = `<html><head><title>reCAPTCHA 原理</title></head><body><article><h1>reCAPTCHA 原理</h1>${'<p>本文讲解 reCAPTCHA 与 hCaptcha 如何区分人机，以及 captcha 的演进历史。</p>'.repeat(6)}</article></body></html>`;
+    expect(isChallengePage(article)).toBe(false);
+    expect(() => extractArticle(article, 'https://blog.test/recaptcha')).not.toThrow();
   });
 });

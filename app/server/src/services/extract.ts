@@ -68,8 +68,25 @@ function textFromNode(doc: Document, selectors: string[], stripSelectors: string
   return '';
 }
 
+/**
+ * 人机验证 / 验证码 / 反爬盾页面识别（issue #18）。
+ * 这类页面常返回 200 但正文是验证内容（如 Cloudflare「Just a moment…」、Kaggle 盾），
+ * 用强特征匹配（挑战页专有措辞），避免误伤「正文讲验证码」的正常文章。
+ */
+export function isChallengePage(html: string): boolean {
+  return /just a moment…|just a moment\.\.\.|checking (?:if the site connection is secure|your browser before accessing)|cf-browser-verification|cf_chl_opt|__cf_chl_|enable javascript and cookies to continue|attention required! \| cloudflare|please (?:complete the security check|verify you are (?:a )?human)|verifying you are human|请完成(?:安全|人机|滑动)验证|滑动(?:上方拼图|完成验证)/i.test(
+    html,
+  );
+}
+
 /** 从 HTML 提取正文（去导航/广告/脚本）。抓不到正文抛 FetchError('network')。 */
 export function extractArticle(html: string, url = ''): Article {
+  if (isChallengePage(html)) {
+    throw new FetchError(
+      '该网站返回了人机验证/验证码页（如 Cloudflare 盾、Kaggle 等），服务器无法直接抓取——请用浏览器「剪藏扩展」在你已通过验证的页面上剪藏，或复制正文用「粘贴文本」录入。',
+      'network',
+    );
+  }
   const safeHtml = sanitizeContent(html);
   const dom = new JSDOM(safeHtml, { url: url || 'https://example.invalid/' });
   const doc = dom.window.document;

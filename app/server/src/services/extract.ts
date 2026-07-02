@@ -8,6 +8,7 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { config } from '../config.ts';
 import { sanitizeContent } from './sanitize.ts';
+import { fetchAcademicMeta, metaToArticle } from './academic.ts';
 
 export class FetchError extends Error {
   constructor(
@@ -115,6 +116,13 @@ export function extractArticle(html: string, url = ''): Article {
 
 /** 真实抓取并提取。非 200 / 超时 / 网络错误抛 FetchError（U-ING-03）。 */
 export async function fetchAndExtract(url: string): Promise<Article> {
+  // 学术论文（DOI/arXiv）优先用开放 API 取标题+作者+摘要，绕开付费墙/反爬（issue #9）。
+  const meta = await fetchAcademicMeta(url).catch(() => null);
+  if (meta) {
+    const a = metaToArticle(meta, url);
+    return { title: a.title, content: sanitizeContent(a.content), viaWeixin: false };
+  }
+
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), config.fetchTimeoutMs);
   let res: Response;

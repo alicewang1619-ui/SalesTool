@@ -248,3 +248,8 @@ assigned -> no_feedback -> manager_attention
 ## 2026-07-02 大模型连接配置 UI 补充
 - `SettingsPage` 的“大模型连接配置”Card 顶部 `extra` 只保留添加和保存动作。
 - 编辑/删除当前模型不再放在 Card 顶部，应渲染到选中模型详情卡片底部，按钮文案为“编辑”“删除”，删除仍走现有二次确认与绑定回退逻辑。
+
+## 2026-07-02 全站信息型蓝框清理开发口径
+- 前端不得在业务页面继续使用 `Alert type="info"` 展示说明性文案、筛选摘要、用途说明、权限说明或选中态；应改为 `Typography.Text`、`Typography.Paragraph`、普通 `Card` 内容、`Tag`、`Tooltip` 或现有 `muted` 文案。
+- `Alert` 仅保留给 error、warning、success 等需要用户关注或处理的状态反馈，例如接口错误、发信邮箱未配置、导入/导出任务结果。
+- 清理范围覆盖所有 `frontend/src/pages`，修改后需通过前端构建并确认没有残留说明型 `type="info"`。

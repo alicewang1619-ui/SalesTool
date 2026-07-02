@@ -9,6 +9,8 @@ type LoginForm = {
   password: string;
 };
 
+const accountEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -52,13 +54,26 @@ export function LoginPage() {
             <Alert className="login-error" type="info" showIcon message="请输入后台账号和密码，登录后才会显示左侧菜单。" />
           )}
 
-          <Form<LoginForm> layout="vertical" requiredMark={false} onFinish={(values) => void handleSubmit(values)} autoComplete="on">
+          <Form<LoginForm>
+            layout="vertical"
+            requiredMark={false}
+            onFinish={(values) => void handleSubmit(values)}
+            onValuesChange={() => setErrorMessage(null)}
+            autoComplete="on"
+          >
             <Form.Item
               label="账号邮箱"
               name="email"
               rules={[
                 { required: true, message: "请输入账号邮箱。" },
-                { type: "email", message: "请输入有效邮箱账号。" }
+                {
+                  validator: async (_, value: string | undefined) => {
+                    if (!value || accountEmailPattern.test(value.trim())) {
+                      return;
+                    }
+                    throw new Error("请输入有效邮箱账号。");
+                  }
+                }
               ]}
             >
               <Input prefix={<Mail size={16} />} autoComplete="username" placeholder="admin@ultrasound-growth.local" />

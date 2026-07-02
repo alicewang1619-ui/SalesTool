@@ -48,6 +48,7 @@
 - [07-02-2026 17:44:00] 再营销英文模板实现与验证｜背景：完成后端生成链路替换和测试补充后，需要确认用户反馈的中英文混杂问题已被门禁覆盖。｜结论：`POST /api/nurture-tasks/{task_id}/regenerate` 已从硬拼字符串改为后端生成服务；生成输入保留客户上下文、写手风格技能、人工提示词和附件，正文输出校验为英文邮件正文；专项测试 `py -m pytest .\tests\test_api_contract.py -q -k "nurture or ai_model_library"` 9 passed，全量后端 110 passed，前端构建通过。｜来源：AI
 - [07-02-2026 17:45:36] 模型 API Key 服务端调用修正｜背景：复核后发现若只读取环境变量，管理员在设置页新增模型并填写 API Key 后仍无法让再营销接口直接调用该模型，和用户“直接调用后台的大模型”的要求不一致。｜结论：在不回显明文 Key 的前提下，后端需保存并复用服务端密钥字段；模型调用优先使用设置页保存的 Key，其次读取环境变量，若二者都不可用或调用失败才返回英文兜底模板。｜来源：AI
 - [07-02-2026 17:48:54] 再营销模型调用最终门禁｜背景：补齐设置页 API Key 服务端保存与复用后，需要重新验证不会回显密钥且再营销英文模板链路仍稳定。｜结论：新增契约断言设置页响应不包含 `api_key` / `api_key_secret`，但后端模型调用会使用保存的 Key；专项 `py -m pytest .\tests\test_api_contract.py -q -k "ai_model_library or nurture"` 9 passed，全量 `py -m pytest .\tests -q` 110 passed，前端 `npm.cmd run build` 通过。｜来源：AI
+- [07-02-2026 17:51:10] 再营销英文模板修复推送完成｜背景：用户要求修改后上传到 Alice 仓库，且不得推送到陈国增仓库。｜结论：已提交并推送 commit `8efc8e53`（修复再营销英文模板生成）到 `origin/main`，远端为 `https://github.com/alicewang1619-ui/SalesTool.git`；未推送到 `chenguozeng-origin`。｜来源：AI
 
 ## 待解决问题
 

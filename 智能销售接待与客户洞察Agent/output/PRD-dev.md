@@ -296,3 +296,6 @@ assigned -> no_feedback -> manager_attention
 - 写邮件、再营销重新生成和群发邮件生成必须按场景读取启用知识库内容，并把知识库内容作为大模型数据上下文；用户不需要回到设置中心手动寻找知识库。
 - 知识库接口需在 `ProductKnowledge` 中保存 `tags` 关键词数组；`GET /api/ai/product-knowledge/context` 输出时必须携带标签并写入渲染后的 Prompt。
 - 知识库上传接口为 `POST /api/settings/product-knowledge/upload`，支持 PDF、Word、TXT/Markdown，后端解析正文后返回 `extracted_text` 和 `suggested_tags`，前端填入知识内容但仍需人工确认保存。
+
+## 2026-07-03 群发邮件附件解析补充
+- 群发邮件参考附件上传后必须立即进入后端解析链路，支持 PDF、Word、Excel 抽取可读正文；页面需展示“已解析正文 / 仅元数据”状态，创建群发草稿时必须把 `extracted_text` 写入 `prompt_context_snapshot.rendered_prompt`，不能只把文件名传给大模型。

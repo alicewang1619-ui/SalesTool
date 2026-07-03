@@ -66,3 +66,6 @@
 - NURTURE-DETAIL-P0-12：切换邮件写手角色后必须重新生成草稿，`draft_content`、`writer_role_key` 和角色定义快照同步变化，不得沿用旧写手模板。
 - NURTURE-DETAIL-P0-13：重新生成上下文必须包含写手能力与技能方向、角色目标、相关技能、背景定义和角色标签；接口返回不依赖中文名。
 - NURTURE-DETAIL-P0-14：重新生成上下文必须包含写手后台执行提示词 `prompt_directive`；同一客户切换 `ReplyMirror`、`Mario`、`Baymax` 等写手时，返回正文必须体现不同角色的结构和语气差异。
+
+## 2026-07-03 群发邮件附件解析 TDD
+- BULK-EMAIL-P0-05：群发邮件参考附件上传必须调用后端解析接口，PDF、Word、Excel 返回 `extracted_text`；创建群发草稿时 `prompt_context_snapshot.rendered_prompt` 必须包含附件正文，前端附件标签显示“已解析正文/仅元数据”。

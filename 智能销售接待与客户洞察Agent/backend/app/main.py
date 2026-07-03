@@ -277,6 +277,11 @@ def ensure_sqlite_compatibility() -> None:
                 connection.execute(text("ALTER TABLE product_knowledge ADD COLUMN knowledge_base VARCHAR(80) NOT NULL DEFAULT 'product'"))
             if "tags" not in product_knowledge_columns:
                 connection.execute(text("ALTER TABLE product_knowledge ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'"))
+    if "prospecting_plans" in table_names:
+        prospecting_plan_columns = {column["name"] for column in inspector.get_columns("prospecting_plans")}
+        if "candidate_limit" not in prospecting_plan_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE prospecting_plans ADD COLUMN candidate_limit INTEGER NOT NULL DEFAULT 20"))
     if "customers" in table_names:
         customer_columns = {column["name"] for column in inspector.get_columns("customers")}
         with engine.begin() as connection:
@@ -1025,6 +1030,7 @@ def prospecting_plan_out(db: Session, plan: ProspectingPlan) -> ProspectingPlanO
         target_region=plan.target_region,
         target_customer_profile=plan.target_customer_profile,
         channels=[str(channel) for channel in channels],
+        candidate_limit=plan.candidate_limit,
         ai_strategy=plan.ai_strategy,
         cadence_plan=plan.cadence_plan,
         status=plan.status,
@@ -1043,6 +1049,7 @@ def build_prospecting_strategy(payload: ProspectingPlanCreateRequest, channels: 
     strategy = (
         f"围绕 {focus_text}，优先寻找 {payload.target_region} "
         f"市场中符合“{profile_snapshot}”的机构。渠道侧重点：{channel_text}。"
+        f"本次目标生成 {payload.candidate_limit} 个候选。"
         "候选只作为公开搜索或授权归档入口，必须人工核验来源链接后入库。"
     )
     cadence = (
@@ -1075,9 +1082,13 @@ def build_prospect_candidates(plan: ProspectingPlan, channels: list[str]) -> lis
         "Manual": "人工来源入口",
     }
     candidates: list[ProspectCandidate] = []
-    for channel in channels:
+    target_count = max(1, min(int(plan.candidate_limit or 20), 100))
+    for index in range(target_count):
+        channel = channels[index % len(channels)]
         source_label = label_by_channel.get(channel, "搜索入口")
-        candidate_name = names_by_channel.get(channel, f"{region} {channel} Prospect")
+        base_name = names_by_channel.get(channel, f"{region} {channel} Prospect")
+        batch_number = (index // len(channels)) + 1
+        candidate_name = base_name if target_count <= len(channels) else f"{base_name} #{batch_number}"
         candidates.append(
             ProspectCandidate(
                 plan_id=plan.id,
@@ -1089,7 +1100,7 @@ def build_prospect_candidates(plan: ProspectingPlan, channels: list[str]) -> lis
                 source_channel=channel,
                 source_label=source_label,
                 source_url=prospecting_source_url(channel, query),
-                source_note=f"来源渠道：{channel}；画像关键词：{query}；需人工打开来源链接核验后入库。",
+                source_note=f"来源渠道：{channel}；本次目标数量：{target_count}；画像关键词：{query}；需人工打开来源链接核验后入库。",
                 ai_match_reason=f"目标画像包含“{persona_hint}”，与 {region} 的 {product} 拓客方向匹配。",
                 score_label="待确认",
                 status=PROSPECT_STATUS_PENDING,
@@ -2308,6 +2319,7 @@ def create_prospecting_plan(
         target_region=payload.target_region.strip(),
         target_customer_profile=profile_snapshot,
         channels_json=json.dumps(channels, ensure_ascii=False),
+        candidate_limit=payload.candidate_limit,
         ai_strategy=ai_strategy,
         cadence_plan=cadence_plan,
         status="active",

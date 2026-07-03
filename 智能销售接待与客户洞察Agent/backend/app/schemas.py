@@ -104,6 +104,7 @@ class ProspectingPlanCreateRequest(BaseModel):
     intent_keywords: list[str] = Field(default_factory=list)
     exclude_keywords: list[str] = Field(default_factory=list)
     channels: list[str] = Field(default_factory=lambda: ["Google", "LinkedIn", "Google Maps", "Facebook"])
+    candidate_limit: int = Field(default=20, ge=1, le=100)
 
 
 class ProspectCandidateOut(BaseModel):
@@ -134,6 +135,7 @@ class ProspectingPlanOut(BaseModel):
     target_region: str
     target_customer_profile: str
     channels: list[str]
+    candidate_limit: int
     ai_strategy: str
     cadence_plan: str
     status: str

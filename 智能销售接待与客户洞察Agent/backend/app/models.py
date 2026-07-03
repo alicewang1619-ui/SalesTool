@@ -200,6 +200,7 @@ class ProspectingPlan(Base):
     target_region: Mapped[str] = mapped_column(String(120), nullable=False)
     target_customer_profile: Mapped[str] = mapped_column(Text, nullable=False)
     channels_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    candidate_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     ai_strategy: Mapped[str] = mapped_column(Text, nullable=False, default="")
     cadence_plan: Mapped[str] = mapped_column(Text, nullable=False, default="")
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")

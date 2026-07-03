@@ -85,6 +85,7 @@ export type ProspectingPlanInput = {
   intent_keywords: string[];
   exclude_keywords: string[];
   channels: string[];
+  candidate_limit: number;
 };
 
 export type ProspectCandidate = {
@@ -115,6 +116,7 @@ export type ProspectingPlan = {
   target_region: string;
   target_customer_profile: string;
   channels: string[];
+  candidate_limit: number;
   ai_strategy: string;
   cadence_plan: string;
   status: string;

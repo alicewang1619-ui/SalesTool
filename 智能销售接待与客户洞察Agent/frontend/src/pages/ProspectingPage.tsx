@@ -1,4 +1,4 @@
-import { App, Button, Card, Col, Empty, Form, Input, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
+import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { Check, ExternalLink, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -86,7 +86,8 @@ export function ProspectingPage() {
       use_cases: trimList(values.use_cases),
       intent_keywords: trimList(values.intent_keywords),
       exclude_keywords: trimList(values.exclude_keywords),
-      channels: channels.length ? channels : ["Google", "LinkedIn", "Google Maps", "Facebook"]
+      channels: channels.length ? channels : ["Google", "LinkedIn", "Google Maps", "Facebook"],
+      candidate_limit: Number(values.candidate_limit ?? 20)
     };
     setCreating(true);
     try {
@@ -274,7 +275,8 @@ export function ProspectingPage() {
                 intent_keywords: ["portable ultrasound distributor", "POCUS supplier"],
                 exclude_keywords: ["veterinary clinic", "used equipment"],
                 target_customer_profile: "优先找能代理或采购便携超声的区域渠道，不找个人医生或二手设备卖家。",
-                channels: ["Google", "LinkedIn", "Google Maps", "Facebook"]
+                channels: ["Google", "LinkedIn", "Google Maps", "Facebook"],
+                candidate_limit: 20
               }}
             >
               <Row gutter={12}>
@@ -325,9 +327,18 @@ export function ProspectingPage() {
                   placeholder="选择预设来源，或直接输入新增来源"
                 />
               </Form.Item>
-              <Button type="primary" icon={<Search size={16} />} loading={creating} onClick={() => void handleCreate()}>
-                按画像生成拓客方案
-              </Button>
+              <Space align="end" wrap>
+                <Form.Item
+                  name="candidate_limit"
+                  label="本次挖取数量"
+                  rules={[{ required: true, message: "请填写本次挖取数量" }]}
+                >
+                  <InputNumber min={1} max={100} precision={0} style={{ width: 180 }} />
+                </Form.Item>
+                <Button type="primary" icon={<Search size={16} />} loading={creating} onClick={() => void handleCreate()}>
+                  按画像生成拓客方案
+                </Button>
+              </Space>
             </Form>
           </Card>
         </Col>
@@ -340,6 +351,7 @@ export function ProspectingPage() {
                   {latestPlan.brand_name ? <Tag color="purple">{latestPlan.brand_name}</Tag> : <Tag>品牌未填写</Tag>}
                   <Tag color="blue">{latestPlan.product_focus}</Tag>
                   <Tag>{latestPlan.target_region}</Tag>
+                  <Tag color="geekblue">目标 {latestPlan.candidate_limit} 个</Tag>
                   {latestPlan.channels.map((channel) => (
                     <Tag key={channel}>{channel}</Tag>
                   ))}

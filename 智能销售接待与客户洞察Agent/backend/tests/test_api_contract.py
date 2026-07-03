@@ -380,6 +380,7 @@ def test_sales_user_only_sees_owned_leads(client: TestClient) -> None:
 
 
 def prospecting_payload(region: str, channels: list[str] | None = None) -> dict[str, object]:
+    selected_channels = channels or ["Google", "LinkedIn", "Google Maps", "Facebook"]
     return {
         "brand_name": "CHISON Ultrasound",
         "product_focus": "Portable Ultrasound",
@@ -391,7 +392,8 @@ def prospecting_payload(region: str, channels: list[str] | None = None) -> dict[
         "intent_keywords": ["portable ultrasound distributor", "POCUS supplier"],
         "exclude_keywords": ["veterinary clinic", "used equipment"],
         "target_customer_profile": "优先找能代理或采购便携超声的区域渠道。",
-        "channels": channels or ["Google", "LinkedIn", "Google Maps", "Facebook"],
+        "channels": selected_channels,
+        "candidate_limit": len(selected_channels),
     }
 
 
@@ -406,6 +408,7 @@ def test_prospecting_plan_generates_candidates_with_source_links(client: TestCli
     assert "行业/机构: Medical device distributor" in body["target_customer_profile"]
     assert "岗位/采购角色: Procurement manager" in body["target_customer_profile"]
     assert "公开搜索" in body["ai_strategy"]
+    assert body["candidate_limit"] == 4
     assert len(body["candidates"]) == 4
     assert {item["source_channel"] for item in body["candidates"]} == {"Google", "LinkedIn", "Google Maps", "Facebook"}
     assert all(item["source_url"].startswith("https://") for item in body["candidates"])
@@ -423,6 +426,7 @@ def test_prospecting_allows_optional_brand_and_custom_sources(client: TestClient
     custom_source = "Regional Dealer Directory"
     payload = prospecting_payload(region, ["Google", custom_source])
     payload["brand_name"] = ""
+    payload["candidate_limit"] = 2
 
     response = client.post("/api/prospecting/plans", json=payload, headers=headers)
 
@@ -435,6 +439,29 @@ def test_prospecting_allows_optional_brand_and_custom_sources(client: TestClient
     custom_candidate = next(item for item in body["candidates"] if item["source_channel"] == custom_source)
     assert custom_candidate["company_name"] == f"{region} {custom_source} Prospect"
     assert custom_candidate["source_url"].startswith("https://www.google.com/search?")
+
+
+def test_prospecting_candidate_limit_controls_count_and_is_validated(client: TestClient) -> None:
+    headers = auth_headers(client)
+    payload = prospecting_payload(f"Prospectland-{uuid4().hex[:6]}", ["Google", "LinkedIn"])
+    payload["candidate_limit"] = 7
+
+    response = client.post("/api/prospecting/plans", json=payload, headers=headers)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["candidate_limit"] == 7
+    assert len(body["candidates"]) == 7
+    assert {item["source_channel"] for item in body["candidates"]} == {"Google", "LinkedIn"}
+    assert all("本次目标数量：7" in item["source_note"] for item in body["candidates"])
+
+    invalid_low = prospecting_payload(f"Prospectland-{uuid4().hex[:6]}", ["Google"])
+    invalid_low["candidate_limit"] = 0
+    assert client.post("/api/prospecting/plans", json=invalid_low, headers=headers).status_code == 422
+
+    invalid_high = prospecting_payload(f"Prospectland-{uuid4().hex[:6]}", ["Google"])
+    invalid_high["candidate_limit"] = 101
+    assert client.post("/api/prospecting/plans", json=invalid_high, headers=headers).status_code == 422
 
 
 def test_prospecting_requires_customer_persona(client: TestClient) -> None:

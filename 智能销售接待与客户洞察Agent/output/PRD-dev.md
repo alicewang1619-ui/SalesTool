@@ -299,3 +299,4 @@ assigned -> no_feedback -> manager_attention
 
 ## 2026-07-03 群发邮件附件解析补充
 - 群发邮件参考附件上传后必须立即进入后端解析链路，支持 PDF、Word、Excel 抽取可读正文；页面需展示“已解析正文 / 仅元数据”状态，创建群发草稿时必须把 `extracted_text` 写入 `prompt_context_snapshot.rendered_prompt`，不能只把文件名传给大模型。
+- 实现接口落点：群发邮件参考附件上传使用 POST /api/email-campaigns/reference-attachments，返回 NurtureAttachmentOut 后随创建草稿请求传入 reference_attachments。

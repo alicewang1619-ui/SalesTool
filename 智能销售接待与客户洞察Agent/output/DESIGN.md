@@ -338,3 +338,4 @@ Agent 设计指令：
 
 ## 2026-07-03 设计补充：群发附件解析
 - 参考附件上传控件必须调用后端解析接口，上传 PDF、Word、Excel 后在表单下方以标签展示文件名、大小和解析状态；已解析正文进入 Prompt 上下文，解析失败或旧 Word/Excel 二进制只能作为“仅元数据”提醒用户。
+- 实现接口落点：群发邮件参考附件按钮调用 POST /api/email-campaigns/reference-attachments，文件标签直接读取返回的 extracted_text 状态展示解析结果。

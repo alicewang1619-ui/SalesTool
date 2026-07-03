@@ -74,6 +74,31 @@ def make_docx(text_value: str) -> bytes:
     return output.getvalue()
 
 
+def make_pdf(text_value: str) -> bytes:
+    escaped = text_value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream = f"BT /F1 12 Tf 72 720 Td ({escaped}) Tj ET".encode("utf-8")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+    ]
+    output = b"%PDF-1.4\n"
+    offsets: list[int] = []
+    for index, value in enumerate(objects, start=1):
+        offsets.append(len(output))
+        output += f"{index} 0 obj\n".encode("ascii") + value + b"\nendobj\n"
+    xref_offset = len(output)
+    output += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("ascii")
+    for offset in offsets:
+        output += f"{offset:010d} 00000 n \n".encode("ascii")
+    output += (
+        f"trailer\n<< /Root 1 0 R /Size {len(objects) + 1} >>\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    return output
+
+
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     for key in [
@@ -2936,6 +2961,34 @@ def test_bulk_email_campaign_is_admin_ops_only_and_uses_customer_filters(client:
     assert preview_body["target_count"] >= 1
     assert preview_body["recipients_preview"]
 
+    word_attachment = client.post(
+        "/api/email-campaigns/reference-attachments",
+        files={
+            "file": (
+                "portable-workshop-invitation.docx",
+                make_docx("Portable ultrasound workshop invitation for regional distributors."),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+        headers=headers,
+    )
+    assert word_attachment.status_code == 200
+    assert "regional distributors" in word_attachment.json()["extracted_text"]
+
+    pdf_attachment = client.post(
+        "/api/email-campaigns/reference-attachments",
+        files={
+            "file": (
+                "portable-ultrasound-event.pdf",
+                make_pdf("Portable ultrasound PDF invitation for hospital distributor prospects."),
+                "application/pdf",
+            )
+        },
+        headers=headers,
+    )
+    assert pdf_attachment.status_code == 200
+    assert "hospital distributor prospects" in pdf_attachment.json()["extracted_text"]
+
     campaign = client.post(
         "/api/email-campaigns",
         json={
@@ -2946,13 +2999,8 @@ def test_bulk_email_campaign_is_admin_ops_only_and_uses_customer_filters(client:
             "generation_prompt": "生成活动推广模板，强调人工确认后再发送。",
             "writer_role_key": "baymax",
             "reference_attachments": [
-                {
-                    "filename": "campaign-plan.xlsx",
-                    "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    "size": 1200,
-                    "uploaded_by": "admin",
-                    "uploaded_at": "2026-07-02T00:00:00",
-                }
+                word_attachment.json(),
+                pdf_attachment.json(),
             ],
         },
         headers=headers,
@@ -2962,7 +3010,7 @@ def test_bulk_email_campaign_is_admin_ops_only_and_uses_customer_filters(client:
     assert campaign.json()["status"] == "draft"
     assert campaign.json()["purpose"] == "活动推广"
     assert campaign.json()["writer_role_name"]
-    assert campaign.json()["reference_attachments"][0]["filename"] == "campaign-plan.xlsx"
+    assert campaign.json()["reference_attachments"][0]["filename"] == "portable-workshop-invitation.docx"
     campaign_body = campaign.json()
     assert campaign_body["generation_prompt"] != "生成活动推广模板，强调人工确认后再发送。"
     assert "Purpose: 活动推广" in campaign_body["generation_prompt"]
@@ -2977,7 +3025,10 @@ def test_bulk_email_campaign_is_admin_ops_only_and_uses_customer_filters(client:
     assert snapshot["filters"]["product"] == "Portable Ultrasound"
     assert snapshot["writer_role_key"] == "baymax"
     assert "formal" in snapshot["writer_role_tags"]
-    assert "campaign-plan.xlsx" in snapshot["rendered_prompt"]
+    assert "portable-workshop-invitation.docx" in snapshot["rendered_prompt"]
+    assert "regional distributors" in snapshot["rendered_prompt"]
+    assert "portable-ultrasound-event.pdf" in snapshot["rendered_prompt"]
+    assert "hospital distributor prospects" in snapshot["rendered_prompt"]
     assert snapshot["generated_prompt"] == campaign_body["generation_prompt"]
 
     sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")

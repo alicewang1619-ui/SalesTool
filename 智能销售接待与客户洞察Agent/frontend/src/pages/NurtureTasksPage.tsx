@@ -7,6 +7,7 @@ import {
   fetchEmailWriterRoles,
   fetchNurtureTasks,
   previewBulkEmailCampaign,
+  uploadBulkEmailReferenceAttachment,
   type BulkEmailFilters,
   type BulkEmailPreview,
   type EmailWriterRole,
@@ -242,6 +243,7 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
   const [referenceAttachments, setReferenceAttachments] = useState<NurtureAttachment[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [uploadingReferenceAttachment, setUploadingReferenceAttachment] = useState(false);
 
   useEffect(() => {
     form.setFieldsValue(initialValues);
@@ -269,23 +271,22 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
     });
   }
 
-  function beforeReferenceUpload(file: File) {
+  async function beforeReferenceUpload(file: File) {
     const suffix = file.name.split(".").pop()?.toLowerCase() ?? "";
     if (!["pdf", "doc", "docx", "xls", "xlsx"].includes(suffix)) {
       message.error("参考附件仅支持 PDF / Word / Excel");
       return Upload.LIST_IGNORE;
     }
-    setReferenceAttachments((current) => [
-      ...current,
-      {
-        filename: file.name,
-        content_type: file.type || "application/octet-stream",
-        size: file.size,
-        uploaded_by: "当前操作人",
-        uploaded_at: new Date().toISOString()
-      }
-    ]);
-    message.success(`${file.name} 已加入参考附件`);
+    setUploadingReferenceAttachment(true);
+    try {
+      const attachment = await uploadBulkEmailReferenceAttachment(file);
+      setReferenceAttachments((current) => [...current, attachment]);
+      message.success(`${file.name} 已上传并${attachment.extracted_text ? "解析正文" : "保存元数据"}`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "附件解析失败");
+    } finally {
+      setUploadingReferenceAttachment(false);
+    }
     return Upload.LIST_IGNORE;
   }
 
@@ -360,7 +361,7 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
           <Col xs={24} md={8}>
             <Form.Item label="参考附件">
               <Upload beforeUpload={beforeReferenceUpload} showUploadList={false} accept=".pdf,.doc,.docx,.xls,.xlsx">
-                <Button icon={<Paperclip size={16} />}>上传 PDF / Word / Excel</Button>
+                <Button icon={<Paperclip size={16} />} loading={uploadingReferenceAttachment}>上传 PDF / Word / Excel</Button>
               </Upload>
             </Form.Item>
           </Col>
@@ -397,7 +398,9 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
         {referenceAttachments.length ? (
           <Space wrap style={{ marginBottom: 16 }}>
             {referenceAttachments.map((attachment) => (
-              <Tag key={`${attachment.filename}-${attachment.uploaded_at}`} color="blue">{attachment.filename}</Tag>
+              <Tag key={`${attachment.filename}-${attachment.uploaded_at}`} color={attachment.extracted_text ? "green" : "gold"}>
+                {attachment.filename} · {Math.max(1, Math.ceil(attachment.size / 1024))} KB · {attachment.extracted_text ? "已解析正文" : "仅元数据"}
+              </Tag>
             ))}
           </Space>
         ) : null}

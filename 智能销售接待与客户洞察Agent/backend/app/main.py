@@ -4674,6 +4674,34 @@ def preview_email_campaign(
     return bulk_email_preview(db, user, payload)
 
 
+@app.post("/api/email-campaigns/reference-attachments", response_model=NurtureAttachmentOut)
+async def upload_email_campaign_reference_attachment(
+    file: UploadFile = File(...),
+    user: User = Depends(require_admin_or_ops),
+) -> NurtureAttachmentOut:
+    filename = file.filename or "attachment"
+    suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if suffix not in {"pdf", "doc", "docx", "xls", "xlsx"}:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("BULK_EMAIL_ATTACHMENT_UNSUPPORTED", "Unsupported attachment type"),
+        )
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("BULK_EMAIL_ATTACHMENT_TOO_LARGE", "Attachment too large"),
+        )
+    return NurtureAttachmentOut(
+        filename=filename,
+        content_type=file.content_type or "application/octet-stream",
+        size=len(content),
+        uploaded_by=user.name,
+        uploaded_at=datetime.utcnow(),
+        extracted_text=extract_attachment_text(filename, content),
+    )
+
+
 @app.post("/api/email-campaigns", response_model=BulkEmailCampaignOut, status_code=status.HTTP_201_CREATED)
 def create_email_campaign(
     payload: BulkEmailCampaignRequest,

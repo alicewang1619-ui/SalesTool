@@ -1455,6 +1455,12 @@ export function createBulkEmailCampaign(payload: {
   });
 }
 
+export function uploadBulkEmailReferenceAttachment(file: File): Promise<NurtureAttachment> {
+  const body = new FormData();
+  body.append("file", file);
+  return requestForm<NurtureAttachment>("/api/email-campaigns/reference-attachments", body);
+}
+
 export function fetchCustomerSignals(filters: CustomerSignalFilters = {}): Promise<CustomerSignalPageResult> {
   const params = new URLSearchParams({
     page: String(filters.page ?? 1),

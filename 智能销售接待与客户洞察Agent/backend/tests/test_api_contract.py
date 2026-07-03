@@ -2963,6 +2963,22 @@ def test_bulk_email_campaign_is_admin_ops_only_and_uses_customer_filters(client:
     assert campaign.json()["purpose"] == "活动推广"
     assert campaign.json()["writer_role_name"]
     assert campaign.json()["reference_attachments"][0]["filename"] == "campaign-plan.xlsx"
+    campaign_body = campaign.json()
+    assert campaign_body["generation_prompt"] != "生成活动推广模板，强调人工确认后再发送。"
+    assert "Purpose: 活动推广" in campaign_body["generation_prompt"]
+    assert "Product focus: Portable Ultrasound" in campaign_body["generation_prompt"]
+    assert "Writer tags:" in campaign_body["generation_prompt"]
+    assert "formal" in campaign_body["generation_prompt"]
+    assert campaign_body["body"] != "Hi, we prepared a short update for portable ultrasound distributors and clinics."
+    assert_english_email_body(campaign_body["body"])
+    snapshot = campaign_body["prompt_context_snapshot"]
+    assert snapshot["safety_boundary"] == "BULK_EMAIL_CONTEXT_DATA_ONLY"
+    assert snapshot["purpose"] == "活动推广"
+    assert snapshot["filters"]["product"] == "Portable Ultrasound"
+    assert snapshot["writer_role_key"] == "baymax"
+    assert "formal" in snapshot["writer_role_tags"]
+    assert "campaign-plan.xlsx" in snapshot["rendered_prompt"]
+    assert snapshot["generated_prompt"] == campaign_body["generation_prompt"]
 
     sales_headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
     denied = client.post("/api/email-campaigns/preview", json=filters, headers=sales_headers)

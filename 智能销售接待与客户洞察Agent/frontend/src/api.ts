@@ -612,6 +612,7 @@ export type BulkEmailCampaign = {
   subject: string;
   body: string;
   generation_prompt: string;
+  prompt_context_snapshot: Record<string, unknown>;
   writer_role_key: string;
   writer_role_name: string;
   reference_attachments: NurtureAttachment[];

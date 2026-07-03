@@ -45,21 +45,15 @@ const defaultBulkPurpose = "开发信";
 const promotionBulkPurpose = "活动推广";
 const customBulkPurpose = "自定义类型";
 
-const bulkPurposeTemplates: Record<string, { subject: string; body: string; generationPrompt: string }> = {
+const bulkPurposeTemplates: Record<string, { subject: string }> = {
   [defaultBulkPurpose]: {
-    subject: "Portable Ultrasound cooperation opportunity",
-    body: "Hi, we noticed your medical imaging business and would like to introduce CHISON portable ultrasound options for clinics and distributors.",
-    generationPrompt: "生成一封专业开发信，确认应用场景、采购窗口和下一步沟通，不承诺价格、独家代理或注册证。"
+    subject: "Portable Ultrasound cooperation opportunity"
   },
   [promotionBulkPurpose]: {
-    subject: "Ultrasound campaign update for your market",
-    body: "Hi, we prepared a short campaign update and product material that may help your team evaluate upcoming ultrasound opportunities.",
-    generationPrompt: "生成一封活动推广邮件，突出资料价值，邀请客户查看材料或预约沟通，避免未经确认的折扣承诺。"
+    subject: "Ultrasound campaign update for your market"
   },
   [customBulkPurpose]: {
-    subject: "Ultrasound follow-up",
-    body: "Hi, we prepared a short update and would like to confirm your current ultrasound needs.",
-    generationPrompt: "按运营自定义目的、筛选客户、邮件写手风格和参考附件生成邮件，避免未经支持的承诺。"
+    subject: "Ultrasound follow-up"
   }
 };
 
@@ -82,8 +76,8 @@ function initialBulkValues(searchParams: URLSearchParams): BulkEmailFormValues {
     tier: searchParams.get("tier") || undefined,
     purpose: defaultBulkPurpose,
     subject: template.subject,
-    body: template.body,
-    generationPrompt: template.generationPrompt
+    body: "",
+    generationPrompt: ""
   };
 }
 
@@ -270,8 +264,8 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
     form.setFieldsValue({
       purpose,
       subject: template.subject,
-      body: template.body,
-      generationPrompt: template.generationPrompt
+      body: "",
+      generationPrompt: ""
     });
   }
 
@@ -319,7 +313,13 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
         writerRoleKey: values.writerRoleKey,
         referenceAttachments
       });
-      message.success(`群发邮件草稿已创建，目标客户 ${campaign.target_count} 个，等待邮箱配置和人工确认后再发送`);
+      form.setFieldsValue({
+        subject: campaign.subject,
+        body: campaign.body,
+        generationPrompt: campaign.generation_prompt,
+        writerRoleKey: campaign.writer_role_key
+      });
+      message.success(`已由后台大模型生成 Prompt 和英文正文，目标客户 ${campaign.target_count} 个，人工确认后再发送`);
       await handlePreview();
     } finally {
       setCreating(false);
@@ -374,9 +374,25 @@ function BulkEmailPanel({ initialValues }: { initialValues: BulkEmailFormValues 
               <Select allowClear options={["未分配", "无效", "跟进中", "已报价", "已签单", "已付款", "价格流失", "撤单"].map((item) => ({ value: item, label: item }))} />
             </Form.Item>
           </Col>
-          <Col xs={24}><Form.Item name="subject" label="邮件主题" rules={[{ required: true, min: 2 }]}><Input /></Form.Item></Col>
-          <Col xs={24}><Form.Item name="body" label="邮件正文" rules={[{ required: true, min: 10 }]}><Input.TextArea rows={6} /></Form.Item></Col>
-          <Col xs={24}><Form.Item name="generationPrompt" label="生成 Prompt"><Input.TextArea rows={4} /></Form.Item></Col>
+          <Col xs={24}><Form.Item name="subject" label="邮件主题"><Input placeholder="可选：为空时由后台大模型按目的和客户背景生成" /></Form.Item></Col>
+          <Col xs={24}>
+            <Form.Item
+              name="body"
+              label="邮件正文"
+              extra="点击“创建群发草稿”后，后台大模型会根据下方 Prompt 生成英文正文；生成后可人工修改。"
+            >
+              <Input.TextArea rows={6} placeholder="后台大模型生成后会显示在这里" />
+            </Form.Item>
+          </Col>
+          <Col xs={24}>
+            <Form.Item
+              name="generationPrompt"
+              label="生成 Prompt"
+              extra="Prompt 由后台大模型根据客户背景、目的、产品、写手标签和附件摘要生成；生成后可人工补充。"
+            >
+              <Input.TextArea rows={4} placeholder="后台大模型生成后会显示在这里" />
+            </Form.Item>
+          </Col>
         </Row>
         {referenceAttachments.length ? (
           <Space wrap style={{ marginBottom: 16 }}>

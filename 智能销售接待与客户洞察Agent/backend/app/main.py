@@ -147,6 +147,7 @@ from .schemas import (
     ProductKnowledgeBaseRequest,
     ProductKnowledgeStatusRequest,
     ProductKnowledgeUpdateRequest,
+    ProductKnowledgeUploadOut,
     SalesUserCreateRequest,
     SalesUserDeleteOut,
     SalesUserUpdateRequest,
@@ -262,6 +263,8 @@ def ensure_sqlite_compatibility() -> None:
         with engine.begin() as connection:
             if "knowledge_base" not in product_knowledge_columns:
                 connection.execute(text("ALTER TABLE product_knowledge ADD COLUMN knowledge_base VARCHAR(80) NOT NULL DEFAULT 'product'"))
+            if "tags" not in product_knowledge_columns:
+                connection.execute(text("ALTER TABLE product_knowledge ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'"))
     if "customers" in table_names:
         customer_columns = {column["name"] for column in inspector.get_columns("customers")}
         with engine.begin() as connection:
@@ -330,6 +333,7 @@ DEFAULT_PRODUCT_KNOWLEDGE = [
         "model_name": "SonoBook P3",
         "application_scenario": "Regional clinic, distributor demo, and outpatient screening",
         "ai_guidance": "Ask about clinic volume, battery use, probe mix, and distributor training needs.",
+        "tags": ["Portable", "Clinic", "Distributor demo"],
     },
     {
         "knowledge_base": "product",
@@ -337,6 +341,7 @@ DEFAULT_PRODUCT_KNOWLEDGE = [
         "model_name": "SonoEye H1",
         "application_scenario": "Mobile clinic, emergency triage, and bedside quick scan",
         "ai_guidance": "Ask about portability, phone/tablet workflow, target department, and probe requirements.",
+        "tags": ["Handheld", "Emergency", "Mobile clinic"],
     },
     {
         "knowledge_base": "product",
@@ -344,6 +349,7 @@ DEFAULT_PRODUCT_KNOWLEDGE = [
         "model_name": "SonoMax T8",
         "application_scenario": "Radiology, emergency department, and hospital room-based ultrasound",
         "ai_guidance": "Ask about room setup, departments, image quality expectations, and after-sales service needs.",
+        "tags": ["Trolley", "Radiology", "Hospital"],
     },
 ]
 
@@ -362,7 +368,12 @@ def ensure_default_product_knowledge(db: Session) -> None:
             continue
         db.add(
             ProductKnowledge(
-                **item,
+                knowledge_base=item["knowledge_base"],
+                product_type=item["product_type"],
+                model_name=item["model_name"],
+                application_scenario=item["application_scenario"],
+                ai_guidance=item["ai_guidance"],
+                tags=json.dumps(item.get("tags", []), ensure_ascii=False),
                 version="v1",
                 status="active",
                 updated_by=admin.id if admin else None,
@@ -4283,17 +4294,101 @@ def product_knowledge_active_version(items: list[ProductKnowledge]) -> str:
     return latest.version
 
 
+def clean_product_knowledge_tags(raw_tags: object) -> list[str]:
+    if isinstance(raw_tags, str):
+        try:
+            parsed = json.loads(raw_tags)
+        except json.JSONDecodeError:
+            parsed = re.split(r"[,，;；\n]", raw_tags)
+    elif isinstance(raw_tags, list):
+        parsed = raw_tags
+    else:
+        parsed = []
+    cleaned: list[str] = []
+    for value in parsed:
+        tag = str(value).strip()
+        if not tag:
+            continue
+        tag = re.sub(r"\s+", " ", tag)[:40]
+        if tag.lower() not in {item.lower() for item in cleaned}:
+            cleaned.append(tag)
+        if len(cleaned) >= 12:
+            break
+    return cleaned
+
+
+def product_knowledge_tags(item: ProductKnowledge) -> list[str]:
+    return clean_product_knowledge_tags(item.tags)
+
+
+def product_knowledge_out(item: ProductKnowledge) -> ProductKnowledgeOut:
+    return ProductKnowledgeOut(
+        id=item.id,
+        knowledge_base=item.knowledge_base,
+        product_type=item.product_type,
+        model_name=item.model_name,
+        application_scenario=item.application_scenario,
+        ai_guidance=item.ai_guidance,
+        tags=product_knowledge_tags(item),
+        version=item.version,
+        status=item.status,
+        updated_by=item.updated_by,
+        updated_at=item.updated_at,
+    )
+
+
+def product_knowledge_block_out(item: ProductKnowledge) -> ProductKnowledgeBlockOut:
+    return ProductKnowledgeBlockOut(
+        id=item.id,
+        knowledge_base=item.knowledge_base,
+        product_type=item.product_type,
+        model_name=item.model_name,
+        application_scenario=item.application_scenario,
+        ai_guidance=item.ai_guidance,
+        tags=product_knowledge_tags(item),
+        version=item.version,
+    )
+
+
+def suggest_product_knowledge_tags(text_value: str, filename: str = "") -> list[str]:
+    text_lower = f"{filename} {text_value}".lower()
+    rule_tags = [
+        ("product", "产品知识"),
+        ("ultrasound", "Ultrasound"),
+        ("portable", "Portable"),
+        ("handheld", "Handheld"),
+        ("trolley", "Trolley"),
+        ("competitor", "竞品知识"),
+        ("market", "市场知识"),
+        ("price", "价格"),
+        ("distributor", "代理商"),
+        ("dealer", "代理商"),
+        ("clinic", "诊所"),
+        ("hospital", "医院"),
+        ("campaign", "活动"),
+        ("invitation", "邀请函"),
+        ("case", "商务成果"),
+        ("reference", "商务成果"),
+        ("tender", "招投标"),
+    ]
+    tags = [label for needle, label in rule_tags if needle in text_lower]
+    tags.extend(re.findall(r"\b[A-Z][A-Za-z0-9-]{2,}\b", text_value)[:5])
+    return clean_product_knowledge_tags(tags)
+
+
 def render_product_knowledge_prompt(items: list[ProductKnowledge]) -> str:
     lines = ["<product_knowledge>"]
     for item in items:
+        tags = product_knowledge_tags(item)
         lines.append(
             "\n".join(
                 [
                     f"Knowledge Base: {item.knowledge_base}",
-                    f"Product Type: {item.product_type}",
-                    f"Model: {item.model_name}",
-                    f"Application Scenario: {item.application_scenario}",
-                    f"AI Guidance: {item.ai_guidance}",
+                    f"Knowledge Type: {item.product_type}",
+                    f"Topic: {item.model_name}",
+                    f"Tags: {', '.join(tags) if tags else 'None'}",
+                    f"Scenario: {item.application_scenario}",
+                    f"Reference Content: {item.ai_guidance}",
                     f"Version: {item.version}",
                     "---",
                 ]
@@ -4310,7 +4405,7 @@ def settings_entries() -> list[SettingsEntryOut]:
         SettingsEntryOut(key="role_permissions", title="角色权限", description="维护后台菜单、按钮和接口权限", path="/admin/settings?section=permissions", status="ready"),
         SettingsEntryOut(key="global_banner", title="全局 Banner", description="上传并发布全部后台页面顶部 Banner", path="/admin/settings?section=banner", status="ready"),
         SettingsEntryOut(key="country_sales_mapping", title="国家区域销售映射", description="维护国家、区域和销售负责人", path="/admin/settings/country-sales", status="warning", risk_count=1),
-        SettingsEntryOut(key="product_knowledge", title="产品知识库", description="维护 ultrasound 产品与 AI 接待知识", path="/admin/settings/product-knowledge", status="ready"),
+        SettingsEntryOut(key="product_knowledge", title="知识库", description="维护产品、竞品、市场和商务成果资料", path="/admin/knowledge-base", status="ready"),
         SettingsEntryOut(key="ai_model_selection", title="AI 场景与邮件写手", description="维护大模型、使用场景和邮件写手角色", path="/admin/settings?section=ai-model", status="ready"),
         SettingsEntryOut(key="mail_interface", title="邮件接口", description="维护全局主邮箱、SMTP 和测试发送", path="/admin/settings?section=mail", status="ready"),
         SettingsEntryOut(key="source_dictionary", title="客户来源字典", description="维护官网、邮箱、社媒和线下展会来源", path="/admin/settings?section=sources", status="ready"),
@@ -4323,7 +4418,7 @@ MAIL_SETTING_KEY = "mail:global"
 CHANNEL_CONFIG_SETTING_KEY = "channels:config"
 REMINDER_RULE_SETTING_KEY = "reminders:rules"
 PRODUCT_KNOWLEDGE_BASES_SETTING_KEY = "product_knowledge:bases"
-DEFAULT_KNOWLEDGE_BASES = ["product", "competitor", "market"]
+DEFAULT_KNOWLEDGE_BASES = ["product", "competitor", "market", "commercial"]
 DEFAULT_CHANNEL_CONFIGS = [
     {
         "key": "website_chat",
@@ -5111,6 +5206,7 @@ def product_knowledge_page(
             or needle in item.knowledge_base.lower()
             or needle in item.product_type.lower()
             or needle in item.application_scenario.lower()
+            or needle in " ".join(product_knowledge_tags(item)).lower()
         ]
     if knowledge_base:
         filtered = [item for item in filtered if item.knowledge_base == knowledge_base]
@@ -5137,8 +5233,8 @@ def product_knowledge_page(
         },
         knowledge_bases=product_knowledge_bases(db),
         active_version=product_knowledge_active_version(rows),
-        items=[ProductKnowledgeOut.model_validate(item, from_attributes=True) for item in filtered[start : start + page_size]],
-        empty_state=EmptyStateOut(title="暂无产品知识", action_label="新增产品知识", action_path="/admin/settings/product-knowledge") if not filtered else None,
+        items=[product_knowledge_out(item) for item in filtered[start : start + page_size]],
+        empty_state=EmptyStateOut(title="暂无知识条目", action_label="新增知识条目", action_path="/admin/knowledge-base") if not filtered else None,
         recent_changes=[AuditLogOut.model_validate(item, from_attributes=True).model_dump() for item in changes],
     )
 
@@ -5153,6 +5249,7 @@ def save_product_knowledge(
     knowledge_base = payload.knowledge_base.strip() or "product"
     product_type = payload.product_type.strip()
     model_name = payload.model_name.strip()
+    tags = clean_product_knowledge_tags(payload.tags)
     existing = db.scalar(
         select(ProductKnowledge).where(
             ProductKnowledge.knowledge_base == knowledge_base,
@@ -5163,6 +5260,7 @@ def save_product_knowledge(
     if existing:
         existing.application_scenario = payload.application_scenario.strip()
         existing.ai_guidance = payload.ai_guidance.strip()
+        existing.tags = json.dumps(tags, ensure_ascii=False)
         existing.status = payload.status
         existing.version = product_knowledge_version(existing)
         existing.updated_by = user.id
@@ -5174,6 +5272,7 @@ def save_product_knowledge(
             model_name=model_name,
             application_scenario=payload.application_scenario.strip(),
             ai_guidance=payload.ai_guidance.strip(),
+            tags=json.dumps(tags, ensure_ascii=False),
             version="v1",
             status=payload.status,
             updated_by=user.id,
@@ -5191,7 +5290,7 @@ def save_product_knowledge(
     )
     db.commit()
     db.refresh(item)
-    return ProductKnowledgeOut.model_validate(item, from_attributes=True)
+    return product_knowledge_out(item)
 
 
 @app.post("/api/settings/product-knowledge/bases", response_model=list[str])
@@ -5281,7 +5380,7 @@ def update_product_knowledge_status(
     )
     db.commit()
     db.refresh(item)
-    return ProductKnowledgeOut.model_validate(item, from_attributes=True)
+    return product_knowledge_out(item)
 
 
 @app.get("/api/ai/product-knowledge/context", response_model=ProductKnowledgeContextOut)
@@ -5297,8 +5396,38 @@ def product_knowledge_context(
     return ProductKnowledgeContextOut(
         active_version=product_knowledge_active_version(rows),
         safety_boundary="PRODUCT_KNOWLEDGE_REFERENCE_ONLY",
-        knowledge_blocks=[ProductKnowledgeBlockOut.model_validate(item, from_attributes=True) for item in rows],
+        knowledge_blocks=[product_knowledge_block_out(item) for item in rows],
         rendered_prompt=render_product_knowledge_prompt(rows),
+    )
+
+
+@app.post("/api/settings/product-knowledge/upload", response_model=ProductKnowledgeUploadOut)
+async def upload_product_knowledge_source(
+    file: UploadFile = File(...),
+    _user: User = Depends(require_admin_or_ops),
+) -> ProductKnowledgeUploadOut:
+    filename = file.filename or "knowledge-source"
+    suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if suffix not in {"pdf", "doc", "docx", "txt", "md"}:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("PRODUCT_KNOWLEDGE_SOURCE_UNSUPPORTED", "Unsupported knowledge source type"),
+        )
+    content = await file.read()
+    if len(content) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail=error_detail("PRODUCT_KNOWLEDGE_SOURCE_TOO_LARGE", "Knowledge source file too large"))
+    extracted_text = extract_attachment_text(filename, content)
+    if not extracted_text:
+        raise HTTPException(
+            status_code=422,
+            detail=error_detail("PRODUCT_KNOWLEDGE_SOURCE_UNREADABLE", "No readable text could be extracted from this file."),
+        )
+    return ProductKnowledgeUploadOut(
+        filename=filename,
+        content_type=file.content_type or "application/octet-stream",
+        size=len(content),
+        extracted_text=extracted_text,
+        suggested_tags=suggest_product_knowledge_tags(extracted_text, filename),
     )
 
 

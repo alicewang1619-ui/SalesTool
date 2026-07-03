@@ -289,3 +289,5 @@ assigned -> no_feedback -> manager_attention
 - “知识库”作为左侧主导航一级入口，生产路由为 `/admin/knowledge-base`；产品、竞品、市场和自定义知识库板块都在这里维护，旧 `/admin/settings/product-knowledge` 仅保留兼容。
 - “配置中心”顶部 Tab 只保留总览、账号权限、全局 Banner、线索分发、邮件接口、AI 与模型、配置审计；“AI 与模型”只保留模型场景绑定和大模型连接配置，不再出现邮件写手或知识库入口卡。
 - 写邮件、再营销重新生成和群发邮件生成必须按场景读取启用知识库内容，并把知识库内容作为大模型数据上下文；用户不需要回到设置中心手动寻找知识库。
+- 知识库接口需在 `ProductKnowledge` 中保存 `tags` 关键词数组；`GET /api/ai/product-knowledge/context` 输出时必须携带标签并写入渲染后的 Prompt。
+- 知识库上传接口为 `POST /api/settings/product-knowledge/upload`，支持 PDF、Word、TXT/Markdown，后端解析正文后返回 `extracted_text` 和 `suggested_tags`，前端填入知识内容但仍需人工确认保存。

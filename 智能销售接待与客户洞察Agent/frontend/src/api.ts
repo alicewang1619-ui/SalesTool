@@ -767,6 +767,7 @@ export type ProductKnowledge = {
   model_name: string;
   application_scenario: string;
   ai_guidance: string;
+  tags: string[];
   version: string;
   status: "active" | "draft" | "disabled";
   updated_by: number | null;
@@ -807,9 +808,18 @@ export type ProductKnowledgeContext = {
     model_name: string;
     application_scenario: string;
     ai_guidance: string;
+    tags: string[];
     version: string;
   }>;
   rendered_prompt: string;
+};
+
+export type ProductKnowledgeUploadResult = {
+  filename: string;
+  content_type: string;
+  size: number;
+  extracted_text: string;
+  suggested_tags: string[];
 };
 
 export type ForbiddenContext = {
@@ -1559,6 +1569,7 @@ export function saveProductKnowledge(payload: {
   modelName: string;
   applicationScenario: string;
   aiGuidance: string;
+  tags: string[];
   status: string;
 }): Promise<ProductKnowledge> {
   return request<ProductKnowledge>("/api/settings/product-knowledge", {
@@ -1569,9 +1580,16 @@ export function saveProductKnowledge(payload: {
       model_name: payload.modelName,
       application_scenario: payload.applicationScenario,
       ai_guidance: payload.aiGuidance,
+      tags: payload.tags,
       status: payload.status
     })
   });
+}
+
+export function uploadProductKnowledgeSource(file: File): Promise<ProductKnowledgeUploadResult> {
+  const body = new FormData();
+  body.append("file", file);
+  return requestForm<ProductKnowledgeUploadResult>("/api/settings/product-knowledge/upload", body);
 }
 
 export function updateProductKnowledgeStatus(id: number, status: string): Promise<ProductKnowledge> {

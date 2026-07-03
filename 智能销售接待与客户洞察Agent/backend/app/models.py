@@ -90,6 +90,7 @@ class ProductKnowledge(Base):
     model_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     application_scenario: Mapped[str] = mapped_column(String(500), nullable=False)
     ai_guidance: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     version: Mapped[str] = mapped_column(String(40), nullable=False, default="v1")
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
     updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

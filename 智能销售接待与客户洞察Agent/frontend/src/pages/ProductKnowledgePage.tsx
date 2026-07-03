@@ -9,24 +9,25 @@ import {
   Row,
   Select,
   Space,
-  Statistic,
   Table,
   Tag,
-  Typography
+  Typography,
+  Upload,
+  message
 } from "antd";
+import type { UploadProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ArrowLeft, BookOpen, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Save, Trash2, UploadCloud } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  fetchProductKnowledge,
-  fetchProductKnowledgeContext,
   deleteProductKnowledgeBase,
+  fetchProductKnowledge,
   saveProductKnowledge,
   saveProductKnowledgeBase,
   updateProductKnowledgeStatus,
+  uploadProductKnowledgeSource,
   type ProductKnowledge,
-  type ProductKnowledgeContext,
   type ProductKnowledgePageResult
 } from "../api";
 
@@ -36,6 +37,7 @@ type ProductKnowledgeFormValues = {
   modelName: string;
   applicationScenario: string;
   aiGuidance: string;
+  tags: string[];
   status: string;
 };
 
@@ -52,14 +54,57 @@ const statusLabel: Record<string, string> = {
 };
 
 const defaultKnowledgeBases = [
-  { value: "product", label: "产品知识库" },
-  { value: "competitor", label: "竞品知识库" },
-  { value: "market", label: "市场知识库" }
+  { value: "product", label: "产品知识" },
+  { value: "competitor", label: "竞品知识" },
+  { value: "market", label: "市场知识" },
+  { value: "commercial", label: "商务成果" }
 ];
+
 const defaultKnowledgeBaseKeys = new Set(defaultKnowledgeBases.map((item) => item.value));
+
+const baseTypePreset: Record<string, string> = {
+  product: "本公司产品",
+  competitor: "竞品信息",
+  market: "市场资料",
+  commercial: "商务成果"
+};
+
+const baseColor: Record<string, string> = {
+  product: "purple",
+  competitor: "red",
+  market: "blue",
+  commercial: "gold"
+};
 
 function knowledgeBaseLabel(value: string) {
   return defaultKnowledgeBases.find((item) => item.value === value)?.label ?? value;
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isSupportedKnowledgeFile(filename: string) {
+  const lower = filename.toLowerCase();
+  return [".pdf", ".doc", ".docx", ".txt", ".md"].some((suffix) => lower.endsWith(suffix));
+}
+
+function fileTitle(filename: string) {
+  return filename.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+}
+
+function uniqueTags(tags: string[]) {
+  const result: string[] = [];
+  tags.forEach((tag) => {
+    const normalized = tag.trim();
+    if (!normalized) return;
+    if (!result.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+      result.push(normalized.slice(0, 40));
+    }
+  });
+  return result.slice(0, 12);
 }
 
 export function ProductKnowledgePage() {
@@ -68,12 +113,18 @@ export function ProductKnowledgePage() {
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm<ProductKnowledgeFormValues>();
   const [data, setData] = useState<ProductKnowledgePageResult | null>(null);
-  const [context, setContext] = useState<ProductKnowledgeContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [sourceFileLabel, setSourceFileLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [filters, setFilters] = useState({ query: "", knowledgeBase: searchParams.get("knowledge_base") ?? "", productType: "", status: "" });
+  const [filters, setFilters] = useState({
+    query: "",
+    knowledgeBase: searchParams.get("knowledge_base") ?? "",
+    productType: "",
+    status: ""
+  });
   const [selectedBaseKey, setSelectedBaseKey] = useState(searchParams.get("knowledge_base") ?? "product");
   const [baseDraft, setBaseDraft] = useState(searchParams.get("knowledge_base") ?? "");
   const [page, setPage] = useState(1);
@@ -83,9 +134,12 @@ export function ProductKnowledgePage() {
 
   const productTypeOptions = useMemo(() => {
     const values = new Set((data?.items ?? []).map((item) => item.product_type));
-    ["Portable", "Handheld", "Trolley"].forEach((item) => values.add(item));
+    ["本公司产品", "竞品信息", "市场资料", "商务成果", "活动资料", "Portable", "Handheld", "Trolley"].forEach((item) =>
+      values.add(item)
+    );
     return Array.from(values).map((value) => ({ value, label: value }));
   }, [data]);
+
   const knowledgeBaseOptions = useMemo(() => {
     const values = new Set([...(data?.knowledge_bases ?? []), ...defaultKnowledgeBases.map((item) => item.value)]);
     return Array.from(values).map((value) => ({ value, label: knowledgeBaseLabel(value) }));
@@ -95,21 +149,17 @@ export function ProductKnowledgePage() {
     setLoading(true);
     setError(null);
     try {
-      const [pageResult, contextResult] = await Promise.all([
-        fetchProductKnowledge({
-          query: filters.query.trim() || undefined,
-          knowledgeBase: filters.knowledgeBase || undefined,
-          productType: filters.productType || undefined,
-          status: filters.status || undefined,
-          page,
-          pageSize
-        }),
-        fetchProductKnowledgeContext()
-      ]);
+      const pageResult = await fetchProductKnowledge({
+        query: filters.query.trim() || undefined,
+        knowledgeBase: filters.knowledgeBase || undefined,
+        productType: filters.productType || undefined,
+        status: filters.status || undefined,
+        page,
+        pageSize
+      });
       setData(pageResult);
-      setContext(contextResult);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "产品知识库加载失败");
+      setError(failure instanceof Error ? failure.message : "知识库加载失败");
     } finally {
       setLoading(false);
     }
@@ -124,13 +174,16 @@ export function ProductKnowledgePage() {
     setError(null);
     setNotice(null);
     try {
-      const saved = await saveProductKnowledge(values);
-      setNotice(`${knowledgeBaseLabel(saved.knowledge_base)} · ${saved.product_type} / ${saved.model_name} 已保存为 ${saved.version}，AI 接待上下文会读取启用版本`);
+      const saved = await saveProductKnowledge({
+        ...values,
+        tags: uniqueTags(values.tags ?? [])
+      });
+      setNotice(`${knowledgeBaseLabel(saved.knowledge_base)} · ${saved.model_name} 已保存，写邮件时可作为大模型知识上下文`);
       setFilters((current) => ({ ...current, query: saved.model_name }));
       setPage(1);
       await load();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "产品知识保存失败");
+      setError(failure instanceof Error ? failure.message : "知识保存失败");
     } finally {
       setSaving(false);
     }
@@ -155,8 +208,12 @@ export function ProductKnowledgePage() {
       modelName: item.model_name,
       applicationScenario: item.application_scenario,
       aiGuidance: item.ai_guidance,
+      tags: item.tags ?? [],
       status: item.status
     });
+    setSelectedBaseKey(item.knowledge_base);
+    setBaseDraft(defaultKnowledgeBaseKeys.has(item.knowledge_base) ? "" : item.knowledge_base);
+    setSourceFileLabel(null);
   }
 
   async function addKnowledgeBaseCategory() {
@@ -170,6 +227,7 @@ export function ProductKnowledgePage() {
     const bases = await saveProductKnowledgeBase({ nextKey });
     setData((current) => (current ? { ...current, knowledge_bases: bases } : current));
     setSelectedBaseKey(nextKey);
+    form.setFieldsValue({ knowledgeBase: nextKey });
     setBaseDraft("");
     setNotice(`${knowledgeBaseLabel(nextKey)} 已加入知识库板块`);
   }
@@ -181,7 +239,7 @@ export function ProductKnowledgePage() {
       return;
     }
     if (isSelectedDefaultBase) {
-      setError("产品/竞品/市场属于默认板块，不建议重命名；可直接新增自定义知识库");
+      setError("默认知识库板块不支持重命名，可新增自定义知识库");
       return;
     }
     setError(null);
@@ -189,6 +247,7 @@ export function ProductKnowledgePage() {
     const bases = await saveProductKnowledgeBase({ currentKey: selectedBaseKey, nextKey });
     setData((current) => (current ? { ...current, knowledge_bases: bases } : current));
     setSelectedBaseKey(nextKey);
+    form.setFieldsValue({ knowledgeBase: nextKey });
     setBaseDraft(nextKey);
     setNotice(`${selectedBaseKey} 已重命名为 ${nextKey}`);
     await load();
@@ -209,26 +268,78 @@ export function ProductKnowledgePage() {
     setData((current) => (current ? { ...current, knowledge_bases: bases } : current));
     setFilters((current) => ({ ...current, knowledgeBase: current.knowledgeBase === selectedBaseKey ? "" : current.knowledgeBase }));
     setSelectedBaseKey("product");
+    form.setFieldsValue({ knowledgeBase: "product", productType: baseTypePreset.product });
     setBaseDraft("");
     setNotice(`${selectedBaseKey} 已删除`);
     await load();
   }
 
+  const uploadProps: UploadProps = {
+    accept: ".pdf,.doc,.docx,.txt,.md",
+    maxCount: 1,
+    showUploadList: false,
+    beforeUpload: async (file) => {
+      if (!isSupportedKnowledgeFile(file.name)) {
+        setError("知识库资料支持 PDF / Word / TXT / Markdown，请不要上传图片或压缩包。");
+        return Upload.LIST_IGNORE;
+      }
+      setUploading(true);
+      setError(null);
+      setNotice(null);
+      try {
+        const uploaded = await uploadProductKnowledgeSource(file);
+        const currentGuidance = (form.getFieldValue("aiGuidance") ?? "").trim();
+        const extractedBlock = `【资料文件：${uploaded.filename}】\n${uploaded.extracted_text}`;
+        const nextGuidance = (currentGuidance ? `${currentGuidance}\n\n${extractedBlock}` : extractedBlock).slice(0, 3900);
+        const currentTags = form.getFieldValue("tags") ?? [];
+        const currentBase = form.getFieldValue("knowledgeBase") || selectedBaseKey || "product";
+        form.setFieldsValue({
+          knowledgeBase: currentBase,
+          productType: form.getFieldValue("productType") || baseTypePreset[currentBase] || "自定义资料",
+          modelName: form.getFieldValue("modelName") || fileTitle(uploaded.filename),
+          applicationScenario: form.getFieldValue("applicationScenario") || `由资料文件导入：${uploaded.filename}`,
+          aiGuidance: nextGuidance,
+          tags: uniqueTags([...currentTags, ...uploaded.suggested_tags]),
+          status: form.getFieldValue("status") || "active"
+        });
+        setSourceFileLabel(`${uploaded.filename} · ${formatFileSize(uploaded.size)} · 已读取正文，可编辑后保存`);
+        message.success("资料已解析到知识内容，请确认分类和标签后保存");
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : "资料上传解析失败");
+      } finally {
+        setUploading(false);
+      }
+      return Upload.LIST_IGNORE;
+    }
+  };
+
   const columns: ColumnsType<ProductKnowledge> = [
-    { title: "知识库", dataIndex: "knowledge_base", fixed: "left", width: 130, render: (value: string) => <Tag color="purple">{knowledgeBaseLabel(value)}</Tag> },
-    { title: "产品类型", dataIndex: "product_type", width: 130 },
-    { title: "型号", dataIndex: "model_name", width: 160 },
     {
-      title: "应用场景",
-      dataIndex: "application_scenario",
-      width: 260,
-      render: (value: string) => <Typography.Text>{value}</Typography.Text>
+      title: "知识库",
+      dataIndex: "knowledge_base",
+      fixed: "left",
+      width: 130,
+      render: (value: string) => <Tag color={baseColor[value] ?? "purple"}>{knowledgeBaseLabel(value)}</Tag>
     },
+    { title: "知识类型", dataIndex: "product_type", width: 140 },
+    { title: "主题 / 对象", dataIndex: "model_name", width: 180 },
     {
-      title: "AI 接待知识",
+      title: "内容与标签",
       dataIndex: "ai_guidance",
-      width: 340,
-      render: (value: string) => <Typography.Paragraph ellipsis={{ rows: 2 }}>{value}</Typography.Paragraph>
+      width: 520,
+      render: (_, item) => (
+        <Space direction="vertical" size={6} className="knowledge-content-cell">
+          <Typography.Text strong>{item.application_scenario}</Typography.Text>
+          <Typography.Paragraph ellipsis={{ rows: 2 }}>{item.ai_guidance}</Typography.Paragraph>
+          <Space wrap size={[4, 4]}>
+            {(item.tags ?? []).length > 0 ? (
+              item.tags.map((tag) => <Tag key={`${item.id}-${tag}`}>{tag}</Tag>)
+            ) : (
+              <Tag color="default">暂无关键词</Tag>
+            )}
+          </Space>
+        </Space>
+      )
     },
     { title: "版本", dataIndex: "version", width: 90 },
     {
@@ -246,7 +357,7 @@ export function ProductKnowledgePage() {
     {
       title: "操作",
       fixed: "right",
-      width: 210,
+      width: 190,
       render: (_, item) => (
         <Space wrap>
           <Button onClick={() => edit(item)}>编辑</Button>
@@ -262,81 +373,66 @@ export function ProductKnowledgePage() {
 
   return (
     <section className="product-knowledge-page">
-      <div className="page-heading">
-        <div>
-          <Typography.Title level={2}>知识库管理</Typography.Title>
-          <Typography.Paragraph className="muted">
-            维护产品、竞品、市场等不同知识库板块；写邮件和再营销生成时会按场景读取启用知识作为 AI 上下文。
-          </Typography.Paragraph>
+      {openedFromSettings ? (
+        <div className="subpage-toolbar">
+          <Button icon={<ArrowLeft size={16} />} onClick={() => navigate("/admin/settings")}>
+            返回配置中心
+          </Button>
         </div>
-        <Space wrap>
-          {openedFromSettings ? (
-            <Button icon={<ArrowLeft size={16} />} onClick={() => navigate("/admin/settings?section=ai")}>
-              返回设置中心
-            </Button>
-          ) : null}
-          <Button icon={<RefreshCw size={16} />} onClick={() => void load()}>
-            刷新
-          </Button>
-          <Button icon={<ShieldCheck size={16} />} onClick={() => setFilters({ query: "", knowledgeBase: "", productType: "", status: "active" })}>
-            只看启用
-          </Button>
-        </Space>
-      </div>
+      ) : null}
 
-      {error ? <Alert type="error" showIcon message="产品知识库操作失败" description={error} /> : null}
+      {error ? <Alert type="error" showIcon message="知识库操作失败" description={error} /> : null}
       {notice ? <Alert type="success" showIcon message={notice} closable onClose={() => setNotice(null)} /> : null}
-
-      <Row gutter={[16, 16]} className="metric-row">
-        <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
-            <Statistic title="知识条目" value={data?.summary.total_items ?? 0} prefix={<BookOpen size={18} />} />
-            <div className="metric-chip">产品/竞品/市场/自定义</div>
-          </Card>
-        </Col>
-        <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
-            <Statistic title="启用条目" value={data?.summary.active_items ?? 0} />
-            <div className="metric-chip green">进入 AI 上下文</div>
-          </Card>
-        </Col>
-        <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
-            <Statistic title="停用条目" value={data?.summary.disabled_items ?? 0} />
-            <div className="metric-chip">保留历史版本</div>
-          </Card>
-        </Col>
-        <Col xs={24} md={12} xl={6}>
-          <Card loading={loading}>
-            <Statistic title="当前版本" value={context?.active_version ?? data?.active_version ?? "v0"} />
-            <div className="metric-chip amber">保存后自动升版</div>
-          </Card>
-        </Col>
-      </Row>
 
       <Row gutter={[16, 16]} className="summary-grid">
         <Col xs={24} xl={8}>
-          <Card title="保存知识版本" className="knowledge-form-card">
+          <Card title="新增 / 编辑知识" className="knowledge-form-card">
             <Form<ProductKnowledgeFormValues>
               form={form}
               layout="vertical"
-              initialValues={{ knowledgeBase: searchParams.get("knowledge_base") ?? "product", productType: "Portable", status: "active" }}
+              initialValues={{
+                knowledgeBase: searchParams.get("knowledge_base") ?? "product",
+                productType: baseTypePreset[searchParams.get("knowledge_base") ?? "product"],
+                tags: [],
+                status: "active"
+              }}
               onFinish={(values) => void submit(values)}
             >
               <Form.Item name="knowledgeBase" label="所属知识库" rules={[{ required: true, min: 2 }]}>
-                <Input placeholder="product / competitor / market / 自定义知识库名称" />
+                <Select
+                  showSearch
+                  options={knowledgeBaseOptions}
+                  onChange={(value) => {
+                    setSelectedBaseKey(value);
+                    form.setFieldsValue({ productType: form.getFieldValue("productType") || baseTypePreset[value] || "自定义资料" });
+                  }}
+                />
               </Form.Item>
-              <Form.Item name="productType" label="产品类型" rules={[{ required: true, min: 2 }]}>
+              <Form.Item name="productType" label="知识类型" rules={[{ required: true, min: 2 }]}>
                 <Select options={productTypeOptions} showSearch />
               </Form.Item>
-              <Form.Item name="modelName" label="型号" rules={[{ required: true, min: 2 }]}>
-                <Input placeholder="例如 SonoBook P3" />
+              <Form.Item name="modelName" label="主题 / 对象" rules={[{ required: true, min: 2 }]}>
+                <Input placeholder="例如 SonoBook P3 / 竞品型号 / 某次活动 / 商务案例" />
               </Form.Item>
-              <Form.Item name="applicationScenario" label="应用场景" rules={[{ required: true, min: 2 }]}>
-                <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="适用科室、渠道、客户场景" />
+              <Form.Item name="applicationScenario" label="适用场景" rules={[{ required: true, min: 2 }]}>
+                <Input.TextArea autoSize={{ minRows: 3, maxRows: 5 }} placeholder="说明这条知识适合在哪些客户、邮件目的或销售场景中使用" />
               </Form.Item>
-              <Form.Item name="aiGuidance" label="AI 接待知识" rules={[{ required: true, min: 2 }]}>
-                <Input.TextArea autoSize={{ minRows: 5, maxRows: 8 }} placeholder="AI 追问重点、禁止承诺边界、升级销售规则" />
+              <Form.Item name="aiGuidance" label="知识内容" rules={[{ required: true, min: 2 }]}>
+                <Input.TextArea autoSize={{ minRows: 6, maxRows: 10 }} placeholder="可手动输入，也可上传 PDF / Word 后自动读取正文" />
+              </Form.Item>
+              <Form.Item name="tags" label="关键词标签">
+                <Select mode="tags" tokenSeparators={[",", "，", ";", "；"]} placeholder="输入关键词后回车，如 Portable、竞品、医院、活动" />
+              </Form.Item>
+              <Form.Item label="资料上传">
+                <Upload {...uploadProps}>
+                  <Button icon={<UploadCloud size={16} />} loading={uploading}>
+                    上传 PDF / Word / TXT
+                  </Button>
+                </Upload>
+                <div className="knowledge-upload-note">
+                  <FileText size={14} />
+                  <span>{sourceFileLabel ?? "上传后会读取正文并填入“知识内容”，同时建议关键词标签；保存后才进入知识库。"}</span>
+                </div>
               </Form.Item>
               <Form.Item name="status" label="状态" rules={[{ required: true }]}>
                 <Select
@@ -348,37 +444,46 @@ export function ProductKnowledgePage() {
                 />
               </Form.Item>
               <Button type="primary" htmlType="submit" icon={<Save size={16} />} loading={saving} block>
-                保存知识版本
+                保存知识
               </Button>
             </Form>
           </Card>
         </Col>
+
         <Col xs={24} xl={16}>
-          <Card title="知识库筛选">
+          <Card title="知识库内容" className="knowledge-list-card">
             <Space wrap className="knowledge-filter-bar">
               <Select
-                placeholder="选择已有板块"
+                placeholder="选择板块"
                 value={selectedBaseKey}
                 onChange={(value) => {
                   setSelectedBaseKey(value);
                   setBaseDraft(defaultKnowledgeBaseKeys.has(value) ? "" : value);
+                  form.setFieldsValue({ knowledgeBase: value, productType: form.getFieldValue("productType") || baseTypePreset[value] || "自定义资料" });
                 }}
                 options={knowledgeBaseOptions}
                 style={{ width: 180 }}
               />
               <Input
-                placeholder="新增自定义板块，如 regional_playbook"
+                placeholder="新增自定义板块，如 distributor_playbook"
                 value={baseDraft}
                 onChange={(event) => setBaseDraft(event.target.value)}
                 style={{ width: 260 }}
               />
-              <Button icon={<Plus size={16} />} onClick={() => void addKnowledgeBaseCategory()}>新增板块</Button>
-              <Button disabled={isSelectedDefaultBase} onClick={() => void renameKnowledgeBaseCategory()}>重命名自定义板块</Button>
-              <Button danger disabled={isSelectedDefaultBase} icon={<Trash2 size={16} />} onClick={() => void removeKnowledgeBaseCategory()}>删除自定义板块</Button>
+              <Button icon={<Plus size={16} />} onClick={() => void addKnowledgeBaseCategory()}>
+                新增板块
+              </Button>
+              <Button disabled={isSelectedDefaultBase} onClick={() => void renameKnowledgeBaseCategory()}>
+                重命名
+              </Button>
+              <Button danger disabled={isSelectedDefaultBase} icon={<Trash2 size={16} />} onClick={() => void removeKnowledgeBaseCategory()}>
+                删除
+              </Button>
             </Space>
+
             <Space wrap className="knowledge-filter-bar">
               <Input
-                placeholder="搜索知识库/型号/场景"
+                placeholder="搜索主题 / 标签 / 场景"
                 value={filters.query}
                 onChange={(event) => {
                   setPage(1);
@@ -388,7 +493,7 @@ export function ProductKnowledgePage() {
               />
               <Select
                 allowClear
-                placeholder="知识库板块"
+                placeholder="知识库分类"
                 value={filters.knowledgeBase || undefined}
                 onChange={(value) => {
                   setPage(1);
@@ -399,7 +504,7 @@ export function ProductKnowledgePage() {
               />
               <Select
                 allowClear
-                placeholder="产品类型"
+                placeholder="知识类型"
                 value={filters.productType || undefined}
                 onChange={(value) => {
                   setPage(1);
@@ -424,16 +529,28 @@ export function ProductKnowledgePage() {
                 style={{ width: 140 }}
               />
             </Space>
+
             <Table<ProductKnowledge>
               rowKey="id"
               loading={loading}
               dataSource={data?.items ?? []}
               columns={columns}
-              scroll={{ x: 1470 }}
+              scroll={{ x: 1410 }}
               locale={{
                 emptyText: (
-                  <Empty description={data?.empty_state?.title ?? "暂无产品知识"}>
-                    <Button onClick={() => form.setFieldsValue({ knowledgeBase: "product", productType: "Portable", status: "active" })}>新增知识</Button>
+                  <Empty description={data?.empty_state?.title ?? "暂无知识条目"}>
+                    <Button
+                      onClick={() =>
+                        form.setFieldsValue({
+                          knowledgeBase: selectedBaseKey || "product",
+                          productType: baseTypePreset[selectedBaseKey] || "自定义资料",
+                          tags: [],
+                          status: "active"
+                        })
+                      }
+                    >
+                      新增知识
+                    </Button>
                   </Empty>
                 )
               }}
@@ -452,23 +569,6 @@ export function ProductKnowledgePage() {
           </Card>
         </Col>
       </Row>
-
-      <Card title="AI 上下文预览" className="settings-section" loading={loading}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} md={8}>
-            <Space direction="vertical">
-              <Typography.Text strong>安全边界</Typography.Text>
-              <Tag color="purple">{context?.safety_boundary ?? "PRODUCT_KNOWLEDGE_REFERENCE_ONLY"}</Tag>
-              <Typography.Text className="muted">
-                知识内容只作为引用数据，不作为系统指令；外部复制文本会被包裹在产品知识标签中。
-              </Typography.Text>
-            </Space>
-          </Col>
-          <Col xs={24} md={16}>
-            <Input.TextArea readOnly value={context?.rendered_prompt ?? ""} autoSize={{ minRows: 8, maxRows: 14 }} />
-          </Col>
-        </Row>
-      </Card>
     </section>
   );
 }

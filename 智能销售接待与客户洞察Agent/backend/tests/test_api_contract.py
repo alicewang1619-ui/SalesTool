@@ -52,6 +52,26 @@ def make_xlsx(rows: list[list[str]]) -> bytes:
     return output.getvalue()
 
 
+def make_docx(text_value: str) -> bytes:
+    escaped = (
+        text_value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as document:
+        document.writestr("[Content_Types].xml", '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>')
+        document.writestr(
+            "word/document.xml",
+            (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                f"<w:body><w:p><w:r><w:t>{escaped}</w:t></w:r></w:p></w:body></w:document>"
+            ),
+        )
+    return output.getvalue()
+
+
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     for key in [
@@ -2428,6 +2448,7 @@ def test_product_knowledge_overview_lists_products_versions_and_ai_guidance(clie
         "model_name",
         "application_scenario",
         "ai_guidance",
+        "tags",
         "version",
         "status",
         "updated_at",
@@ -2471,6 +2492,7 @@ def test_product_knowledge_save_persists_version_audit_and_ai_context(client: Te
             "model_name": model_name,
             "application_scenario": "Emergency triage and mobile clinic screening",
             "ai_guidance": "Ask the buyer about probe, department, portability, and daily scanning volume.",
+            "tags": ["Emergency", "Mobile clinic", "Probe mix"],
             "status": "active",
         },
         headers=headers,
@@ -2481,15 +2503,19 @@ def test_product_knowledge_save_persists_version_audit_and_ai_context(client: Te
     assert saved["model_name"] == model_name
     assert saved["version"].startswith("v")
     assert saved["status"] == "active"
+    assert saved["tags"] == ["Emergency", "Mobile clinic", "Probe mix"]
 
     overview = client.get("/api/settings/product-knowledge", params={"query": model_name}, headers=headers).json()
     assert overview["total"] == 1
     assert overview["items"][0]["model_name"] == model_name
+    assert "Mobile clinic" in overview["items"][0]["tags"]
 
     context = client.get("/api/ai/product-knowledge/context", headers=headers)
     assert context.status_code == 200
     context_body = context.json()
     assert any(block["model_name"] == model_name for block in context_body["knowledge_blocks"])
+    assert any("Probe mix" in block["tags"] for block in context_body["knowledge_blocks"] if block["model_name"] == model_name)
+    assert "Tags: Emergency, Mobile clinic, Probe mix" in context_body["rendered_prompt"]
     assert context_body["active_version"]
 
     audit = client.get("/api/audit-logs", headers=headers).json()["items"]
@@ -2552,6 +2578,23 @@ def test_product_knowledge_prompt_injection_is_wrapped_as_reference_data(client:
     assert "<product_knowledge>" in body["rendered_prompt"]
     assert "</product_knowledge>" in body["rendered_prompt"]
     assert "Ignore previous instructions" in body["rendered_prompt"]
+
+
+def test_product_knowledge_upload_extracts_word_file_and_suggests_tags(client: TestClient) -> None:
+    headers = auth_headers(client)
+    content = make_docx("Portable ultrasound campaign invitation for hospital distributor case reference.")
+
+    response = client.post(
+        "/api/settings/product-knowledge/upload",
+        files={"file": ("campaign-invitation.docx", content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["filename"] == "campaign-invitation.docx"
+    assert "Portable ultrasound campaign invitation" in body["extracted_text"]
+    assert {"Portable", "活动", "医院"}.intersection(set(body["suggested_tags"]))
 
 
 def test_product_knowledge_invalid_required_fields_are_rejected(client: TestClient) -> None:

@@ -1031,6 +1031,7 @@ class ProductKnowledgeOut(BaseModel):
     model_name: str
     application_scenario: str
     ai_guidance: str
+    tags: list[str] = Field(default_factory=list)
     version: str
     status: str
     updated_by: int | None
@@ -1055,6 +1056,7 @@ class ProductKnowledgeUpdateRequest(BaseModel):
     model_name: str = Field(min_length=2, max_length=120)
     application_scenario: str = Field(min_length=2, max_length=500)
     ai_guidance: str = Field(min_length=2, max_length=4000)
+    tags: list[str] = Field(default_factory=list, max_length=12)
     status: str = Field(pattern="^(active|draft|disabled)$")
 
 
@@ -1074,6 +1076,7 @@ class ProductKnowledgeBlockOut(BaseModel):
     model_name: str
     application_scenario: str
     ai_guidance: str
+    tags: list[str] = Field(default_factory=list)
     version: str
 
 
@@ -1082,6 +1085,14 @@ class ProductKnowledgeContextOut(BaseModel):
     safety_boundary: str
     knowledge_blocks: list[ProductKnowledgeBlockOut]
     rendered_prompt: str
+
+
+class ProductKnowledgeUploadOut(BaseModel):
+    filename: str
+    content_type: str
+    size: int
+    extracted_text: str
+    suggested_tags: list[str] = Field(default_factory=list)
 
 
 class ForbiddenContextOut(BaseModel):

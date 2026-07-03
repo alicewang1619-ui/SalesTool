@@ -642,6 +642,33 @@ body {
   margin-bottom: 16px;
 }
 
+.knowledge-upload-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  color: #748098;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.knowledge-content-cell {
+  max-width: 500px;
+}
+
+.knowledge-content-cell .ant-typography {
+  margin-bottom: 0;
+}
+
+.knowledge-list-card .ant-card-body {
+  padding-top: 18px;
+}
+
+.subpage-toolbar {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .forbidden-page {
   min-height: calc(100vh - 180px);
   display: grid;

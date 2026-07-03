@@ -746,6 +746,19 @@ body {
   background: #ffffff;
 }
 
+.prospecting-page .section-grid,
+.prospecting-page .table-card {
+  margin-top: 18px;
+}
+
+.prospecting-page .full-width {
+  width: 100%;
+}
+
+.prospecting-page .table-link-button {
+  padding-inline: 0;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;

@@ -33,6 +33,8 @@ class LeadOut(BaseModel):
     product: str
     source_category: str
     source_label: str
+    source_url: str = ""
+    source_note: str = ""
     score_label: str
     feedback_status: str
     owner_id: int | None = None
@@ -88,6 +90,72 @@ class LeadDetailOut(LeadOut):
 class LeadAssignmentUpdate(BaseModel):
     owner_id: int | None = None
     feedback_status: str = Field(min_length=2, max_length=80)
+
+
+class ProspectingPlanCreateRequest(BaseModel):
+    brand_name: str = Field(min_length=1, max_length=120)
+    product_focus: str = Field(min_length=1, max_length=160)
+    target_region: str = Field(min_length=1, max_length=120)
+    target_customer_profile: str = Field(min_length=1, max_length=500)
+    channels: list[str] = Field(default_factory=lambda: ["Google", "LinkedIn", "Google Maps"])
+
+
+class ProspectCandidateOut(BaseModel):
+    id: int
+    plan_id: int
+    company_name: str
+    email: str = ""
+    organization: str = ""
+    country: str
+    customer_type: str
+    product: str
+    source_channel: str
+    source_label: str
+    source_url: str
+    source_note: str
+    ai_match_reason: str
+    score_label: str
+    status: str
+    lead_id: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ProspectingPlanOut(BaseModel):
+    id: int
+    brand_name: str
+    product_focus: str
+    target_region: str
+    target_customer_profile: str
+    channels: list[str]
+    ai_strategy: str
+    cadence_plan: str
+    status: str
+    created_by: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    candidates: list[ProspectCandidateOut] = Field(default_factory=list)
+
+
+class ProspectingMetricsOut(BaseModel):
+    total_candidates: int
+    pending_candidates: int
+    confirmed_candidates: int
+    discarded_candidates: int
+
+
+class ProspectingOverviewOut(BaseModel):
+    metrics: ProspectingMetricsOut
+    plans: list[ProspectingPlanOut]
+    candidates: list[ProspectCandidateOut]
+
+
+class ProspectConfirmOut(BaseModel):
+    candidate: ProspectCandidateOut
+    lead_id: int
+    lead_detail_path: str
+    customer_id: int
+    customer_detail_path: str
 
 
 class PageResult(BaseModel):

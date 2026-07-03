@@ -23,6 +23,8 @@ export type Lead = {
   product: string;
   source_category: string;
   source_label: string;
+  source_url: string;
+  source_note: string;
   score_label: string;
   feedback_status: string;
   owner_id: number | null;
@@ -69,6 +71,70 @@ export type LeadDetail = Lead & {
   };
   feedback_history: string[];
   background_task_status: string;
+};
+
+export type ProspectingPlanInput = {
+  brand_name: string;
+  product_focus: string;
+  target_region: string;
+  target_customer_profile: string;
+  channels: string[];
+};
+
+export type ProspectCandidate = {
+  id: number;
+  plan_id: number;
+  company_name: string;
+  email: string;
+  organization: string;
+  country: string;
+  customer_type: string;
+  product: string;
+  source_channel: string;
+  source_label: string;
+  source_url: string;
+  source_note: string;
+  ai_match_reason: string;
+  score_label: string;
+  status: string;
+  lead_id: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ProspectingPlan = {
+  id: number;
+  brand_name: string;
+  product_focus: string;
+  target_region: string;
+  target_customer_profile: string;
+  channels: string[];
+  ai_strategy: string;
+  cadence_plan: string;
+  status: string;
+  created_by: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  candidates: ProspectCandidate[];
+};
+
+export type ProspectingOverview = {
+  metrics: {
+    total_candidates: number;
+    pending_candidates: number;
+    confirmed_candidates: number;
+    discarded_candidates: number;
+  };
+  plans: ProspectingPlan[];
+  candidates: ProspectCandidate[];
+};
+
+export type ProspectConfirmResult = {
+  candidate: ProspectCandidate;
+  lead_id: number;
+  lead_detail_path: string;
+  customer_id: number;
+  customer_detail_path: string;
 };
 
 export type PageResult<T> = {
@@ -1066,6 +1132,29 @@ export function updateLeadAssignment(
   return request<LeadDetail>(`/api/leads/${leadId}/assignment`, {
     method: "PUT",
     body: JSON.stringify({ owner_id: payload.ownerId, feedback_status: payload.feedbackStatus })
+  });
+}
+
+export function fetchProspectingOverview(): Promise<ProspectingOverview> {
+  return request<ProspectingOverview>("/api/prospecting");
+}
+
+export function createProspectingPlan(payload: ProspectingPlanInput): Promise<ProspectingPlan> {
+  return request<ProspectingPlan>("/api/prospecting/plans", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function confirmProspectCandidate(candidateId: number): Promise<ProspectConfirmResult> {
+  return request<ProspectConfirmResult>(`/api/prospecting/candidates/${candidateId}/confirm`, {
+    method: "POST"
+  });
+}
+
+export function discardProspectCandidate(candidateId: number): Promise<ProspectCandidate> {
+  return request<ProspectCandidate>(`/api/prospecting/candidates/${candidateId}/discard`, {
+    method: "POST"
   });
 }
 

@@ -61,6 +61,8 @@ class Lead(Base):
     product: Mapped[str] = mapped_column(String(160), nullable=False)
     source_category: Mapped[str] = mapped_column(String(40), nullable=False)
     source_label: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    source_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
     score_label: Mapped[str] = mapped_column(String(40), nullable=False)
     feedback_status: Mapped[str] = mapped_column(String(80), nullable=False)
     raw_inquiry: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -187,6 +189,46 @@ class CustomerBackground(Base):
     updated_by: Mapped[str] = mapped_column(String(120), default="system")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     customer: Mapped[Customer] = relationship(back_populates="background")
+
+
+class ProspectingPlan(Base):
+    __tablename__ = "prospecting_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brand_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    product_focus: Mapped[str] = mapped_column(String(160), nullable=False)
+    target_region: Mapped[str] = mapped_column(String(120), nullable=False)
+    target_customer_profile: Mapped[str] = mapped_column(Text, nullable=False)
+    channels_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    ai_strategy: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    cadence_plan: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ProspectCandidate(Base):
+    __tablename__ = "prospect_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("prospecting_plans.id"), nullable=False, index=True)
+    company_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    organization: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    country: Mapped[str] = mapped_column(String(80), nullable=False, default="待确认")
+    customer_type: Mapped[str] = mapped_column(String(80), nullable=False, default="待确认")
+    product: Mapped[str] = mapped_column(String(160), nullable=False, default="待确认")
+    source_channel: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_label: Mapped[str] = mapped_column(String(120), nullable=False, default="搜索入口")
+    source_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    ai_match_reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    score_label: Mapped[str] = mapped_column(String(40), nullable=False, default="待确认")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="待确认", index=True)
+    lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class CustomerSignal(Base):

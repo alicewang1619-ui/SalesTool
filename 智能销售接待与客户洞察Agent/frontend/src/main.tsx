@@ -11,6 +11,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadImportPage } from "./pages/LeadImportPage";
+import { ProspectingPage } from "./pages/ProspectingPage";
 import { FeedbackCardPage } from "./pages/FeedbackCardPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
       { path: "leads", element: <LeadsPage /> },
       { path: "leads/import", element: <LeadImportPage /> },
       { path: "leads/:leadId", element: <LeadDetailPage /> },
+      { path: "prospecting", element: <ProspectingPage /> },
       { path: "assignments/pending", element: <PendingAssignmentsPage /> },
       { path: "customers", element: <CustomersPage /> },
       { path: "customers/:customerId", element: <CustomerDetailPage /> },

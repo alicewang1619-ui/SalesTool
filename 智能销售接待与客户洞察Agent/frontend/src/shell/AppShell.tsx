@@ -1,5 +1,5 @@
 import { Layout, Menu, Typography } from "antd";
-import { BarChart3, BookOpen, CircleUserRound, ClipboardList, Database, Home, Send, Settings, UsersRound, WandSparkles } from "lucide-react";
+import { BarChart3, BookOpen, CircleUserRound, ClipboardList, Database, Home, Radar, Send, Settings, UsersRound, WandSparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, fetchMe, getToken } from "../api";
@@ -10,6 +10,7 @@ const { Sider, Content } = Layout;
 const navItems = [
   { key: "/admin/dashboard", icon: <Home size={18} />, label: "工作台", roles: ["admin", "ops", "sales"] },
   { key: "/admin/leads", icon: <Database size={18} />, label: "线索池", roles: ["admin", "ops", "sales"] },
+  { key: "/admin/prospecting", icon: <Radar size={18} />, label: "挖潜客", roles: ["admin", "ops"] },
   { key: "/admin/assignments/pending", icon: <ClipboardList size={18} />, label: "待分配", roles: ["admin", "ops"] },
   { key: "/admin/customers", icon: <UsersRound size={18} />, label: "客户池", roles: ["admin", "ops", "sales"] },
   { key: "/admin/nurture", icon: <Send size={18} />, label: "再营销", roles: ["admin", "ops", "sales"] },
@@ -54,7 +55,7 @@ export function AppShell() {
   const salesRestricted =
     user?.role === "sales" &&
     !location.pathname.startsWith("/admin/forbidden") &&
-    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/customer-signals", "/admin/marketing-skills", "/admin/knowledge-base"].some((path) =>
+    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/customer-signals", "/admin/prospecting", "/admin/marketing-skills", "/admin/knowledge-base"].some((path) =>
       location.pathname.startsWith(path)
     );
 
@@ -69,7 +70,9 @@ export function AppShell() {
 
   const selectedKey = location.pathname.startsWith("/admin/leads")
     ? "/admin/leads"
-    : location.pathname.startsWith("/admin/assignments")
+    : location.pathname.startsWith("/admin/prospecting")
+      ? "/admin/prospecting"
+      : location.pathname.startsWith("/admin/assignments")
       ? "/admin/assignments/pending"
       : location.pathname.startsWith("/admin/customers") || location.pathname.startsWith("/admin/customer-signals")
         ? "/admin/customers"

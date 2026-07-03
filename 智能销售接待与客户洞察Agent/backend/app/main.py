@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 from uuid import uuid4
 import zipfile
 import xml.etree.ElementTree as ET
@@ -30,6 +30,8 @@ from .models import (
     Lead,
     LoginAttempt,
     NurtureTask,
+    ProspectCandidate,
+    ProspectingPlan,
     ProductKnowledge,
     ReportExportJob,
     SalesFeedback,
@@ -148,6 +150,12 @@ from .schemas import (
     ProductKnowledgeStatusRequest,
     ProductKnowledgeUpdateRequest,
     ProductKnowledgeUploadOut,
+    ProspectCandidateOut,
+    ProspectConfirmOut,
+    ProspectingMetricsOut,
+    ProspectingOverviewOut,
+    ProspectingPlanCreateRequest,
+    ProspectingPlanOut,
     SalesUserCreateRequest,
     SalesUserDeleteOut,
     SalesUserUpdateRequest,
@@ -205,6 +213,10 @@ def ensure_sqlite_compatibility() -> None:
                 connection.execute(text("ALTER TABLE leads ADD COLUMN raw_inquiry TEXT NOT NULL DEFAULT ''"))
             if "conversation_history" not in lead_columns:
                 connection.execute(text("ALTER TABLE leads ADD COLUMN conversation_history TEXT NOT NULL DEFAULT '[]'"))
+            if "source_url" not in lead_columns:
+                connection.execute(text("ALTER TABLE leads ADD COLUMN source_url VARCHAR(500) NOT NULL DEFAULT ''"))
+            if "source_note" not in lead_columns:
+                connection.execute(text("ALTER TABLE leads ADD COLUMN source_note TEXT NOT NULL DEFAULT ''"))
             connection.execute(
                 text(
                     """
@@ -822,7 +834,10 @@ def ensure_customer_for_lead(db: Session, lead: Lead) -> Customer:
     if customer is None and lead.email:
         customer = db.scalar(select(Customer).where(Customer.email == lead.email))
 
-    source_summary = f"{lead.source_category} / {lead.source_label}"
+    source_parts = [f"{lead.source_category} / {lead.source_label}"]
+    if getattr(lead, "source_url", ""):
+        source_parts.append(str(lead.source_url))
+    source_summary = " · ".join(source_parts)
     first_inquiry_at = lead.created_at or datetime.utcnow()
     if customer is None:
         customer = Customer(
@@ -859,7 +874,7 @@ def ensure_customer_for_lead(db: Session, lead: Lead) -> Customer:
             customer_id=customer.id,
             auto_summary=f"{lead.customer_name} 来自 {source_summary}，需求：{lead.raw_inquiry or '待补充'}",
             manual_summary=None,
-            evidence=f"线索：{lead.id or '未入库'}；来源：{source_summary}；国家：{lead.country or '待确认'}；邮箱：{lead.email or '未提供'}",
+            evidence=f"线索：{lead.id or '未入库'}；来源：{source_summary}；来源说明：{getattr(lead, 'source_note', '') or '未提供'}；国家：{lead.country or '待确认'}；邮箱：{lead.email or '未提供'}",
             confidence="待复核",
         )
         db.add(background)
@@ -902,6 +917,141 @@ def create_active_feedback_link(db: Session, lead: Lead, owner: User) -> tuple[S
     db.add(feedback_link)
     db.flush()
     return feedback_link, expires_at
+
+
+PROSPECTING_CHANNELS = {"Google", "LinkedIn", "Google Maps", "Manual"}
+PROSPECT_STATUS_PENDING = "待确认"
+PROSPECT_STATUS_CONFIRMED = "已入库"
+PROSPECT_STATUS_DISCARDED = "已丢弃"
+
+
+def clean_prospecting_channels(channels: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for channel in channels:
+        value = channel.strip()
+        if value in PROSPECTING_CHANNELS and value not in cleaned:
+            cleaned.append(value)
+    return cleaned or ["Google", "LinkedIn", "Google Maps"]
+
+
+def prospecting_query(plan: ProspectingPlan) -> str:
+    return " ".join(
+        part
+        for part in [
+            plan.target_region,
+            plan.target_customer_profile,
+            plan.product_focus,
+            plan.brand_name,
+        ]
+        if part
+    )
+
+
+def prospecting_source_url(channel: str, query: str) -> str:
+    if channel == "Google Maps":
+        return f"https://www.google.com/maps/search/{quote_plus(query)}"
+    if channel == "LinkedIn":
+        return "https://www.linkedin.com/search/results/companies/?" + urlencode({"keywords": query})
+    if channel == "Manual":
+        return "https://www.google.com/search?" + urlencode({"q": query})
+    return "https://www.google.com/search?" + urlencode({"q": query})
+
+
+def prospect_candidate_out(candidate: ProspectCandidate) -> ProspectCandidateOut:
+    return ProspectCandidateOut.model_validate(candidate, from_attributes=True)
+
+
+def prospecting_plan_out(db: Session, plan: ProspectingPlan) -> ProspectingPlanOut:
+    try:
+        channels = json.loads(plan.channels_json or "[]")
+    except json.JSONDecodeError:
+        channels = []
+    if not isinstance(channels, list):
+        channels = []
+    candidates = db.scalars(
+        select(ProspectCandidate)
+        .where(ProspectCandidate.plan_id == plan.id)
+        .order_by(ProspectCandidate.created_at.desc(), ProspectCandidate.id.desc())
+    ).all()
+    return ProspectingPlanOut(
+        id=plan.id,
+        brand_name=plan.brand_name,
+        product_focus=plan.product_focus,
+        target_region=plan.target_region,
+        target_customer_profile=plan.target_customer_profile,
+        channels=[str(channel) for channel in channels],
+        ai_strategy=plan.ai_strategy,
+        cadence_plan=plan.cadence_plan,
+        status=plan.status,
+        created_by=plan.created_by,
+        created_at=plan.created_at,
+        updated_at=plan.updated_at,
+        candidates=[prospect_candidate_out(candidate) for candidate in candidates],
+    )
+
+
+def build_prospecting_strategy(payload: ProspectingPlanCreateRequest, channels: list[str]) -> tuple[str, str]:
+    channel_text = "、".join(channels)
+    strategy = (
+        f"围绕 {payload.brand_name} 的 {payload.product_focus}，优先寻找 {payload.target_region} "
+        f"市场中符合“{payload.target_customer_profile}”的机构。渠道侧重点：{channel_text}。"
+        "候选只作为公开搜索或授权归档入口，必须人工核验来源链接后入库。"
+    )
+    cadence = (
+        "第 1 天：按渠道打开来源链接并筛掉明显不匹配对象；"
+        "第 2 天：核验官网、公司简介和联系方式；"
+        "第 3 天：确认入库高匹配候选并进入线索池/再营销。"
+    )
+    return strategy, cadence
+
+
+def build_prospect_candidates(plan: ProspectingPlan, channels: list[str]) -> list[ProspectCandidate]:
+    query = prospecting_query(plan)
+    region = plan.target_region.strip() or "Global"
+    product = plan.product_focus.strip() or "Ultrasound"
+    customer_profile = plan.target_customer_profile.strip()
+    names_by_channel = {
+        "Google": f"{region} {product} Distributor Prospect",
+        "LinkedIn": f"{region} Imaging Partner Prospect",
+        "Google Maps": f"{region} Clinic Network Prospect",
+        "Manual": f"{region} Manual Prospect",
+    }
+    label_by_channel = {
+        "Google": "Google 搜索入口",
+        "LinkedIn": "LinkedIn 公司搜索入口",
+        "Google Maps": "Google Maps 地图搜索入口",
+        "Manual": "人工来源入口",
+    }
+    candidates: list[ProspectCandidate] = []
+    for channel in channels:
+        source_label = label_by_channel.get(channel, "搜索入口")
+        candidates.append(
+            ProspectCandidate(
+                plan_id=plan.id,
+                company_name=names_by_channel.get(channel, f"{region} Prospect"),
+                organization=names_by_channel.get(channel, f"{region} Prospect"),
+                country=region,
+                customer_type="待确认",
+                product=product,
+                source_channel=channel,
+                source_label=source_label,
+                source_url=prospecting_source_url(channel, query),
+                source_note=f"来源渠道：{channel}；搜索关键词：{query}；需人工打开来源链接核验后入库。",
+                ai_match_reason=f"目标画像为“{customer_profile}”，与 {product} 的区域拓客方向匹配。",
+                score_label="待确认",
+                status=PROSPECT_STATUS_PENDING,
+            )
+        )
+    return candidates
+
+
+def prospecting_owner_for_country(db: Session, country: str) -> User | None:
+    return db.scalar(
+        select(User)
+        .join(CountrySalesMapping, CountrySalesMapping.sales_user_id == User.id)
+        .where(CountrySalesMapping.country == country, CountrySalesMapping.active.is_(True), User.enabled.is_(True))
+        .limit(1)
+    )
 
 
 def import_job_out(job: ImportJob) -> ImportJobOut:
@@ -2042,6 +2192,184 @@ def update_lead_assignment(
     db.commit()
     db.refresh(lead)
     return build_lead_detail(db, lead)
+
+
+@app.get("/api/prospecting", response_model=ProspectingOverviewOut)
+def prospecting_overview(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ProspectingOverviewOut:
+    plans = db.scalars(
+        select(ProspectingPlan)
+        .order_by(ProspectingPlan.created_at.desc(), ProspectingPlan.id.desc())
+        .limit(10)
+    ).all()
+    candidates = db.scalars(
+        select(ProspectCandidate)
+        .order_by(ProspectCandidate.created_at.desc(), ProspectCandidate.id.desc())
+        .limit(80)
+    ).all()
+    total_candidates = db.scalar(select(func.count()).select_from(ProspectCandidate)) or 0
+    pending_candidates = (
+        db.scalar(select(func.count()).select_from(ProspectCandidate).where(ProspectCandidate.status == PROSPECT_STATUS_PENDING))
+        or 0
+    )
+    confirmed_candidates = (
+        db.scalar(select(func.count()).select_from(ProspectCandidate).where(ProspectCandidate.status == PROSPECT_STATUS_CONFIRMED))
+        or 0
+    )
+    discarded_candidates = (
+        db.scalar(select(func.count()).select_from(ProspectCandidate).where(ProspectCandidate.status == PROSPECT_STATUS_DISCARDED))
+        or 0
+    )
+    return ProspectingOverviewOut(
+        metrics=ProspectingMetricsOut(
+            total_candidates=total_candidates,
+            pending_candidates=pending_candidates,
+            confirmed_candidates=confirmed_candidates,
+            discarded_candidates=discarded_candidates,
+        ),
+        plans=[prospecting_plan_out(db, plan) for plan in plans],
+        candidates=[prospect_candidate_out(candidate) for candidate in candidates],
+    )
+
+
+@app.post("/api/prospecting/plans", response_model=ProspectingPlanOut, status_code=status.HTTP_201_CREATED)
+def create_prospecting_plan(
+    payload: ProspectingPlanCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ProspectingPlanOut:
+    channels = clean_prospecting_channels(payload.channels)
+    ai_strategy, cadence_plan = build_prospecting_strategy(payload, channels)
+    plan = ProspectingPlan(
+        brand_name=payload.brand_name.strip(),
+        product_focus=payload.product_focus.strip(),
+        target_region=payload.target_region.strip(),
+        target_customer_profile=payload.target_customer_profile.strip(),
+        channels_json=json.dumps(channels, ensure_ascii=False),
+        ai_strategy=ai_strategy,
+        cadence_plan=cadence_plan,
+        status="active",
+        created_by=user.id,
+    )
+    db.add(plan)
+    db.flush()
+    db.add_all(build_prospect_candidates(plan, channels))
+    add_audit(
+        db,
+        request.state.trace_id,
+        "prospecting_plan_created",
+        f"创建挖潜客方案：{plan.brand_name} / {plan.target_region} / {', '.join(channels)}",
+        actor_id=user.id,
+        target_type="prospecting_plan",
+        target_id=plan.id,
+    )
+    db.commit()
+    db.refresh(plan)
+    return prospecting_plan_out(db, plan)
+
+
+@app.post("/api/prospecting/candidates/{candidate_id}/confirm", response_model=ProspectConfirmOut)
+def confirm_prospect_candidate(
+    candidate_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ProspectConfirmOut:
+    candidate = db.get(ProspectCandidate, candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=404, detail=error_detail("PROSPECT_NOT_FOUND", "Prospect candidate not found."))
+
+    existing_lead: Lead | None = None
+    if candidate.lead_id:
+        existing_lead = db.get(Lead, candidate.lead_id)
+    if existing_lead is None:
+        duplicate_conditions = [Lead.customer_name == candidate.company_name]
+        if candidate.email:
+            duplicate_conditions.append(Lead.email == candidate.email)
+        existing_lead = db.scalar(select(Lead).where(or_(*duplicate_conditions)).limit(1))
+
+    if existing_lead is None:
+        owner = prospecting_owner_for_country(db, candidate.country)
+        raw_inquiry = (
+            f"主动挖潜候选客户：{candidate.company_name}。"
+            f"AI 匹配理由：{candidate.ai_match_reason}。"
+            f"来源：{candidate.source_channel} / {candidate.source_label}。"
+            f"来源链接：{candidate.source_url}。"
+            f"来源说明：{candidate.source_note}"
+        )
+        existing_lead = Lead(
+            customer_name=candidate.company_name,
+            email=candidate.email or "",
+            organization=candidate.organization or candidate.company_name,
+            country=candidate.country or "待确认",
+            customer_type=candidate.customer_type or "待确认",
+            product=candidate.product or "待确认",
+            source_category="主动拓客",
+            source_label=candidate.source_channel,
+            source_url=candidate.source_url,
+            source_note=candidate.source_note,
+            score_label=candidate.score_label,
+            feedback_status=PENDING_SALES_FEEDBACK_STATUS if owner else "未分配",
+            raw_inquiry=raw_inquiry,
+            conversation_history=json.dumps([raw_inquiry], ensure_ascii=False),
+            owner_id=owner.id if owner else None,
+        )
+        db.add(existing_lead)
+        db.flush()
+        if owner:
+            create_active_feedback_link(db, existing_lead, owner)
+
+    customer = ensure_customer_for_lead(db, existing_lead)
+    candidate.status = PROSPECT_STATUS_CONFIRMED
+    candidate.lead_id = existing_lead.id
+    add_audit(
+        db,
+        request.state.trace_id,
+        "prospect_candidate_confirmed",
+        f"候选潜客 {candidate.company_name} 已确认入库，来源链接：{candidate.source_url}",
+        actor_id=user.id,
+        target_type="prospect_candidate",
+        target_id=candidate.id,
+    )
+    db.commit()
+    db.refresh(candidate)
+    db.refresh(existing_lead)
+    db.refresh(customer)
+    return ProspectConfirmOut(
+        candidate=prospect_candidate_out(candidate),
+        lead_id=existing_lead.id,
+        lead_detail_path=f"/admin/leads/{existing_lead.id}",
+        customer_id=customer.id,
+        customer_detail_path=f"/admin/customers/{customer.id}?lead_id={existing_lead.id}",
+    )
+
+
+@app.post("/api/prospecting/candidates/{candidate_id}/discard", response_model=ProspectCandidateOut)
+def discard_prospect_candidate(
+    candidate_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ops),
+) -> ProspectCandidateOut:
+    candidate = db.get(ProspectCandidate, candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=404, detail=error_detail("PROSPECT_NOT_FOUND", "Prospect candidate not found."))
+    candidate.status = PROSPECT_STATUS_DISCARDED
+    add_audit(
+        db,
+        request.state.trace_id,
+        "prospect_candidate_discarded",
+        f"候选潜客 {candidate.company_name} 已丢弃，来源链接：{candidate.source_url}",
+        actor_id=user.id,
+        target_type="prospect_candidate",
+        target_id=candidate.id,
+    )
+    db.commit()
+    db.refresh(candidate)
+    return prospect_candidate_out(candidate)
 
 
 @app.get("/api/dashboard", response_model=DashboardOut)

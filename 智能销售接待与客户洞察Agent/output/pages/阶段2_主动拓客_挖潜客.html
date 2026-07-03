@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>挖潜客 · Ultrasound Growth</title>
+    <style>
+      :root {
+        --primary: #6254f3;
+        --bg: #f5f5f6;
+        --card: #ffffff;
+        --text: #1f1f23;
+        --muted: #738095;
+        --border: #e7e8ef;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      .shell {
+        display: grid;
+        grid-template-columns: 248px 1fr;
+        min-height: 100vh;
+      }
+      aside {
+        background: #fff;
+        border-right: 1px solid var(--border);
+        padding: 32px 24px;
+      }
+      .brand {
+        font-size: 24px;
+        font-weight: 800;
+        margin-bottom: 48px;
+      }
+      .nav {
+        display: grid;
+        gap: 12px;
+      }
+      .nav span {
+        padding: 12px 16px;
+        border-radius: 10px;
+      }
+      .nav .active {
+        color: var(--primary);
+        background: #f0ecff;
+        font-weight: 700;
+      }
+      main {
+        overflow: auto;
+      }
+      .banner {
+        padding: 44px 56px;
+        color: #fff;
+        background: linear-gradient(110deg, #13264e, #4d5cf0);
+      }
+      .page {
+        padding: 48px 56px 72px;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 40px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 17px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 420px 1fr;
+        gap: 24px;
+        margin-top: 32px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 24px;
+      }
+      label {
+        display: block;
+        margin: 18px 0 8px;
+        color: #424b5e;
+        font-weight: 700;
+      }
+      input,
+      textarea,
+      select {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid #d9dbe7;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font: inherit;
+      }
+      textarea {
+        min-height: 118px;
+      }
+      .btn {
+        margin-top: 20px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #fff;
+        padding: 12px 18px;
+        font-weight: 800;
+      }
+      .strategy {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      .note {
+        margin-top: 14px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      table {
+        width: 100%;
+        margin-top: 24px;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #edf0f5;
+        padding: 16px;
+        text-align: left;
+      }
+      th {
+        background: #fafafa;
+      }
+      a {
+        color: var(--primary);
+        font-weight: 700;
+      }
+      .tag {
+        display: inline-block;
+        border: 1px solid #cdbdff;
+        color: var(--primary);
+        border-radius: 999px;
+        padding: 3px 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside>
+        <div class="brand">Ultrasound<br />Growth</div>
+        <div class="nav">
+          <span>工作台</span>
+          <span>线索池</span>
+          <span class="active">挖潜客</span>
+          <span>客户池</span>
+          <span>再营销</span>
+        </div>
+      </aside>
+      <main>
+        <div class="banner">
+          <h2>CHISON Ultrasound</h2>
+          <p>New distributor onboarding policy is available.</p>
+        </div>
+        <section class="page">
+          <h1>挖潜客</h1>
+          <p class="sub">根据品牌、区域和目标客户画像生成拓客方案；候选客户确认后进入线索池，并保留来源链接。</p>
+          <div class="grid">
+            <div class="card">
+              <h2>拓客方案</h2>
+              <label>品牌 / 产品侧重点</label>
+              <input value="CHISON Portable Ultrasound" />
+              <label>目标区域</label>
+              <input value="Peru" />
+              <label>目标客户画像</label>
+              <textarea>区域医疗设备代理商、影像设备渠道商、移动诊所采购决策人。</textarea>
+              <label>拓客渠道</label>
+              <select multiple>
+                <option selected>Google</option>
+                <option selected>LinkedIn</option>
+                <option selected>Google Maps</option>
+              </select>
+              <button class="btn">生成拓客方案</button>
+            </div>
+            <div class="card">
+              <h2>AI 拓客方案与节奏</h2>
+              <div class="strategy">
+                <div>
+                  <b>渠道策略</b>
+                  <p class="note">Google 找公开官网和经销商目录；LinkedIn 只作为公开公司搜索入口；Google Maps 补充本地诊所和经销点。</p>
+                </div>
+                <div>
+                  <b>执行节奏</b>
+                  <p class="note">第 1 天搜索与筛选，第 2 天人工核验，第 3 天确认入库并进入再营销草稿。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>候选客户</th>
+                <th>国家</th>
+                <th>来源</th>
+                <th>来源链接</th>
+                <th>AI 匹配理由</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Peru Imaging Distributor Prospect</td>
+                <td>Peru</td>
+                <td>Google · 搜索入口</td>
+                <td><a href="#">打开来源</a></td>
+                <td>匹配区域代理和便携超声产品方向。</td>
+                <td><span class="tag">待确认</span></td>
+                <td>确认入库 / 丢弃</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

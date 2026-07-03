@@ -21,6 +21,8 @@ from app.models import (
     Lead,
     LoginAttempt,
     NurtureTask,
+    ProspectCandidate,
+    ProspectingPlan,
     SalesFeedback,
     SalesFeedbackLink,
     SourceDictionary,
@@ -92,12 +94,21 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
         db.execute(delete(LoginAttempt))
         db.execute(delete(ImportJob))
         db.execute(delete(NurtureTask))
+        db.execute(delete(ProspectCandidate))
+        db.execute(delete(ProspectingPlan))
         db.execute(delete(CustomerSignal))
         db.execute(delete(SalesFeedback))
         db.execute(delete(SalesFeedbackLink))
         for prefix in ["Chile-", "Riskland-", "Blocked-Riskland-", "Utopia-"]:
             db.query(CountrySalesMapping).filter(CountrySalesMapping.country.like(f"{prefix}%")).delete(synchronize_session=False)
         db.query(Lead).filter(Lead.customer_name.like("Pending Utopia-%")).delete(synchronize_session=False)
+        prospect_customer_ids = [
+            item.id for item in db.query(Customer).filter(Customer.name.like("Prospectland-%")).all()
+        ]
+        if prospect_customer_ids:
+            db.query(CustomerBackground).filter(CustomerBackground.customer_id.in_(prospect_customer_ids)).delete(synchronize_session=False)
+            db.query(Customer).filter(Customer.id.in_(prospect_customer_ids)).delete(synchronize_session=False)
+        db.query(Lead).filter(Lead.customer_name.like("Prospectland-%")).delete(synchronize_session=False)
         db.query(User).filter(User.email.like("disabled-%@ultrasound-growth.local")).delete(synchronize_session=False)
         test_customer_names = [
             "Dr. Sofia Ramirez",
@@ -366,6 +377,75 @@ def test_sales_user_only_sees_owned_leads(client: TestClient) -> None:
     names = [item["customer_name"] for item in response.json()["items"]]
     assert "GlobalMed Peru" in names
     assert "Al Noor Hospital" not in names
+
+
+def prospecting_payload(region: str, channels: list[str] | None = None) -> dict[str, object]:
+    return {
+        "brand_name": "CHISON Ultrasound",
+        "product_focus": "Portable Ultrasound",
+        "target_region": region,
+        "target_customer_profile": "区域医疗设备代理商、影像设备渠道商、移动诊所采购决策人",
+        "channels": channels or ["Google", "LinkedIn", "Google Maps"],
+    }
+
+
+def test_prospecting_plan_generates_candidates_with_source_links(client: TestClient) -> None:
+    headers = auth_headers(client)
+    region = f"Prospectland-{uuid4().hex[:6]}"
+    response = client.post("/api/prospecting/plans", json=prospecting_payload(region), headers=headers)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["target_region"] == region
+    assert "公开搜索" in body["ai_strategy"]
+    assert len(body["candidates"]) == 3
+    assert {item["source_channel"] for item in body["candidates"]} == {"Google", "LinkedIn", "Google Maps"}
+    assert all(item["source_url"].startswith("https://") for item in body["candidates"])
+    assert all(region in item["source_note"] for item in body["candidates"])
+
+    overview = client.get("/api/prospecting", headers=headers)
+    assert overview.status_code == 200
+    assert overview.json()["metrics"]["pending_candidates"] >= 3
+
+
+def test_prospecting_candidate_confirm_creates_lead_with_source_trace(client: TestClient) -> None:
+    headers = auth_headers(client)
+    region = f"Prospectland-{uuid4().hex[:6]}"
+    plan = client.post(
+        "/api/prospecting/plans",
+        json=prospecting_payload(region, ["Google"]),
+        headers=headers,
+    ).json()
+    candidate = plan["candidates"][0]
+
+    confirmed = client.post(f"/api/prospecting/candidates/{candidate['id']}/confirm", headers=headers)
+    assert confirmed.status_code == 200
+    result = confirmed.json()
+    assert result["candidate"]["status"] == "已入库"
+    assert result["lead_detail_path"].startswith("/admin/leads/")
+    assert result["customer_detail_path"].startswith("/admin/customers/")
+
+    lead = client.get(f"/api/leads/{result['lead_id']}", headers=headers)
+    assert lead.status_code == 200
+    lead_body = lead.json()
+    assert lead_body["customer_name"] == candidate["company_name"]
+    assert lead_body["source_category"] == "主动拓客"
+    assert lead_body["source_url"] == candidate["source_url"]
+    assert lead_body["source_note"] == candidate["source_note"]
+    assert candidate["source_url"] in lead_body["raw_inquiry"]
+
+    repeated = client.post(f"/api/prospecting/candidates/{candidate['id']}/confirm", headers=headers)
+    assert repeated.status_code == 200
+    assert repeated.json()["lead_id"] == result["lead_id"]
+    with SessionLocal() as db:
+        assert db.query(Lead).filter(Lead.customer_name == candidate["company_name"]).count() == 1
+
+
+def test_sales_cannot_access_prospecting(client: TestClient) -> None:
+    headers = auth_headers(client, "maria@ultrasound-growth.local", "Sales123!")
+
+    assert client.get("/api/prospecting", headers=headers).status_code == 403
+    assert client.post("/api/prospecting/plans", json=prospecting_payload("Prospectland-sales"), headers=headers).status_code == 403
 
 
 def test_dashboard_requires_login(client: TestClient) -> None:

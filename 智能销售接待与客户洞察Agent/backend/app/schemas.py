@@ -93,7 +93,7 @@ class LeadAssignmentUpdate(BaseModel):
 
 
 class ProspectingPlanCreateRequest(BaseModel):
-    brand_name: str = Field(min_length=1, max_length=120)
+    brand_name: str = Field(default="", max_length=120)
     product_focus: str = Field(min_length=1, max_length=160)
     target_region: str = Field(min_length=1, max_length=120)
     target_customer_profile: str = Field(default="", max_length=1000)

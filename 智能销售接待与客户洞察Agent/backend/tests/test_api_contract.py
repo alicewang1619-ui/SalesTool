@@ -417,6 +417,26 @@ def test_prospecting_plan_generates_candidates_with_source_links(client: TestCli
     assert overview.json()["metrics"]["pending_candidates"] >= 4
 
 
+def test_prospecting_allows_optional_brand_and_custom_sources(client: TestClient) -> None:
+    headers = auth_headers(client)
+    region = f"Prospectland-{uuid4().hex[:6]}"
+    custom_source = "Regional Dealer Directory"
+    payload = prospecting_payload(region, ["Google", custom_source])
+    payload["brand_name"] = ""
+
+    response = client.post("/api/prospecting/plans", json=payload, headers=headers)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["brand_name"] == ""
+    assert body["channels"] == ["Google", custom_source]
+    assert custom_source in body["ai_strategy"]
+    assert {item["source_channel"] for item in body["candidates"]} == {"Google", custom_source}
+    custom_candidate = next(item for item in body["candidates"] if item["source_channel"] == custom_source)
+    assert custom_candidate["company_name"] == f"{region} {custom_source} Prospect"
+    assert custom_candidate["source_url"].startswith("https://www.google.com/search?")
+
+
 def test_prospecting_requires_customer_persona(client: TestClient) -> None:
     payload = prospecting_payload(f"Prospectland-{uuid4().hex[:6]}", ["Google"])
     for key in ["industry_segments", "buyer_roles", "company_types", "use_cases", "intent_keywords", "exclude_keywords"]:

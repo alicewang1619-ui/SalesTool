@@ -919,7 +919,7 @@ def create_active_feedback_link(db: Session, lead: Lead, owner: User) -> tuple[S
     return feedback_link, expires_at
 
 
-PROSPECTING_CHANNELS = {"Google", "LinkedIn", "Google Maps", "Facebook", "Manual"}
+DEFAULT_PROSPECTING_CHANNELS = ["Google", "LinkedIn", "Google Maps", "Facebook"]
 PROSPECT_STATUS_PENDING = "待确认"
 PROSPECT_STATUS_CONFIRMED = "已入库"
 PROSPECT_STATUS_DISCARDED = "已丢弃"
@@ -936,10 +936,10 @@ PROSPECTING_PROFILE_FIELDS = [
 def clean_prospecting_channels(channels: list[str]) -> list[str]:
     cleaned: list[str] = []
     for channel in channels:
-        value = channel.strip()
-        if value in PROSPECTING_CHANNELS and value not in cleaned:
-            cleaned.append(value)
-    return cleaned or ["Google", "LinkedIn", "Google Maps", "Facebook"]
+        value = str(channel).strip()
+        if value and value not in cleaned:
+            cleaned.append(value[:80])
+    return cleaned[:12] or DEFAULT_PROSPECTING_CHANNELS
 
 
 def clean_profile_terms(terms: list[str]) -> list[str]:
@@ -1038,8 +1038,10 @@ def prospecting_plan_out(db: Session, plan: ProspectingPlan) -> ProspectingPlanO
 def build_prospecting_strategy(payload: ProspectingPlanCreateRequest, channels: list[str]) -> tuple[str, str]:
     channel_text = "、".join(channels)
     profile_snapshot = prospecting_profile_snapshot(payload)
+    brand_name = payload.brand_name.strip()
+    focus_text = f"{brand_name} 的 {payload.product_focus}" if brand_name else payload.product_focus
     strategy = (
-        f"围绕 {payload.brand_name} 的 {payload.product_focus}，优先寻找 {payload.target_region} "
+        f"围绕 {focus_text}，优先寻找 {payload.target_region} "
         f"市场中符合“{profile_snapshot}”的机构。渠道侧重点：{channel_text}。"
         "候选只作为公开搜索或授权归档入口，必须人工核验来源链接后入库。"
     )
@@ -1075,11 +1077,12 @@ def build_prospect_candidates(plan: ProspectingPlan, channels: list[str]) -> lis
     candidates: list[ProspectCandidate] = []
     for channel in channels:
         source_label = label_by_channel.get(channel, "搜索入口")
+        candidate_name = names_by_channel.get(channel, f"{region} {channel} Prospect")
         candidates.append(
             ProspectCandidate(
                 plan_id=plan.id,
-                company_name=names_by_channel.get(channel, f"{region} Prospect"),
-                organization=names_by_channel.get(channel, f"{region} Prospect"),
+                company_name=candidate_name,
+                organization=candidate_name,
                 country=region,
                 customer_type="待确认",
                 product=product,
@@ -2317,7 +2320,7 @@ def create_prospecting_plan(
         db,
         request.state.trace_id,
         "prospecting_plan_created",
-        f"创建挖潜客方案：{plan.brand_name} / {plan.target_region} / {', '.join(channels)}",
+        f"创建挖潜客方案：{plan.brand_name or '未指定品牌'} / {plan.target_region} / {', '.join(channels)}",
         actor_id=user.id,
         target_type="prospecting_plan",
         target_id=plan.id,

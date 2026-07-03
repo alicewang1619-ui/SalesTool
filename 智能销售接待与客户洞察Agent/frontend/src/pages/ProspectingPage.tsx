@@ -74,8 +74,9 @@ export function ProspectingPage() {
 
   const handleCreate = async () => {
     const values = await form.validateFields();
+    const channels = trimList(values.channels);
     const payload: ProspectingPlanInput = {
-      brand_name: values.brand_name.trim(),
+      brand_name: values.brand_name?.trim() ?? "",
       product_focus: values.product_focus.trim(),
       target_region: values.target_region.trim(),
       target_customer_profile: values.target_customer_profile?.trim() ?? "",
@@ -85,7 +86,7 @@ export function ProspectingPage() {
       use_cases: trimList(values.use_cases),
       intent_keywords: trimList(values.intent_keywords),
       exclude_keywords: trimList(values.exclude_keywords),
-      channels: values.channels?.length ? values.channels : ["Google", "LinkedIn", "Google Maps", "Facebook"]
+      channels: channels.length ? channels : ["Google", "LinkedIn", "Google Maps", "Facebook"]
     };
     setCreating(true);
     try {
@@ -278,7 +279,7 @@ export function ProspectingPage() {
             >
               <Row gutter={12}>
                 <Col xs={24} md={12}>
-                  <Form.Item name="brand_name" label="品牌" rules={[{ required: true, message: "请填写品牌" }]}>
+                  <Form.Item name="brand_name" label="品牌（选填）">
                     <Input placeholder="例如 CHISON Ultrasound" />
                   </Form.Item>
                 </Col>
@@ -316,8 +317,13 @@ export function ProspectingPage() {
               <Form.Item name="target_customer_profile" label="补充说明">
                 <Input.TextArea rows={3} placeholder="例如：优先区域代理商和采购决策人，不找宠物诊所、二手设备或个人医生。" />
               </Form.Item>
-              <Form.Item name="channels" label="拓客渠道" rules={[{ required: true, message: "请选择拓客渠道" }]}>
-                <Select mode="multiple" options={channelOptions} />
+              <Form.Item name="channels" label="来源渠道" rules={[{ required: true, message: "请选择或新增至少一个来源渠道" }]}>
+                <Select
+                  mode="tags"
+                  tokenSeparators={[",", "，"]}
+                  options={channelOptions}
+                  placeholder="选择预设来源，或直接输入新增来源"
+                />
               </Form.Item>
               <Button type="primary" icon={<Search size={16} />} loading={creating} onClick={() => void handleCreate()}>
                 按画像生成拓客方案
@@ -331,7 +337,7 @@ export function ProspectingPage() {
             {latestPlan ? (
               <Space direction="vertical" size={16} className="full-width">
                 <Space wrap>
-                  <Tag color="purple">{latestPlan.brand_name}</Tag>
+                  {latestPlan.brand_name ? <Tag color="purple">{latestPlan.brand_name}</Tag> : <Tag>品牌未填写</Tag>}
                   <Tag color="blue">{latestPlan.product_focus}</Tag>
                   <Tag>{latestPlan.target_region}</Tag>
                   {latestPlan.channels.map((channel) => (

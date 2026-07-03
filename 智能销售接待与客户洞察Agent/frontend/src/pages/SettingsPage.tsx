@@ -687,7 +687,7 @@ export function SettingsPage() {
         defaultEmailWriter
       });
       const savedWriter = saved.email_writers.find((writer) => writer.key === saved.default_email_writer)?.name ?? saved.default_email_writer;
-      setNotice(activeMenu === "marketing" ? `营销技能已保存：默认邮件写手 ${savedWriter}` : `AI 与模型配置已保存：默认模型 ${saved.selected_label}，默认写手 ${savedWriter}`);
+      setNotice(activeMenu === "marketing" ? `写手配置已保存：默认邮件写手 ${savedWriter}` : `AI 与模型配置已保存：默认模型 ${saved.selected_label}，默认写手 ${savedWriter}`);
       await load();
     } catch (failure) {
       setError(asError(failure));
@@ -799,7 +799,7 @@ export function SettingsPage() {
     }
     Modal.confirm({
       title: "删除邮件写手？",
-      content: `将删除“${target.name}”。若它是默认写手，将自动切换到其他启用写手。删除后请点击“保存营销技能”生效。`,
+      content: `将删除“${target.name}”。若它是默认写手，将自动切换到其他启用写手。删除后请点击“保存写手配置”生效。`,
       okText: "删除写手",
       okType: "danger",
       cancelText: "取消",
@@ -809,23 +809,45 @@ export function SettingsPage() {
         setEmailWriters(nextWriters);
         setSelectedWriterKey(fallbackKey);
         setDefaultEmailWriter((current) => current === target.key ? fallbackKey : current);
-        setNotice("邮件写手已从当前草稿删除，请点击保存营销技能。");
+        setNotice("邮件写手已从当前草稿删除，请点击保存写手配置。");
       }
     });
   }
 
+  const isMarketingOnlyView = activeMenu === "marketing";
+  const selectedWriterSkills = selectedWriterForDetails?.skills ?? [];
+  const selectedWriterTags = selectedWriterForDetails?.tags ?? [];
+  const marketingActions = (
+    <Space wrap>
+      <Button icon={<Plus size={16} />} onClick={openCreateWriter}>新增写手</Button>
+      <Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存写手配置</Button>
+    </Space>
+  );
+
   return (
-    <section className="settings-page">
-      <div className="page-heading">
-        <div>
-          <Typography.Title level={2}>配置中心</Typography.Title>
-          <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、营销技能、配置审计分组；点击菜单后只展示对应配置。</Typography.Paragraph>
+    <section className={`settings-page${isMarketingOnlyView ? " writer-skill-page" : ""}`}>
+      {isMarketingOnlyView ? (
+        <div className="writer-skill-hero">
+          <div>
+            <Typography.Title level={2}>邮件写手配置</Typography.Title>
+            <Typography.Paragraph className="muted">
+              这里专门维护再营销邮件的英文写手 Prompt。每个写手都是一套可复用技能，会把角色目标、能力方向、背景定义和执行提示词带入大模型生成上下文。
+            </Typography.Paragraph>
+          </div>
+          {marketingActions}
         </div>
-      </div>
+      ) : (
+        <div className="page-heading">
+          <div>
+            <Typography.Title level={2}>配置中心</Typography.Title>
+            <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、配置审计分组；点击菜单后只展示对应配置。</Typography.Paragraph>
+          </div>
+        </div>
+      )}
 
       {notice ? <Alert type="success" showIcon message={notice} closable onClose={() => setNotice(null)} /> : null}
       {error ? <Alert type="error" showIcon message="设置操作失败" description={error.message} /> : null}
-      <Tabs activeKey={activeMenu} items={settingsMenuItems} onChange={setActiveMenu} className="settings-section" />
+      {!isMarketingOnlyView ? <Tabs activeKey={activeMenu} items={settingsMenuItems} onChange={setActiveMenu} className="settings-section" /> : null}
 
       {activeMenu === "overview" ? (
         <>
@@ -1075,41 +1097,91 @@ export function SettingsPage() {
       ) : null}
 
       {activeMenu === "marketing" ? (
-        <Space direction="vertical" size={16} style={{ width: "100%" }}>
-          <Card
-            title="邮件写手技能配置"
-            loading={loading}
-            extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateWriter}>新增写手技能</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存营销技能</Button></Space>}
-          >
-            <Typography.Paragraph className="muted settings-section-note">
-              邮件写手是一套可复用的营销 Prompt 技能。这里按不同英文写手配置角色目标、能力方向、相关技能和后台执行提示词，再营销写邮件时会自动进入大模型上下文。
-            </Typography.Paragraph>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={8}>
-                <Typography.Text className="field-label">默认邮件写手技能</Typography.Text>
-                <Select value={defaultEmailWriter} options={enabledWriterSelectOptions} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
-              </Col>
-              <Col xs={24} md={8}>
-                <Typography.Text className="field-label">选择邮件写手</Typography.Text>
-                <Select value={selectedWriterKey} options={writerSelectOptions} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
-              </Col>
-              <Col xs={24} md={8}>
-                <div className="config-detail-card compact">
-                  <strong>邮件写手技能配置 · {selectedWriterForDetails?.name}</strong>
-                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.role_goal || selectedWriterForDetails?.best_for}</Typography.Paragraph>
-                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.capabilities || selectedWriterForDetails?.style}</Typography.Paragraph>
-                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.prompt_directive}</Typography.Paragraph>
-                  <Space wrap>{selectedWriterForDetails?.skills.map((skill) => <Tag key={skill}>{skill}</Tag>)}</Space>
-                  <Space wrap style={{ marginTop: 8 }}>{(selectedWriterForDetails?.tags ?? []).map((tag) => <Tag color="purple" key={tag}>{tag}</Tag>)}</Space>
-                  <Space wrap style={{ marginTop: 12 }}>
-                    <Button size="small" disabled={selectedWriterIndex < 0} onClick={() => selectedWriterIndex >= 0 && openEditWriter(selectedWriterIndex)}>编辑</Button>
-                    <Button size="small" danger disabled={selectedWriterIndex < 0} onClick={deleteSelectedWriter}>删除</Button>
-                  </Space>
+        <Row gutter={[20, 20]} className="writer-skill-layout">
+          <Col xs={24} xl={8}>
+            <Card title="写手列表" loading={loading} className="writer-skill-card">
+              <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                <div>
+                  <Typography.Text className="field-label">默认写手</Typography.Text>
+                  <Select value={defaultEmailWriter} options={enabledWriterSelectOptions} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
                 </div>
-              </Col>
-            </Row>
-          </Card>
-        </Space>
+                <div>
+                  <Typography.Text className="field-label">当前编辑写手</Typography.Text>
+                  <Select value={selectedWriterKey} options={writerSelectOptions} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
+                </div>
+                <div className="writer-role-list">
+                  {emailWriters.map((writer) => (
+                    <button
+                      type="button"
+                      key={writer.key}
+                      className={`writer-role-item${writer.key === selectedWriterKey ? " is-active" : ""}`}
+                      onClick={() => setSelectedWriterKey(writer.key)}
+                    >
+                      <span className="writer-role-main">
+                        <strong>{writer.name}</strong>
+                        <Tag color={writer.status === "disabled" ? "default" : "green"}>{writer.status === "disabled" ? "停用" : "启用"}</Tag>
+                      </span>
+                      <span className="writer-role-meta">{writer.best_for || writer.role_goal || "未配置适用场景"}</span>
+                    </button>
+                  ))}
+                </div>
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} xl={16}>
+            <Card loading={loading} className="writer-detail-card">
+              {selectedWriterForDetails ? (
+                <>
+                  <div className="writer-detail-title">
+                    <div>
+                      <Typography.Title level={3}>{selectedWriterForDetails.name}</Typography.Title>
+                      <Typography.Paragraph className="muted">{selectedWriterForDetails.style || "未配置写作风格"}</Typography.Paragraph>
+                    </div>
+                    <Space wrap>
+                      {defaultEmailWriter === selectedWriterForDetails.key ? <Tag color="purple">默认写手</Tag> : null}
+                      <Tag color={selectedWriterForDetails.status === "disabled" ? "default" : "green"}>{selectedWriterForDetails.status === "disabled" ? "停用" : "启用"}</Tag>
+                    </Space>
+                  </div>
+                  <div className="writer-detail-grid">
+                    <div className="writer-detail-block">
+                      <span>角色目标</span>
+                      <p>{selectedWriterForDetails.role_goal || "未配置"}</p>
+                    </div>
+                    <div className="writer-detail-block">
+                      <span>能力与技能方向</span>
+                      <p>{selectedWriterForDetails.capabilities || "未配置"}</p>
+                    </div>
+                    <div className="writer-detail-block">
+                      <span>适用场景</span>
+                      <p>{selectedWriterForDetails.best_for || "未配置"}</p>
+                    </div>
+                    <div className="writer-detail-block">
+                      <span>其他背景定义</span>
+                      <p>{selectedWriterForDetails.background || "未配置"}</p>
+                    </div>
+                    <div className="writer-detail-block full">
+                      <span>后台执行提示词</span>
+                      <p>{selectedWriterForDetails.prompt_directive || "未配置"}</p>
+                    </div>
+                    <div className="writer-detail-block full">
+                      <span>相关技能与标签</span>
+                      <Space wrap>
+                        {selectedWriterSkills.length ? selectedWriterSkills.map((skill) => <Tag key={skill}>{skill}</Tag>) : <Tag>未配置技能</Tag>}
+                        {selectedWriterTags.map((tag) => <Tag color="purple" key={tag}>{tag}</Tag>)}
+                      </Space>
+                    </div>
+                  </div>
+                  <div className="writer-detail-actions">
+                    <Button disabled={selectedWriterIndex < 0} onClick={() => selectedWriterIndex >= 0 && openEditWriter(selectedWriterIndex)}>编辑</Button>
+                    <Button danger disabled={selectedWriterIndex < 0} onClick={deleteSelectedWriter}>删除</Button>
+                  </div>
+                </>
+              ) : (
+                <Typography.Paragraph className="muted">暂无邮件写手，请先新增写手。</Typography.Paragraph>
+              )}
+            </Card>
+          </Col>
+        </Row>
       ) : null}
 
       {activeMenu === "audit" ? (

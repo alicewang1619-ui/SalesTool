@@ -73,6 +73,7 @@ const settingsMenuItems = [
   { key: "routing", label: "线索分发" },
   { key: "mail", label: "邮件接口" },
   { key: "ai", label: "AI 与模型" },
+  { key: "marketing", label: "营销技能" },
   { key: "audit", label: "配置审计" }
 ];
 
@@ -87,6 +88,8 @@ const sectionMenuMap: Record<string, string> = {
   mail: "mail",
   "product-knowledge": "ai",
   "ai-model": "ai",
+  "marketing-skills": "marketing",
+  "email-writers": "marketing",
   audit: "audit"
 };
 
@@ -682,7 +685,8 @@ export function SettingsPage() {
         emailWriters: cleanWriters,
         defaultEmailWriter
       });
-      setNotice(`AI 配置已保存：默认模型 ${saved.selected_label}，默认写手 ${saved.email_writers.find((writer) => writer.key === saved.default_email_writer)?.name ?? saved.default_email_writer}`);
+      const savedWriter = saved.email_writers.find((writer) => writer.key === saved.default_email_writer)?.name ?? saved.default_email_writer;
+      setNotice(activeMenu === "marketing" ? `营销技能已保存：默认邮件写手 ${savedWriter}` : `AI 与模型配置已保存：默认模型 ${saved.selected_label}，默认写手 ${savedWriter}`);
       await load();
     } catch (failure) {
       setError(asError(failure));
@@ -794,7 +798,7 @@ export function SettingsPage() {
     }
     Modal.confirm({
       title: "删除邮件写手？",
-      content: `将删除“${target.name}”。若它是默认写手，将自动切换到其他启用写手。删除后请点击“保存写手配置”生效。`,
+      content: `将删除“${target.name}”。若它是默认写手，将自动切换到其他启用写手。删除后请点击“保存营销技能”生效。`,
       okText: "删除写手",
       okType: "danger",
       cancelText: "取消",
@@ -804,7 +808,7 @@ export function SettingsPage() {
         setEmailWriters(nextWriters);
         setSelectedWriterKey(fallbackKey);
         setDefaultEmailWriter((current) => current === target.key ? fallbackKey : current);
-        setNotice("邮件写手已从当前草稿删除，请点击保存写手配置。");
+        setNotice("邮件写手已从当前草稿删除，请点击保存营销技能。");
       }
     });
   }
@@ -814,7 +818,7 @@ export function SettingsPage() {
       <div className="page-heading">
         <div>
           <Typography.Title level={2}>配置中心</Typography.Title>
-          <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、配置审计分组；点击菜单后只展示对应配置。</Typography.Paragraph>
+          <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、营销技能、配置审计分组；点击菜单后只展示对应配置。</Typography.Paragraph>
         </div>
       </div>
 
@@ -1047,32 +1051,6 @@ export function SettingsPage() {
               </Col>
             </Row>
           </Card>
-          <Card title="邮件写手角色" loading={loading} extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateWriter}>新增写手</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存写手配置</Button></Space>}>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={8}>
-                <Typography.Text className="field-label">默认邮件写手</Typography.Text>
-                <Select value={defaultEmailWriter} options={enabledWriterSelectOptions} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
-              </Col>
-              <Col xs={24} md={8}>
-                <Typography.Text className="field-label">角色下拉菜单</Typography.Text>
-                <Select value={selectedWriterKey} options={writerSelectOptions} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
-              </Col>
-              <Col xs={24} md={8}>
-                <div className="config-detail-card compact">
-                  <strong>{selectedWriterForDetails?.name}</strong>
-                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.role_goal || selectedWriterForDetails?.best_for}</Typography.Paragraph>
-                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.capabilities || selectedWriterForDetails?.style}</Typography.Paragraph>
-                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.prompt_directive}</Typography.Paragraph>
-                  <Space wrap>{selectedWriterForDetails?.skills.map((skill) => <Tag key={skill}>{skill}</Tag>)}</Space>
-                  <Space wrap style={{ marginTop: 8 }}>{(selectedWriterForDetails?.tags ?? []).map((tag) => <Tag color="purple" key={tag}>{tag}</Tag>)}</Space>
-                  <Space wrap style={{ marginTop: 12 }}>
-                    <Button size="small" disabled={selectedWriterIndex < 0} onClick={() => selectedWriterIndex >= 0 && openEditWriter(selectedWriterIndex)}>编辑</Button>
-                    <Button size="small" danger disabled={selectedWriterIndex < 0} onClick={deleteSelectedWriter}>删除</Button>
-                  </Space>
-                </div>
-              </Col>
-            </Row>
-          </Card>
           <Card title="产品与 AI 配置入口">
             <Row gutter={[16, 16]}>
               {knowledgeBaseLinks.map((item) => (
@@ -1089,6 +1067,44 @@ export function SettingsPage() {
                 <Link to="/admin/settings/product-knowledge">
                   <Button icon={<Plus size={16} />}>新增自定义知识库板块</Button>
                 </Link>
+              </Col>
+            </Row>
+          </Card>
+        </Space>
+      ) : null}
+
+      {activeMenu === "marketing" ? (
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Card
+            title="邮件写手技能配置"
+            loading={loading}
+            extra={<Space wrap><Button icon={<Plus size={16} />} onClick={openCreateWriter}>新增写手技能</Button><Button type="primary" icon={<Save size={16} />} loading={savingAIModel} onClick={() => void saveAIModel()}>保存营销技能</Button></Space>}
+          >
+            <Typography.Paragraph className="muted settings-section-note">
+              邮件写手是一套可复用的营销 Prompt 技能。这里按不同英文写手配置角色目标、能力方向、相关技能和后台执行提示词，再营销写邮件时会自动进入大模型上下文。
+            </Typography.Paragraph>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={8}>
+                <Typography.Text className="field-label">默认邮件写手技能</Typography.Text>
+                <Select value={defaultEmailWriter} options={enabledWriterSelectOptions} onChange={(value) => { setDefaultEmailWriter(value); setSelectedWriterKey(value); }} style={{ width: "100%" }} />
+              </Col>
+              <Col xs={24} md={8}>
+                <Typography.Text className="field-label">选择邮件写手</Typography.Text>
+                <Select value={selectedWriterKey} options={writerSelectOptions} onChange={setSelectedWriterKey} style={{ width: "100%" }} />
+              </Col>
+              <Col xs={24} md={8}>
+                <div className="config-detail-card compact">
+                  <strong>邮件写手技能配置 · {selectedWriterForDetails?.name}</strong>
+                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.role_goal || selectedWriterForDetails?.best_for}</Typography.Paragraph>
+                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.capabilities || selectedWriterForDetails?.style}</Typography.Paragraph>
+                  <Typography.Paragraph className="muted">{selectedWriterForDetails?.prompt_directive}</Typography.Paragraph>
+                  <Space wrap>{selectedWriterForDetails?.skills.map((skill) => <Tag key={skill}>{skill}</Tag>)}</Space>
+                  <Space wrap style={{ marginTop: 8 }}>{(selectedWriterForDetails?.tags ?? []).map((tag) => <Tag color="purple" key={tag}>{tag}</Tag>)}</Space>
+                  <Space wrap style={{ marginTop: 12 }}>
+                    <Button size="small" disabled={selectedWriterIndex < 0} onClick={() => selectedWriterIndex >= 0 && openEditWriter(selectedWriterIndex)}>编辑</Button>
+                    <Button size="small" danger disabled={selectedWriterIndex < 0} onClick={deleteSelectedWriter}>删除</Button>
+                  </Space>
+                </div>
               </Col>
             </Row>
           </Card>
@@ -1148,7 +1164,7 @@ export function SettingsPage() {
         </Form>
       </Modal>
 
-      <Modal title={editingWriterIndex === null ? "新增邮件写手" : "编辑邮件写手"} open={writerModalOpen} onCancel={() => setWriterModalOpen(false)} footer={null} destroyOnClose width={640}>
+      <Modal title={editingWriterIndex === null ? "新增邮件写手技能" : "编辑邮件写手技能"} open={writerModalOpen} onCancel={() => setWriterModalOpen(false)} footer={null} destroyOnClose width={640}>
         <Form form={writerForm} layout="vertical" onFinish={submitWriter}>
           <Form.Item name="key" label="角色 Key" rules={[{ required: true, min: 2 }]}><Input placeholder="例如 baymax" /></Form.Item>
           <Form.Item name="name" label="英文角色名" rules={[{ required: true, min: 2 }]}><Input placeholder="ReplyMirror" /></Form.Item>
@@ -1161,7 +1177,7 @@ export function SettingsPage() {
           <Form.Item name="style" label="风格" rules={[{ required: true, min: 4 }]}><Input.TextArea rows={2} placeholder="Reflective, precise, customer-led" /></Form.Item>
           <Form.Item name="best_for" label="适用场景" rules={[{ required: true, min: 2 }]}><Input.TextArea rows={2} /></Form.Item>
           <Form.Item name="status" label="状态" rules={[{ required: true }]}><Select options={[{ value: "enabled", label: "启用" }, { value: "disabled", label: "停用" }]} /></Form.Item>
-          <Button type="primary" htmlType="submit">保存角色</Button>
+          <Button type="primary" htmlType="submit">保存技能</Button>
         </Form>
       </Modal>
     </section>

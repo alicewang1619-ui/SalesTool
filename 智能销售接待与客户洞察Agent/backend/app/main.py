@@ -919,10 +919,18 @@ def create_active_feedback_link(db: Session, lead: Lead, owner: User) -> tuple[S
     return feedback_link, expires_at
 
 
-PROSPECTING_CHANNELS = {"Google", "LinkedIn", "Google Maps", "Manual"}
+PROSPECTING_CHANNELS = {"Google", "LinkedIn", "Google Maps", "Facebook", "Manual"}
 PROSPECT_STATUS_PENDING = "待确认"
 PROSPECT_STATUS_CONFIRMED = "已入库"
 PROSPECT_STATUS_DISCARDED = "已丢弃"
+PROSPECTING_PROFILE_FIELDS = [
+    ("industry_segments", "行业/机构"),
+    ("buyer_roles", "岗位/采购角色"),
+    ("company_types", "公司/渠道类型"),
+    ("use_cases", "应用场景"),
+    ("intent_keywords", "意图关键词"),
+    ("exclude_keywords", "排除条件"),
+]
 
 
 def clean_prospecting_channels(channels: list[str]) -> list[str]:
@@ -931,20 +939,55 @@ def clean_prospecting_channels(channels: list[str]) -> list[str]:
         value = channel.strip()
         if value in PROSPECTING_CHANNELS and value not in cleaned:
             cleaned.append(value)
-    return cleaned or ["Google", "LinkedIn", "Google Maps"]
+    return cleaned or ["Google", "LinkedIn", "Google Maps", "Facebook"]
+
+
+def clean_profile_terms(terms: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for term in terms:
+        value = str(term).strip()
+        if value and value not in cleaned:
+            cleaned.append(value[:80])
+    return cleaned[:8]
+
+
+def prospecting_profile_map(payload: ProspectingPlanCreateRequest) -> dict[str, list[str]]:
+    return {
+        key: clean_profile_terms(getattr(payload, key))
+        for key, _label in PROSPECTING_PROFILE_FIELDS
+    }
+
+
+def prospecting_profile_snapshot(payload: ProspectingPlanCreateRequest) -> str:
+    parts: list[str] = []
+    for key, label in PROSPECTING_PROFILE_FIELDS:
+        terms = clean_profile_terms(getattr(payload, key))
+        if terms:
+            parts.append(f"{label}: {', '.join(terms)}")
+    free_profile = payload.target_customer_profile.strip()
+    if free_profile:
+        parts.append(f"补充描述: {free_profile[:300]}")
+    return "；".join(parts) or "未配置画像"
+
+
+def prospecting_query_terms(plan: ProspectingPlan) -> list[str]:
+    terms: list[str] = []
+    profile_terms: list[str] = []
+    for segment in plan.target_customer_profile.replace("\n", "；").split("；"):
+        if ":" in segment:
+            segment = segment.split(":", 1)[1]
+        if "：" in segment:
+            segment = segment.split("：", 1)[1]
+        profile_terms.extend(segment.replace("，", ",").split(","))
+    for part in [plan.target_region, plan.product_focus, *profile_terms, plan.brand_name]:
+        value = part.strip()
+        if value and value not in terms:
+            terms.append(value)
+    return terms[:16]
 
 
 def prospecting_query(plan: ProspectingPlan) -> str:
-    return " ".join(
-        part
-        for part in [
-            plan.target_region,
-            plan.target_customer_profile,
-            plan.product_focus,
-            plan.brand_name,
-        ]
-        if part
-    )
+    return " ".join(prospecting_query_terms(plan))
 
 
 def prospecting_source_url(channel: str, query: str) -> str:
@@ -952,6 +995,8 @@ def prospecting_source_url(channel: str, query: str) -> str:
         return f"https://www.google.com/maps/search/{quote_plus(query)}"
     if channel == "LinkedIn":
         return "https://www.linkedin.com/search/results/companies/?" + urlencode({"keywords": query})
+    if channel == "Facebook":
+        return "https://www.facebook.com/search/pages/?" + urlencode({"q": query})
     if channel == "Manual":
         return "https://www.google.com/search?" + urlencode({"q": query})
     return "https://www.google.com/search?" + urlencode({"q": query})
@@ -992,14 +1037,15 @@ def prospecting_plan_out(db: Session, plan: ProspectingPlan) -> ProspectingPlanO
 
 def build_prospecting_strategy(payload: ProspectingPlanCreateRequest, channels: list[str]) -> tuple[str, str]:
     channel_text = "、".join(channels)
+    profile_snapshot = prospecting_profile_snapshot(payload)
     strategy = (
         f"围绕 {payload.brand_name} 的 {payload.product_focus}，优先寻找 {payload.target_region} "
-        f"市场中符合“{payload.target_customer_profile}”的机构。渠道侧重点：{channel_text}。"
+        f"市场中符合“{profile_snapshot}”的机构。渠道侧重点：{channel_text}。"
         "候选只作为公开搜索或授权归档入口，必须人工核验来源链接后入库。"
     )
     cadence = (
-        "第 1 天：按渠道打开来源链接并筛掉明显不匹配对象；"
-        "第 2 天：核验官网、公司简介和联系方式；"
+        "第 1 天：按画像关键词打开 Google / LinkedIn / Facebook / Maps 来源链接并筛掉明显不匹配对象；"
+        "第 2 天：核验官网、公司简介、采购角色和联系方式；"
         "第 3 天：确认入库高匹配候选并进入线索池/再营销。"
     )
     return strategy, cadence
@@ -1010,16 +1056,20 @@ def build_prospect_candidates(plan: ProspectingPlan, channels: list[str]) -> lis
     region = plan.target_region.strip() or "Global"
     product = plan.product_focus.strip() or "Ultrasound"
     customer_profile = plan.target_customer_profile.strip()
+    query_terms = prospecting_query_terms(plan)
+    persona_hint = " / ".join(query_terms[2:5]) if len(query_terms) > 2 else customer_profile[:80]
     names_by_channel = {
-        "Google": f"{region} {product} Distributor Prospect",
-        "LinkedIn": f"{region} Imaging Partner Prospect",
-        "Google Maps": f"{region} Clinic Network Prospect",
+        "Google": f"{region} {product} Search Prospect",
+        "LinkedIn": f"{region} LinkedIn Audience Prospect",
+        "Google Maps": f"{region} Maps Local Prospect",
+        "Facebook": f"{region} Facebook Page Audience Prospect",
         "Manual": f"{region} Manual Prospect",
     }
     label_by_channel = {
-        "Google": "Google 搜索入口",
-        "LinkedIn": "LinkedIn 公司搜索入口",
-        "Google Maps": "Google Maps 地图搜索入口",
+        "Google": "Google 画像搜索入口",
+        "LinkedIn": "LinkedIn 公司/人群搜索入口",
+        "Google Maps": "Google Maps 本地画像搜索入口",
+        "Facebook": "Facebook 主页/人群搜索入口",
         "Manual": "人工来源入口",
     }
     candidates: list[ProspectCandidate] = []
@@ -1036,8 +1086,8 @@ def build_prospect_candidates(plan: ProspectingPlan, channels: list[str]) -> lis
                 source_channel=channel,
                 source_label=source_label,
                 source_url=prospecting_source_url(channel, query),
-                source_note=f"来源渠道：{channel}；搜索关键词：{query}；需人工打开来源链接核验后入库。",
-                ai_match_reason=f"目标画像为“{customer_profile}”，与 {product} 的区域拓客方向匹配。",
+                source_note=f"来源渠道：{channel}；画像关键词：{query}；需人工打开来源链接核验后入库。",
+                ai_match_reason=f"目标画像包含“{persona_hint}”，与 {region} 的 {product} 拓客方向匹配。",
                 score_label="待确认",
                 status=PROSPECT_STATUS_PENDING,
             )
@@ -2242,12 +2292,18 @@ def create_prospecting_plan(
     user: User = Depends(require_admin_or_ops),
 ) -> ProspectingPlanOut:
     channels = clean_prospecting_channels(payload.channels)
+    profile_snapshot = prospecting_profile_snapshot(payload)
+    if profile_snapshot == "未配置画像":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error_detail("PROSPECT_PROFILE_REQUIRED", "Please configure at least one prospect persona field."),
+        )
     ai_strategy, cadence_plan = build_prospecting_strategy(payload, channels)
     plan = ProspectingPlan(
         brand_name=payload.brand_name.strip(),
         product_focus=payload.product_focus.strip(),
         target_region=payload.target_region.strip(),
-        target_customer_profile=payload.target_customer_profile.strip(),
+        target_customer_profile=profile_snapshot,
         channels_json=json.dumps(channels, ensure_ascii=False),
         ai_strategy=ai_strategy,
         cadence_plan=cadence_plan,

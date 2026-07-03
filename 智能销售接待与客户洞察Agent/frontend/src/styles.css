@@ -759,6 +759,11 @@ body {
   padding-inline: 0;
 }
 
+.prospecting-page .persona-card {
+  margin-bottom: 18px;
+  background: #fbfaff;
+}
+
 @media (max-width: 800px) {
   .side-nav {
     display: none;

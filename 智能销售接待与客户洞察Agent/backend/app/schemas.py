@@ -96,8 +96,14 @@ class ProspectingPlanCreateRequest(BaseModel):
     brand_name: str = Field(min_length=1, max_length=120)
     product_focus: str = Field(min_length=1, max_length=160)
     target_region: str = Field(min_length=1, max_length=120)
-    target_customer_profile: str = Field(min_length=1, max_length=500)
-    channels: list[str] = Field(default_factory=lambda: ["Google", "LinkedIn", "Google Maps"])
+    target_customer_profile: str = Field(default="", max_length=1000)
+    industry_segments: list[str] = Field(default_factory=list)
+    buyer_roles: list[str] = Field(default_factory=list)
+    company_types: list[str] = Field(default_factory=list)
+    use_cases: list[str] = Field(default_factory=list)
+    intent_keywords: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)
+    channels: list[str] = Field(default_factory=lambda: ["Google", "LinkedIn", "Google Maps", "Facebook"])
 
 
 class ProspectCandidateOut(BaseModel):

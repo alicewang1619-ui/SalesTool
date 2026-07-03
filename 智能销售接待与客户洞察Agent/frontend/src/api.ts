@@ -78,6 +78,12 @@ export type ProspectingPlanInput = {
   product_focus: string;
   target_region: string;
   target_customer_profile: string;
+  industry_segments: string[];
+  buyer_roles: string[];
+  company_types: string[];
+  use_cases: string[];
+  intent_keywords: string[];
+  exclude_keywords: string[];
   channels: string[];
 };
 

@@ -144,6 +144,25 @@
         border-radius: 999px;
         padding: 3px 10px;
       }
+      .persona-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 6px 0 14px;
+      }
+      .chip {
+        background: #f2efff;
+        color: #5b45f0;
+        border: 1px solid #d8ceff;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 13px;
+      }
     </style>
   </head>
   <body>
@@ -165,7 +184,7 @@
         </div>
         <section class="page">
           <h1>挖潜客</h1>
-          <p class="sub">根据品牌、区域和目标客户画像生成拓客方案；候选客户确认后进入线索池，并保留来源链接。</p>
+          <p class="sub">根据品牌、区域和平台式客户画像生成拓客方案；候选客户确认后进入线索池，并保留来源链接。</p>
           <div class="grid">
             <div class="card">
               <h2>拓客方案</h2>
@@ -173,13 +192,33 @@
               <input value="CHISON Portable Ultrasound" />
               <label>目标区域</label>
               <input value="Peru" />
-              <label>目标客户画像</label>
-              <textarea>区域医疗设备代理商、影像设备渠道商、移动诊所采购决策人。</textarea>
+              <label>目标客户画像（像 Facebook / LinkedIn Audience 一样配置）</label>
+              <div class="persona-grid">
+                <div>
+                  <span class="note">行业 / 机构</span>
+                  <div class="chips"><span class="chip">Medical device distributor</span><span class="chip">Imaging clinic</span></div>
+                </div>
+                <div>
+                  <span class="note">岗位 / 采购角色</span>
+                  <div class="chips"><span class="chip">Procurement manager</span><span class="chip">Clinic owner</span></div>
+                </div>
+                <div>
+                  <span class="note">应用场景</span>
+                  <div class="chips"><span class="chip">Mobile clinic</span><span class="chip">Regional ultrasound sales</span></div>
+                </div>
+                <div>
+                  <span class="note">意图关键词</span>
+                  <div class="chips"><span class="chip">portable ultrasound distributor</span><span class="chip">POCUS supplier</span></div>
+                </div>
+              </div>
+              <label>排除条件</label>
+              <input value="宠物诊所、二手设备、个人医生" />
               <label>拓客渠道</label>
               <select multiple>
                 <option selected>Google</option>
                 <option selected>LinkedIn</option>
                 <option selected>Google Maps</option>
+                <option selected>Facebook</option>
               </select>
               <button class="btn">生成拓客方案</button>
             </div>
@@ -188,7 +227,7 @@
               <div class="strategy">
                 <div>
                   <b>渠道策略</b>
-                  <p class="note">Google 找公开官网和经销商目录；LinkedIn 只作为公开公司搜索入口；Google Maps 补充本地诊所和经销点。</p>
+                  <p class="note">Google 找公开官网和经销商目录；LinkedIn/Facebook 按公司画像与关键词做人群搜索入口；Google Maps 补充本地诊所和经销点。</p>
                 </div>
                 <div>
                   <b>执行节奏</b>

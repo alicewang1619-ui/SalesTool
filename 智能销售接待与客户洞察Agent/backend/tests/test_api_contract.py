@@ -384,8 +384,14 @@ def prospecting_payload(region: str, channels: list[str] | None = None) -> dict[
         "brand_name": "CHISON Ultrasound",
         "product_focus": "Portable Ultrasound",
         "target_region": region,
-        "target_customer_profile": "区域医疗设备代理商、影像设备渠道商、移动诊所采购决策人",
-        "channels": channels or ["Google", "LinkedIn", "Google Maps"],
+        "industry_segments": ["Medical device distributor", "Imaging clinic"],
+        "buyer_roles": ["Procurement manager", "Clinic owner"],
+        "company_types": ["Regional distributor", "Imaging equipment channel"],
+        "use_cases": ["Mobile clinic", "Primary care imaging"],
+        "intent_keywords": ["portable ultrasound distributor", "POCUS supplier"],
+        "exclude_keywords": ["veterinary clinic", "used equipment"],
+        "target_customer_profile": "优先找能代理或采购便携超声的区域渠道。",
+        "channels": channels or ["Google", "LinkedIn", "Google Maps", "Facebook"],
     }
 
 
@@ -397,15 +403,30 @@ def test_prospecting_plan_generates_candidates_with_source_links(client: TestCli
     assert response.status_code == 201
     body = response.json()
     assert body["target_region"] == region
+    assert "行业/机构: Medical device distributor" in body["target_customer_profile"]
+    assert "岗位/采购角色: Procurement manager" in body["target_customer_profile"]
     assert "公开搜索" in body["ai_strategy"]
-    assert len(body["candidates"]) == 3
-    assert {item["source_channel"] for item in body["candidates"]} == {"Google", "LinkedIn", "Google Maps"}
+    assert len(body["candidates"]) == 4
+    assert {item["source_channel"] for item in body["candidates"]} == {"Google", "LinkedIn", "Google Maps", "Facebook"}
     assert all(item["source_url"].startswith("https://") for item in body["candidates"])
     assert all(region in item["source_note"] for item in body["candidates"])
+    assert all("portable ultrasound distributor" in item["source_note"] for item in body["candidates"])
 
     overview = client.get("/api/prospecting", headers=headers)
     assert overview.status_code == 200
-    assert overview.json()["metrics"]["pending_candidates"] >= 3
+    assert overview.json()["metrics"]["pending_candidates"] >= 4
+
+
+def test_prospecting_requires_customer_persona(client: TestClient) -> None:
+    payload = prospecting_payload(f"Prospectland-{uuid4().hex[:6]}", ["Google"])
+    for key in ["industry_segments", "buyer_roles", "company_types", "use_cases", "intent_keywords", "exclude_keywords"]:
+        payload[key] = []
+    payload["target_customer_profile"] = ""
+
+    response = client.post("/api/prospecting/plans", json=payload, headers=auth_headers(client))
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "PROSPECT_PROFILE_REQUIRED"
 
 
 def test_prospecting_candidate_confirm_creates_lead_with_source_trace(client: TestClient) -> None:
@@ -605,7 +626,7 @@ def test_customer_pool_lists_statuses_with_pagination_and_metrics(client: TestCl
     assert body["page_size"] == 2
     assert body["total"] >= 4
     assert len(body["items"]) == 2
-    assert {"高意向", "有效跟进", "资料库", "已转代理商"} <= {item["tier"] for item in client.get("/api/customers", params={"page_size": 20}, headers=headers).json()["items"]}
+    assert {"高意向", "有效跟进", "资料库", "已转代理商"} <= {item["tier"] for item in client.get("/api/customers", params={"page_size": 100}, headers=headers).json()["items"]}
     assert {"total_customers", "high_intent", "active_followup", "repository"} <= set(body["metrics"])
     first = body["items"][0]
     assert {"id", "name", "country", "customer_type", "product", "tier", "owner_name", "detail_path", "background_summary"} <= set(first)
@@ -616,7 +637,7 @@ def test_customer_pool_respects_sales_scope(client: TestClient) -> None:
     seed_customer_pool_variants()
     response = client.get(
         "/api/customers",
-        params={"page_size": 20},
+        params={"page_size": 100},
         headers=auth_headers(client, "maria@ultrasound-growth.local", "Sales123!"),
     )
 
@@ -628,7 +649,7 @@ def test_customer_pool_respects_sales_scope(client: TestClient) -> None:
 
 def test_customer_pool_detail_path_opens_real_customer_detail(client: TestClient) -> None:
     headers = auth_headers(client)
-    response = client.get("/api/customers", params={"page_size": 20}, headers=headers)
+    response = client.get("/api/customers", params={"page_size": 100}, headers=headers)
     target = next(item for item in response.json()["items"] if item["name"] == "GlobalMed Peru")
 
     detail = client.get(target["detail_path"].replace("/admin", "/api"), headers=headers)
@@ -2829,7 +2850,7 @@ def test_nurture_tasks_list_uses_persistent_prompt_context_and_pagination(client
 
 def test_customer_detail_can_create_nurture_task_with_score_summary(client: TestClient) -> None:
     headers = {**auth_headers(client), "x-trace-id": "customer-create-nurture-test"}
-    customers = client.get("/api/customers", headers=headers).json()["items"]
+    customers = client.get("/api/customers", params={"page_size": 100}, headers=headers).json()["items"]
     customer = next(item for item in customers if item["name"] == "GlobalMed Peru")
 
     detail = client.get(f"/api/customers/{customer['id']}", headers=headers)
@@ -3312,7 +3333,7 @@ def test_sales_user_can_access_only_scoped_nurture_tasks(client: TestClient) -> 
 
 
 def first_customer_for_signal(client: TestClient, headers: dict[str, str]) -> dict:
-    response = client.get("/api/customers", params={"page_size": 20}, headers=headers)
+    response = client.get("/api/customers", params={"page_size": 100}, headers=headers)
     assert response.status_code == 200
     return next(item for item in response.json()["items"] if item["name"] == "GlobalMed Peru")
 

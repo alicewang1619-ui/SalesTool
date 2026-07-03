@@ -17,8 +17,18 @@ const channelOptions = [
   { value: "Google", label: "Google" },
   { value: "LinkedIn", label: "LinkedIn" },
   { value: "Google Maps", label: "Google Maps" },
-  { value: "Manual", label: "Manual" }
+  { value: "Facebook", label: "Facebook" },
+  { value: "Manual", label: "人工来源" }
 ];
+
+const personaExamples = {
+  industry_segments: ["Medical device distributor", "Imaging clinic", "Hospital procurement"],
+  buyer_roles: ["Procurement manager", "Clinic owner", "Distributor owner"],
+  company_types: ["Regional distributor", "Imaging equipment channel", "Mobile clinic operator"],
+  use_cases: ["Portable ultrasound sales", "POCUS deployment", "Primary care imaging"],
+  intent_keywords: ["portable ultrasound distributor", "POCUS supplier", "ultrasound clinic equipment"],
+  exclude_keywords: ["veterinary clinic", "used equipment", "consumer electronics"]
+};
 
 const statusColor: Record<string, string> = {
   待确认: "purple",
@@ -29,6 +39,10 @@ const statusColor: Record<string, string> = {
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   return new Date(value).toLocaleString();
+}
+
+function trimList(values?: string[]): string[] {
+  return (values ?? []).map((value) => value.trim()).filter(Boolean);
 }
 
 export function ProspectingPage() {
@@ -48,7 +62,7 @@ export function ProspectingPage() {
       const result = await fetchProspectingOverview();
       setOverview(result);
     } catch (failure) {
-      message.error(failure instanceof Error ? failure.message : "加载挖潜客数据失败");
+      message.error(failure instanceof Error ? failure.message : "加载挖潜客数据失败，请确认后端服务已重启到最新版本");
     } finally {
       setLoading(false);
     }
@@ -60,16 +74,23 @@ export function ProspectingPage() {
 
   const handleCreate = async () => {
     const values = await form.validateFields();
+    const payload: ProspectingPlanInput = {
+      brand_name: values.brand_name.trim(),
+      product_focus: values.product_focus.trim(),
+      target_region: values.target_region.trim(),
+      target_customer_profile: values.target_customer_profile?.trim() ?? "",
+      industry_segments: trimList(values.industry_segments),
+      buyer_roles: trimList(values.buyer_roles),
+      company_types: trimList(values.company_types),
+      use_cases: trimList(values.use_cases),
+      intent_keywords: trimList(values.intent_keywords),
+      exclude_keywords: trimList(values.exclude_keywords),
+      channels: values.channels?.length ? values.channels : ["Google", "LinkedIn", "Google Maps", "Facebook"]
+    };
     setCreating(true);
     try {
-      await createProspectingPlan({
-        brand_name: values.brand_name.trim(),
-        product_focus: values.product_focus.trim(),
-        target_region: values.target_region.trim(),
-        target_customer_profile: values.target_customer_profile.trim(),
-        channels: values.channels?.length ? values.channels : ["Google", "LinkedIn", "Google Maps"]
-      });
-      message.success("已生成拓客方案和候选潜客");
+      await createProspectingPlan(payload);
+      message.success("已按客户画像生成拓客方案和候选潜客");
       await loadOverview();
     } catch (failure) {
       message.error(failure instanceof Error ? failure.message : "生成拓客方案失败");
@@ -107,19 +128,19 @@ export function ProspectingPage() {
 
   const columns: ColumnsType<ProspectCandidate> = [
     {
-      title: "候选客户",
+      title: "候选潜客",
       dataIndex: "company_name",
       key: "company_name",
-      width: 220,
+      width: 240,
       render: (value: string, record) => (
         <Space direction="vertical" size={2}>
           <Typography.Text strong>{value}</Typography.Text>
-          <Typography.Text type="secondary">{record.organization || "待核验单位"}</Typography.Text>
+          <Typography.Text type="secondary">{record.organization || "待人工核验单位"}</Typography.Text>
         </Space>
       )
     },
     {
-      title: "国家",
+      title: "国家/区域",
       dataIndex: "country",
       key: "country",
       width: 120
@@ -127,7 +148,7 @@ export function ProspectingPage() {
     {
       title: "来源",
       key: "source",
-      width: 180,
+      width: 190,
       render: (_, record) => (
         <Space direction="vertical" size={2}>
           <Tag color="purple">{record.source_channel}</Tag>
@@ -150,12 +171,14 @@ export function ProspectingPage() {
       title: "来源说明",
       dataIndex: "source_note",
       key: "source_note",
+      width: 320,
       ellipsis: true
     },
     {
       title: "AI 匹配理由",
       dataIndex: "ai_match_reason",
       key: "ai_match_reason",
+      width: 260,
       ellipsis: true
     },
     {
@@ -202,7 +225,7 @@ export function ProspectingPage() {
         <div>
           <Typography.Title level={2}>挖潜客</Typography.Title>
           <Typography.Paragraph className="muted">
-            根据品牌、区域和目标客户画像生成拓客方案；候选客户确认后进入线索池，并保留来源链接。
+            像配置 Facebook / LinkedIn Audience 一样定义客户画像，系统按画像生成渠道搜索入口和候选潜客；确认后再进入线索池。
           </Typography.Paragraph>
         </div>
         <Button icon={<RefreshCw size={16} />} onClick={() => void loadOverview()} loading={loading}>
@@ -234,7 +257,7 @@ export function ProspectingPage() {
       </Row>
 
       <Row gutter={[16, 16]} className="section-grid">
-        <Col xs={24} lg={10}>
+        <Col xs={24} lg={11}>
           <Card title="拓客方案">
             <Form
               form={form}
@@ -243,33 +266,67 @@ export function ProspectingPage() {
                 brand_name: "CHISON Ultrasound",
                 product_focus: "Portable Ultrasound",
                 target_region: "Peru",
-                target_customer_profile: "区域医疗设备代理商、影像设备渠道商、移动诊所采购决策人",
-                channels: ["Google", "LinkedIn", "Google Maps"]
+                industry_segments: ["Medical device distributor", "Imaging clinic"],
+                buyer_roles: ["Procurement manager", "Clinic owner"],
+                company_types: ["Regional distributor", "Imaging equipment channel"],
+                use_cases: ["Mobile clinic", "Primary care imaging"],
+                intent_keywords: ["portable ultrasound distributor", "POCUS supplier"],
+                exclude_keywords: ["veterinary clinic", "used equipment"],
+                target_customer_profile: "优先找能代理或采购便携超声的区域渠道，不找个人医生或二手设备卖家。",
+                channels: ["Google", "LinkedIn", "Google Maps", "Facebook"]
               }}
             >
-              <Form.Item name="brand_name" label="品牌" rules={[{ required: true, message: "请填写品牌" }]}>
-                <Input placeholder="例如 CHISON Ultrasound" />
-              </Form.Item>
-              <Form.Item name="product_focus" label="产品侧重点" rules={[{ required: true, message: "请填写产品侧重点" }]}>
-                <Input placeholder="例如 Portable Ultrasound" />
-              </Form.Item>
+              <Row gutter={12}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="brand_name" label="品牌" rules={[{ required: true, message: "请填写品牌" }]}>
+                    <Input placeholder="例如 CHISON Ultrasound" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="product_focus" label="产品侧重点" rules={[{ required: true, message: "请填写产品侧重点" }]}>
+                    <Input placeholder="例如 Portable Ultrasound" />
+                  </Form.Item>
+                </Col>
+              </Row>
               <Form.Item name="target_region" label="目标区域" rules={[{ required: true, message: "请填写目标区域" }]}>
                 <Input placeholder="例如 Peru / UAE / Southeast Asia" />
               </Form.Item>
-              <Form.Item name="target_customer_profile" label="目标客户画像" rules={[{ required: true, message: "请填写目标客户画像" }]}>
-                <Input.TextArea rows={4} placeholder="例如区域代理商、医院采购、影像设备渠道商" />
+
+              <Card size="small" title="客户画像（Audience Profile）" className="persona-card">
+                <Form.Item name="industry_segments" label="行业 / 机构类型" rules={[{ required: true, message: "请至少填写一个行业或机构类型" }]}>
+                  <Select mode="tags" tokenSeparators={[",", "，"]} options={personaExamples.industry_segments.map((value) => ({ value }))} />
+                </Form.Item>
+                <Form.Item name="buyer_roles" label="岗位 / 采购角色" rules={[{ required: true, message: "请至少填写一个岗位或采购角色" }]}>
+                  <Select mode="tags" tokenSeparators={[",", "，"]} options={personaExamples.buyer_roles.map((value) => ({ value }))} />
+                </Form.Item>
+                <Form.Item name="company_types" label="公司规模 / 渠道类型">
+                  <Select mode="tags" tokenSeparators={[",", "，"]} options={personaExamples.company_types.map((value) => ({ value }))} />
+                </Form.Item>
+                <Form.Item name="use_cases" label="应用场景">
+                  <Select mode="tags" tokenSeparators={[",", "，"]} options={personaExamples.use_cases.map((value) => ({ value }))} />
+                </Form.Item>
+                <Form.Item name="intent_keywords" label="意图关键词" rules={[{ required: true, message: "请至少填写一个搜索或意图关键词" }]}>
+                  <Select mode="tags" tokenSeparators={[",", "，"]} options={personaExamples.intent_keywords.map((value) => ({ value }))} />
+                </Form.Item>
+                <Form.Item name="exclude_keywords" label="排除条件">
+                  <Select mode="tags" tokenSeparators={[",", "，"]} options={personaExamples.exclude_keywords.map((value) => ({ value }))} />
+                </Form.Item>
+              </Card>
+
+              <Form.Item name="target_customer_profile" label="补充说明">
+                <Input.TextArea rows={3} placeholder="例如：优先区域代理商和采购决策人，不找宠物诊所、二手设备或个人医生。" />
               </Form.Item>
               <Form.Item name="channels" label="拓客渠道" rules={[{ required: true, message: "请选择拓客渠道" }]}>
                 <Select mode="multiple" options={channelOptions} />
               </Form.Item>
               <Button type="primary" icon={<Search size={16} />} loading={creating} onClick={() => void handleCreate()}>
-                生成拓客方案
+                按画像生成拓客方案
               </Button>
             </Form>
           </Card>
         </Col>
 
-        <Col xs={24} lg={14}>
+        <Col xs={24} lg={13}>
           <Card title="AI 拓客方案与渠道节奏">
             {latestPlan ? (
               <Space direction="vertical" size={16} className="full-width">
@@ -283,10 +340,13 @@ export function ProspectingPage() {
                 </Space>
                 <Typography.Paragraph>{latestPlan.ai_strategy}</Typography.Paragraph>
                 <Typography.Paragraph className="muted">{latestPlan.cadence_plan}</Typography.Paragraph>
+                <Card size="small" title="本次客户画像快照">
+                  <Typography.Paragraph className="muted">{latestPlan.target_customer_profile}</Typography.Paragraph>
+                </Card>
                 <Typography.Text type="secondary">最近生成：{formatDate(latestPlan.created_at)}</Typography.Text>
               </Space>
             ) : (
-              <Empty description="还没有拓客方案，先填写左侧表单生成一批候选潜客。" />
+              <Empty description="还没有拓客方案，先按左侧客户画像生成一批候选潜客。" />
             )}
           </Card>
         </Col>
@@ -298,7 +358,7 @@ export function ProspectingPage() {
           loading={loading}
           columns={columns}
           dataSource={overview?.candidates ?? []}
-          scroll={{ x: 1360 }}
+          scroll={{ x: 1480 }}
           pagination={{ pageSize: 10, showSizeChanger: true }}
           locale={{ emptyText: <Empty description="暂无候选潜客" /> }}
         />

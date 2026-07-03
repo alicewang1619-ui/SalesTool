@@ -88,6 +88,7 @@ const sectionMenuMap: Record<string, string> = {
   mail: "mail",
   "product-knowledge": "ai",
   "ai-model": "ai",
+  marketing: "marketing",
   "marketing-skills": "marketing",
   "email-writers": "marketing",
   audit: "audit"

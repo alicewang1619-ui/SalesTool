@@ -17,7 +17,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { ArrowLeft, BookOpen, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchProductKnowledge,
   fetchProductKnowledgeContext,
@@ -64,6 +64,7 @@ function knowledgeBaseLabel(value: string) {
 
 export function ProductKnowledgePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm<ProductKnowledgeFormValues>();
   const [data, setData] = useState<ProductKnowledgePageResult | null>(null);
@@ -78,6 +79,7 @@ export function ProductKnowledgePage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const isSelectedDefaultBase = defaultKnowledgeBaseKeys.has(selectedBaseKey);
+  const openedFromSettings = location.pathname.startsWith("/admin/settings");
 
   const productTypeOptions = useMemo(() => {
     const values = new Set((data?.items ?? []).map((item) => item.product_type));
@@ -264,13 +266,15 @@ export function ProductKnowledgePage() {
         <div>
           <Typography.Title level={2}>知识库管理</Typography.Title>
           <Typography.Paragraph className="muted">
-            维护产品、竞品、市场等不同知识库板块；启用版本进入 AI 上下文，停用版本保留审计和历史引用。
+            维护产品、竞品、市场等不同知识库板块；写邮件和再营销生成时会按场景读取启用知识作为 AI 上下文。
           </Typography.Paragraph>
         </div>
         <Space wrap>
-          <Button icon={<ArrowLeft size={16} />} onClick={() => navigate("/admin/settings?section=ai-model")}>
-            返回设置中心
-          </Button>
+          {openedFromSettings ? (
+            <Button icon={<ArrowLeft size={16} />} onClick={() => navigate("/admin/settings?section=ai")}>
+              返回设置中心
+            </Button>
+          ) : null}
           <Button icon={<RefreshCw size={16} />} onClick={() => void load()}>
             刷新
           </Button>

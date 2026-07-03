@@ -1,5 +1,5 @@
 import { Layout, Menu, Typography } from "antd";
-import { BarChart3, CircleUserRound, ClipboardList, Database, Home, Send, Settings, UsersRound, WandSparkles } from "lucide-react";
+import { BarChart3, BookOpen, CircleUserRound, ClipboardList, Database, Home, Send, Settings, UsersRound, WandSparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, fetchMe, getToken } from "../api";
@@ -13,7 +13,8 @@ const navItems = [
   { key: "/admin/assignments/pending", icon: <ClipboardList size={18} />, label: "待分配", roles: ["admin", "ops"] },
   { key: "/admin/customers", icon: <UsersRound size={18} />, label: "客户池", roles: ["admin", "ops", "sales"] },
   { key: "/admin/nurture", icon: <Send size={18} />, label: "再营销", roles: ["admin", "ops", "sales"] },
-  { key: "/admin/settings?section=marketing", icon: <WandSparkles size={18} />, label: "营销技能", roles: ["admin", "ops"] },
+  { key: "/admin/marketing-skills", icon: <WandSparkles size={18} />, label: "营销技能", roles: ["admin", "ops"] },
+  { key: "/admin/knowledge-base", icon: <BookOpen size={18} />, label: "知识库", roles: ["admin", "ops"] },
   { key: "/admin/reports", icon: <BarChart3 size={18} />, label: "报表", roles: ["admin", "ops"] },
   { key: "/admin/settings", icon: <Settings size={18} />, label: "配置", roles: ["admin", "ops"] },
   { key: "/admin/me", icon: <CircleUserRound size={18} />, label: "我的", roles: ["admin", "ops", "sales"] }
@@ -53,7 +54,7 @@ export function AppShell() {
   const salesRestricted =
     user?.role === "sales" &&
     !location.pathname.startsWith("/admin/forbidden") &&
-    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/customer-signals"].some((path) =>
+    ["/admin/settings", "/admin/reports", "/admin/assignments", "/admin/customer-signals", "/admin/marketing-skills", "/admin/knowledge-base"].some((path) =>
       location.pathname.startsWith(path)
     );
 
@@ -74,15 +75,17 @@ export function AppShell() {
         ? "/admin/customers"
         : location.pathname.startsWith("/admin/nurture")
           ? "/admin/nurture"
-          : location.pathname.startsWith("/admin/reports")
-            ? "/admin/reports"
-            : location.pathname.startsWith("/admin/settings")
-              ? new URLSearchParams(location.search).get("section") === "marketing"
-                ? "/admin/settings?section=marketing"
-                : "/admin/settings"
-              : location.pathname.startsWith("/admin/me")
-                ? "/admin/me"
-                : location.pathname;
+          : location.pathname.startsWith("/admin/marketing-skills")
+            ? "/admin/marketing-skills"
+            : location.pathname.startsWith("/admin/knowledge-base") || location.pathname.startsWith("/admin/settings/product-knowledge")
+              ? "/admin/knowledge-base"
+              : location.pathname.startsWith("/admin/reports")
+                ? "/admin/reports"
+                : location.pathname.startsWith("/admin/settings")
+                  ? "/admin/settings"
+                  : location.pathname.startsWith("/admin/me")
+                    ? "/admin/me"
+                    : location.pathname;
 
   return (
     <Layout className="app-shell" aria-busy={sessionState === "checking"}>

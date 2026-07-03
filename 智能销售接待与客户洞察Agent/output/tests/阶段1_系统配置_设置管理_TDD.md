@@ -98,3 +98,9 @@
 ## 2026-07-02 信息型蓝框清理验收
 - SETTINGS-INFO-UI-01：设置总览、Banner 建议、客户来源维护说明、邮件接口用途和 AI 场景说明不使用蓝色 `info` Alert。
 - SETTINGS-INFO-UI-02：设置页仍允许 success/error/warning 状态提示；普通说明改为灰色辅助文案或控件旁提示。
+## 2026-07-03 最新验收：设置中心不承载营销技能和知识库
+- SETTINGS-NAV-SPLIT-01：配置中心顶部 Tab 不出现“营销技能”，总览页和 AI 与模型页不出现邮件写手配置。
+- SETTINGS-NAV-SPLIT-02：配置中心 AI 与模型 Tab 不出现产品/竞品/市场知识库入口卡，只展示模型场景绑定和大模型连接配置。
+- SETTINGS-NAV-SPLIT-03：管理员/运营左侧主导航可见“营销技能”，点击进入 `/admin/marketing-skills`，页面只展示邮件写手配置独立视图。
+- SETTINGS-NAV-SPLIT-04：管理员/运营左侧主导航可见“知识库”，点击进入 `/admin/knowledge-base`，页面可维护产品、竞品、市场和自定义知识库板块。
+- SETTINGS-NAV-SPLIT-05：销售账号看不到“营销技能”和“知识库”入口，直接访问对应路由被权限拦截。

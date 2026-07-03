@@ -44,6 +44,8 @@ const router = createBrowserRouter([
       { path: "customer-signals", element: <Navigate to="/admin/customers" replace /> },
       { path: "nurture", element: <NurtureTasksPage /> },
       { path: "nurture/:taskId", element: <NurtureTaskDetailPage /> },
+      { path: "marketing-skills", element: <SettingsPage standaloneSection="marketing" /> },
+      { path: "knowledge-base", element: <ProductKnowledgePage /> },
       { path: "reports", element: <ReportsHomePage /> },
       { path: "reports/period", element: <ReportsPeriodPage /> },
       { path: "reports/metrics", element: <ReportsMetricsPage /> },

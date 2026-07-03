@@ -73,7 +73,6 @@ const settingsMenuItems = [
   { key: "routing", label: "线索分发" },
   { key: "mail", label: "邮件接口" },
   { key: "ai", label: "AI 与模型" },
-  { key: "marketing", label: "营销技能" },
   { key: "audit", label: "配置审计" }
 ];
 
@@ -86,11 +85,7 @@ const sectionMenuMap: Record<string, string> = {
   channels: "routing",
   reminders: "routing",
   mail: "mail",
-  "product-knowledge": "ai",
   "ai-model": "ai",
-  marketing: "marketing",
-  "marketing-skills": "marketing",
-  "email-writers": "marketing",
   audit: "audit"
 };
 
@@ -110,12 +105,6 @@ const fallbackWriters: EmailWriterRole[] = [
   { key: "reply_mirror", name: "ReplyMirror", display_name: "ReplyMirror", style: "Reflective, precise, customer-led", skills: ["Customer email reply", "Intent reflection", "Follow-up CTA"], best_for: "Replying to existing inquiries", capabilities: "Mirror customer intent and turn scattered inquiry context into a clear response.", role_goal: "Write a natural reply that clarifies the next step.", background: "Best for customer replies after an inquiry or follow-up.", tags: ["reply", "mirror-customer-intent"], prompt_directive: "Write as ReplyMirror. First mirror the customer's implied need, then answer calmly, then ask one narrow confirmation question.", status: "enabled" },
   { key: "mario", name: "Mario", display_name: "Mario", style: "Energetic, direct, momentum-building", skills: ["Sales follow-up", "Decision push"], best_for: "Active follow-up and decision momentum", capabilities: "Move a conversation toward a clear next step.", role_goal: "Help the customer make a concrete decision.", background: "Best for stalled deals after quote or product comparison.", tags: ["action", "sales-follow-up"], prompt_directive: "Write as Mario. Be energetic and direct, summarize the decision path, and end with a decisive next-step CTA.", status: "enabled" },
   { key: "baymax", name: "Baymax", display_name: "Baymax", style: "Steady, professional, reliable", skills: ["Formal email", "Medical customer communication", "Technical explanation"], best_for: "Formal medical customer communication", capabilities: "Turn technical points into credible commercial language.", role_goal: "Provide a reliable reply with compliance boundaries.", background: "Best for hospitals and technical discussions.", tags: ["formal", "medical", "technical"], prompt_directive: "Write as Baymax. Use a professional medical-device structure, focus on workflow and technical fit, and keep compliance-safe boundaries.", status: "enabled" }
-];
-
-const knowledgeBaseLinks = [
-  { key: "product", label: "产品知识库", description: "维护型号、应用场景和 AI 接待知识。" },
-  { key: "competitor", label: "竞品知识库", description: "沉淀竞品对比、优势差异和销售话术。" },
-  { key: "market", label: "市场知识库", description: "整理国家市场、渠道趋势和区域策略。" }
 ];
 
 const fallbackAIModelConfig: AIModelConfig = {
@@ -234,14 +223,18 @@ function readBannerImage(file: File): Promise<{ url: string; meta: BannerImageMe
   });
 }
 
-export function SettingsPage() {
+type SettingsPageProps = {
+  standaloneSection?: "marketing";
+};
+
+export function SettingsPage({ standaloneSection }: SettingsPageProps = {}) {
   const [searchParams] = useSearchParams();
   const [accountForm] = Form.useForm<AccountFormValues>();
   const [modelForm] = Form.useForm<AIModelOption & { apiKey?: string }>();
   const [writerForm] = Form.useForm<EmailWriterRole & { skillsText?: string; tagsText?: string }>();
   const [useCaseForm] = Form.useForm<AIModelUseCase>();
   const [overview, setOverview] = useState<SettingsOverview | null>(null);
-  const [activeMenu, setActiveMenu] = useState(sectionMenuMap[searchParams.get("section") ?? ""] ?? "overview");
+  const [activeMenu, setActiveMenu] = useState(standaloneSection ?? sectionMenuMap[searchParams.get("section") ?? ""] ?? "overview");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -360,9 +353,13 @@ export function SettingsPage() {
   }, []);
 
   useEffect(() => {
+    if (standaloneSection) {
+      setActiveMenu(standaloneSection);
+      return;
+    }
     const section = searchParams.get("section");
     setActiveMenu(section ? sectionMenuMap[section] ?? "overview" : "overview");
-  }, [searchParams]);
+  }, [searchParams, standaloneSection]);
 
   useEffect(() => {
     if (currentPermission) setPermissionValues(currentPermission.permissions);
@@ -814,7 +811,7 @@ export function SettingsPage() {
     });
   }
 
-  const isMarketingOnlyView = activeMenu === "marketing";
+  const isMarketingOnlyView = standaloneSection === "marketing";
   const selectedWriterSkills = selectedWriterForDetails?.skills ?? [];
   const selectedWriterTags = selectedWriterForDetails?.tags ?? [];
   const marketingActions = (
@@ -840,7 +837,7 @@ export function SettingsPage() {
         <div className="page-heading">
           <div>
             <Typography.Title level={2}>配置中心</Typography.Title>
-            <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、配置审计分组；点击菜单后只展示对应配置。</Typography.Paragraph>
+            <Typography.Paragraph className="muted">顶部菜单按账号权限、Banner、线索分发、邮件接口、AI 与模型、配置审计分组；营销技能和知识库已放到左侧独立菜单，点击后只展示对应业务页面。</Typography.Paragraph>
           </div>
         </div>
       )}
@@ -1071,25 +1068,6 @@ export function SettingsPage() {
                     <Button size="small" danger disabled={selectedModelIndex < 0} onClick={deleteSelectedModel}>删除</Button>
                   </Space>
                 </div>
-              </Col>
-            </Row>
-          </Card>
-          <Card title="产品与 AI 配置入口">
-            <Row gutter={[16, 16]}>
-              {knowledgeBaseLinks.map((item) => (
-                <Col xs={24} md={8} key={item.key}>
-                  <Link to={`/admin/settings/product-knowledge?knowledge_base=${item.key}`}>
-                    <Card size="small" hoverable className="settings-entry-card">
-                      <Typography.Text strong>{item.label}</Typography.Text>
-                      <Typography.Paragraph className="muted" style={{ marginTop: 8, marginBottom: 0 }}>{item.description}</Typography.Paragraph>
-                    </Card>
-                  </Link>
-                </Col>
-              ))}
-              <Col xs={24}>
-                <Link to="/admin/settings/product-knowledge">
-                  <Button icon={<Plus size={16} />}>新增自定义知识库板块</Button>
-                </Link>
               </Col>
             </Row>
           </Card>
